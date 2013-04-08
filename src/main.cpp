@@ -3,7 +3,8 @@
 
 void foo()
 {
-	int tmp = 0;
+   int tmp = 0;
+   int tmp2 = 1;
 }
 
 int main(int argc, char* argv[] )
