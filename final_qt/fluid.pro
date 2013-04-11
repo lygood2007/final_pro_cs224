@@ -21,6 +21,7 @@ SOURCES += main.cpp\
     camera.cpp \
     common/CS123Matrix.inl \
     common/CS123Vector.inl \
+    fluid.cpp
 
 HEADERS  += mainwindow.h \
     glwidget.h \
@@ -30,7 +31,8 @@ HEADERS  += mainwindow.h \
     common/vector.h \
     common/CS123Algebra.h \
     common/vector.h \
-    common/CS123Common.h
+    common/CS123Common.h \
+    fluid.h
 
 OTHER_FILES += cuda/test.cu
 CUDA_SOURCES += cuda/test.cu
