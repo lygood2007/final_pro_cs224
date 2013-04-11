@@ -331,10 +331,10 @@ void Terrain::draw() const
     glBegin(GL_QUADS);
     glNormal3f(0.f,1.f,0.f);
     glColor3f(0.3f,0.3f,1.f);
-    glVertex3f(-10,2,-10);
-    glVertex3f(-10,2,10);
-    glVertex3f(10,2,10);
-    glVertex3f(10,2,-10);
+    glVertex3f(-10,4,-10);
+    glVertex3f(-10,4,10);
+    glVertex3f(10,4,10);
+    glVertex3f(10,4,-10);
     glEnd();
     glDisable(GL_BLEND);
     drawNormals();
