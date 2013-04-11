@@ -6,21 +6,34 @@
 
 QT       += core gui opengl
 
-TARGET = videofilters
+TARGET = fluid
 TEMPLATE = app
 
+INCLUDEPATH += common \
+
+DEPENDPATH += common \
 
 SOURCES += main.cpp\
         mainwindow.cpp \
     glwidget.cpp \
+    textureloader.cpp \
+    terrain.cpp \
+    camera.cpp \
+    common/CS123Matrix.inl \
+    common/CS123Vector.inl \
 
 HEADERS  += mainwindow.h \
-    glwidget.h
+    glwidget.h \
+    textureloader.h \
+    terrain.h \
+    camera.h \
+    common/vector.h \
+    common/CS123Algebra.h \
+    common/vector.h \
+    common/CS123Common.h
 
-OTHER_FILES += test.cu
-CUDA_SOURCES += test.cu
-
-
+OTHER_FILES += cuda/test.cu
+CUDA_SOURCES += cuda/test.cu
 
 # you shouldn't have to change anything under this line
 
@@ -62,3 +75,7 @@ cuda.depend_command = $$CUDA_DIR/bin/nvcc -g -G -M $$CUDA_INC $$NVCCFLAGS ${QMAK
 QMAKE_EXTRA_COMPILERS += cuda
 
 FORMS    += mainwindow.ui
+
+#unix|win32: LIBS += -lGLU -lglut
+
+unix:!macx:!symbian: LIBS += -lGLU -lglut

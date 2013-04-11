@@ -47,13 +47,14 @@ void testVector() {
 
         // Invoke kernel
         int threadsPerBlock = 256;
-//        int blocksPerGrid = (N + threadsPerBlock - 1)/(threadsPerBlock);
         int blocksPerGrid = (N+threadsPerBlock-1)/threadsPerBlock;
         VecAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, N);
 
         // Copy result from device memory to host memory
         // h_C contains the result in host memory
         cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
+
+     //   assert( d_A[0]+d_B[0] == d_C[0]&&"Cuda is not running or has problems" );
 
         fflush(stdin);
         fflush(stdout);
