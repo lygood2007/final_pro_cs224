@@ -1,3 +1,10 @@
+/** main.cpp
+ ** Brief: This is the source file of the main function, which defines the entrance of program.
+ ** Project: large-scale fluids
+ ** Date: 04/10/2013
+ ** Member: Scott, Hobarts, Yan Li
+ **/
+
 #include <QtGui/QApplication>
 #include "mainwindow.h"
 
