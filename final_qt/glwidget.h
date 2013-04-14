@@ -21,6 +21,10 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
+//added by hcreynol
+#define USE_HEIGHTMAP
+#define HEIGHTMAP_FILENAME "./aaa.jpg"
+
 class GLWidget : public QGLWidget
 {
     Q_OBJECT

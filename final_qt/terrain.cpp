@@ -16,6 +16,11 @@ Terrain::Terrain( const int decay, const float roughness, const int depth, const
     init(decay, roughness, depth, renderNormals);
 }
 
+Terrain::Terrain(QString filename){
+    m_filename = filename;
+    init();
+}
+
 Terrain::~Terrain()
 {
     if( m_normals )
@@ -255,6 +260,74 @@ void Terrain::populateTerrain()
     subdivideSquare(tlg, brg, m_depth);
 }
 
+void Terrain::populateTerrainFromHeightmap(){
+    //@TODO write this code
+
+    //get the file
+    QFile file(m_filename);
+    assert(file.exists() && "The texture does not exist");
+
+    //load the file
+    QImage image;
+    image.load(file.fileName());
+
+    //iterate through grid
+    for(int i = 0; i < m_gridLength; i++){
+        for(int j = 0; j < m_gridLength; j++){
+            //interpolate the height for this vertex
+            int interpolatedHeight = interpolateHeight(image, (double)i / (double)m_gridLength, (double)j / (double)m_gridLength);
+            Vector3 &currVertex = m_vertices[getIndex(i, j)];
+            currVertex.y = (double)interpolatedHeight;
+        }
+    }
+}
+
+double Terrain::interpolateHeight(QImage heightMap, double x, double y){
+    //get width and height of the map
+    int width = heightMap.width();
+    int height = heightMap.height();
+
+    //get the current x and y positions
+    double currX = x * (double)width;
+    double currY = y * (double)height;
+
+    //get the indices of the map
+    double lowX = floor(currX);
+    double highX = ceil(currX);
+    double lowY = floor(currY);
+    double highY = ceil(currY);
+
+    //get the distance between the current position and the lower bound
+    double xDist = 1 - (currX - lowX);
+    double yDist = 1 - (currY - lowY);
+
+    //get the colors
+    //int lowXlowYgray = qGray(heightMap.color(heightMap.pixelIndex((int)lowX, (int)lowY)));
+    //int lowXhighYgray = qGray(heightMap.color(heightMap.pixelIndex((int)lowX, (int)highY)));
+    //int highXlowYgray = qGray(heightMap.color(heightMap.pixelIndex((int)highX, (int)lowY)));
+    //int highXhighYgray = qGray(heightMap.color(heightMap.pixelIndex((int)highX, (int)highY)));
+
+    std::cout << "Checkpoint 1" << std::endl;
+
+    QRgb lowXlowYgray = heightMap.color(((int)lowX * width) + (int)lowY);
+    QRgb lowXhighYgray = heightMap.color(((int)lowX * width) + (int)highY);
+    QRgb highXlowYgray = heightMap.color(((int)highX * width) + (int)lowY);
+    QRgb highXhighYgray = heightMap.color(((int)highX * width) + (int)highY);
+
+    std::cout << qRed(lowXlowYgray) << " " << qGreen(lowXlowYgray) << " " << qBlue(lowXlowYgray) << " " << qGray(lowXlowYgray) << std::endl;
+    std::cout << qRed(lowXhighYgray) << " " << qGreen(lowXhighYgray) << " " << qBlue(lowXhighYgray) << " " << qGray(lowXhighYgray) << std::endl;
+    std::cout << qRed(highXlowYgray) << " " << qGreen(highXlowYgray) << " " << qBlue(highXlowYgray) << " " << qGray(highXlowYgray) << std::endl;
+    std::cout << qRed(highXhighYgray) << " " << qGreen(highXhighYgray) << " " << qBlue(highXhighYgray) << " " << qGray(highXhighYgray) << std::endl;
+
+    /*int returnGray = (xDist * yDist * (double)lowXlowYgray) + (xDist * (1 - yDist) * (double)lowXhighYgray) +
+            ((1 - xDist) * yDist * (double)highXlowYgray) + ((1 - xDist) * (1 - yDist) * (double)highXhighYgray);
+
+    std::cout << "Return Gray: " << returnGray;
+
+    return returnGray;*/
+    return 1.1;
+}
+
 /**
  * Draws a line at each vertex showing the direction of that vertex's normal. You may find
  * this to be a useful tool if you're having trouble getting the lighting to look right.
@@ -359,7 +432,15 @@ void Terrain::loadTextureToTerrain()
 
 void Terrain::generate()
 {
-    loadTextureToTerrain();
-    populateTerrain();
-    computeNormals();
+    if(m_filename.size() > 0){
+        //added by hcreynol
+        loadTextureToTerrain();
+        populateTerrainFromHeightmap();
+        computeNormals();
+    } else {
+        //original code
+        loadTextureToTerrain();
+        populateTerrain();
+        computeNormals();
+    }
 }

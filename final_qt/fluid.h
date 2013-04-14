@@ -5,7 +5,7 @@ class fluid
 {
 public:
     fluid();
-    draw(); //the name says it all - draw some fluid
+    void draw(); //the name says it all - draw some fluid
 
 };
 

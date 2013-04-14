@@ -38,7 +38,11 @@ void GLWidget::init()
     // The game loop is implemented using a timer
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
+#ifdef USE_HEIGHTMAP
+    m_terrain = new Terrain("./aaa.jpg"); //added by hcreynol
+#else
     m_terrain = new Terrain();
+#endif
 
     // Start a timer that will try to get 60 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
