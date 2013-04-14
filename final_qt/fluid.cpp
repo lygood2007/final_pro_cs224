@@ -20,7 +20,7 @@ fluid::fluid()
 }
 
 //where the magic happens
-fluid::draw()
+void fluid::draw()
 {
 
 //Main algo loop - once per time step
