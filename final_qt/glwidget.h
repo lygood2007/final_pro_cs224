@@ -11,6 +11,8 @@
 #include <qgl.h>
 #include <QTime>
 #include <QTimer>
+#include <QHash>
+#include <QString>
 #include "camera.h"
 #include "terrain.h"
 
@@ -24,6 +26,9 @@
 //added by hcreynol
 #define USE_HEIGHTMAP
 #define HEIGHTMAP_FILENAME "./aaa.jpg"
+
+class QGLShaderProgram;
+class QGLFramebufferObject;
 
 class GLWidget : public QGLWidget
 {
@@ -39,6 +44,14 @@ private:
     QTimer m_timer; // The timer variable
     OrbitCamera m_camera; // Camera
     Terrain* m_terrain;
+    float m_prevFps, m_fps;
+
+    QHash<QString, QGLShaderProgram *> m_shaderPrograms; // hash map of all shader programs
+    QHash<QString, QGLFramebufferObject *> m_framebufferObjects; // hash map of all framebuffer objects
+    GLuint m_skybox; // skybox call list ID
+    GLuint m_cubeMap; // cubeMap texture ID
+    QFont m_font; // font for rendering tex
+
 
     bool m_mouseLeftDown; // True if mouse left is down
     bool m_mouseRightDown; // True if mouse right is down
@@ -74,6 +87,15 @@ private:
      * and modelview matrices to match the values in m_camera.
      */
     void updateCamera();
+
+    //copied from CS123 lab 09 - SH
+    void loadCubeMap();
+    void createShaderPrograms();
+    void createFramebufferObjects(int width, int height);
+    void createBlurKernel(int radius, int width, int height, GLfloat* kernel, GLfloat* offsets);
+
+    void renderBlur(int width, int height);
+
 
 private slots:
     /** Callback function, will be called whenever the timer ticks*/

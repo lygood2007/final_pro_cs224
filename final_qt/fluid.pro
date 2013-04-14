@@ -21,7 +21,10 @@ SOURCES += main.cpp\
     camera.cpp \
     common/CS123Matrix.inl \
     common/CS123Vector.inl \
-    fluid.cpp
+    fluid.cpp \
+    resourceloader.cpp \
+    glm.cpp \
+    targa.cpp
 
 HEADERS  += mainwindow.h \
     glwidget.h \
@@ -32,9 +35,18 @@ HEADERS  += mainwindow.h \
     common/CS123Algebra.h \
     common/vector.h \
     common/CS123Common.h \
-    fluid.h
+    fluid.h \
+    resourceloader.h \
+    glm.h \
+    targa.h
 
-OTHER_FILES += cuda/test.cu
+OTHER_FILES += cuda/test.cu \
+    shaders/refract.vert \
+    shaders/refract.frag \
+    shaders/reflect.vert \
+    shaders/reflect.frag \
+    shaders/brightpass.frag \
+    shaders/blur.frag
 CUDA_SOURCES += cuda/test.cu
 
 # you shouldn't have to change anything under this line
