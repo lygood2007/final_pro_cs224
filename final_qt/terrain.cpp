@@ -34,7 +34,7 @@ void Terrain::init(const int decay, const int depth,
                    const float roughness, const bool renderNormals)
 {
     m_decay = 2;
-    m_depth = 8;
+    m_depth = 6;
     m_roughness  = 5;
     m_gridLength = (1<<m_depth)+1;
     int terrain_array_size = m_gridLength*m_gridLength;
