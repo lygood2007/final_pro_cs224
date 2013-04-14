@@ -32,7 +32,8 @@ HEADERS  += mainwindow.h \
     common/CS123Algebra.h \
     common/vector.h \
     common/CS123Common.h \
-    fluid.h
+    fluid.h \
+    common/types.h
 
 OTHER_FILES += cuda/test.cu
 CUDA_SOURCES += cuda/test.cu
