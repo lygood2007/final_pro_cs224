@@ -10,32 +10,56 @@ TARGET = fluid
 TEMPLATE = app
 
 INCLUDEPATH += common \
+    support \
+    terrain \
+    camera \
+    loader
 
 DEPENDPATH += common \
+    support \
+    terrain \
+    camera  \
+    loader
 
-SOURCES += main.cpp\
-        mainwindow.cpp \
-    glwidget.cpp \
-    textureloader.cpp \
-    terrain.cpp \
-    camera.cpp \
+SOURCES += \
+    camera/camera.cpp \
+    water/fluid.cpp \
+    terrain/terrain.cpp \
+    support/glwidget.cpp \
+    support/main.cpp \
+    support/mainwindow.cpp \
+    loader/glm.cpp \
+    loader/resourceloader.cpp \
+    loader/targa.cpp \
+    loader/textureloader.cpp \
+    common/CS123Matrix.cpp \
     common/CS123Matrix.inl \
-    common/CS123Vector.inl \
-    fluid.cpp
+    common/CS123Vector.inl
 
-HEADERS  += mainwindow.h \
-    glwidget.h \
-    textureloader.h \
-    terrain.h \
-    camera.h \
-    common/vector.h \
+HEADERS  += \
+    camera/camera.h \
+    water/fluid.h \
+    terrain/terrain.h \
+    support/glwidget.h \
+    support/mainwindow.h \
+    support/ui_mainwindow.h \
+    loader/glm.h \
+    loader/resourceloader.h \
+    loader/targa.h \
+    loader/textureloader.h \
     common/CS123Algebra.h \
-    common/vector.h \
     common/CS123Common.h \
-    fluid.h \
-    common/types.h
+    common/types.h \
+    common/vector.h
 
-OTHER_FILES += cuda/test.cu
+OTHER_FILES += cuda/test.cu \
+    shaders/refract.vert \
+    shaders/refract.frag \
+    shaders/reflect.vert \
+    shaders/reflect.frag \
+    shaders/brightpass.frag \
+    shaders/blur.frag
+
 CUDA_SOURCES += cuda/test.cu
 
 # you shouldn't have to change anything under this line
@@ -77,7 +101,8 @@ cuda.depend_command = $$CUDA_DIR/bin/nvcc -g -G -M $$CUDA_INC $$NVCCFLAGS ${QMAK
 
 QMAKE_EXTRA_COMPILERS += cuda
 
-FORMS    += mainwindow.ui
+FORMS    += \
+    support/mainwindow.ui
 
 #unix|win32: LIBS += -lGLU -lglut
 
