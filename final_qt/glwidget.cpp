@@ -9,6 +9,9 @@
 #include "glwidget.h"
 #include <QApplication>
 #include <QKeyEvent>
+//added by SH
+#include <QGLFramebufferObject>
+#include <QGLShaderProgram>
 
 // Declaration of Cuda functions
 extern "C"
@@ -25,6 +28,11 @@ GLWidget::~GLWidget()
 {
     if( m_terrain )
         delete m_terrain;
+
+//    foreach (QGLShaderProgram *sp, m_shaderPrograms)
+//        delete sp;
+//    foreach (QGLFramebufferObject *fbo, m_framebufferObjects)
+//        delete fbo;
 }
 
 void GLWidget::init()
@@ -123,6 +131,124 @@ void GLWidget::resizeGL(int w, int h)
     m_camera.setRatio((float)w/(float)h);
         updateCamera();
     glViewport(0, 0, w, h);
+}
+
+/**
+  Load a cube map for the skybox
+ **/
+void GLWidget::loadCubeMap()
+{
+//    QList<QFile *> fileList;
+//    fileList.append(new QFile("/course/cs123/bin/textures/astra/posx.jpg"));
+//    fileList.append(new QFile("/course/cs123/bin/textures/astra/negx.jpg"));
+//    fileList.append(new QFile("/course/cs123/bin/textures/astra/posy.jpg"));
+//    fileList.append(new QFile("/course/cs123/bin/textures/astra/negy.jpg"));
+//    fileList.append(new QFile("/course/cs123/bin/textures/astra/posz.jpg"));
+//    fileList.append(new QFile("/course/cs123/bin/textures/astra/negz.jpg"));
+//    m_cubeMap = ResourceLoader::loadCubeMap(fileList);
+}
+
+/**
+  Create shader programs.
+ **/
+void GLWidget::createShaderPrograms()
+{
+//    const QGLContext *ctx = context();
+//    m_shaderPrograms["reflect"] = ResourceLoader::newShaderProgram(ctx, "shaders/reflect.vert", "shaders/reflect.frag");
+//    m_shaderPrograms["refract"] = ResourceLoader::newShaderProgram(ctx, "shaders/refract.vert", "shaders/refract.frag");
+//    m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
+//    m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
+}
+
+/**
+  Allocate framebuffer objects.
+
+  @param width: the viewport width
+  @param height: the viewport height
+ **/
+void GLWidget::createFramebufferObjects(int width, int height)
+{
+    // Allocate the main framebuffer object for rendering the scene to
+    // This needs a depth attachment
+    m_framebufferObjects["fbo_0"] = new QGLFramebufferObject(width, height, QGLFramebufferObject::Depth,
+                                                             GL_TEXTURE_2D, GL_RGB16F_ARB);
+    m_framebufferObjects["fbo_0"]->format().setSamples(16);
+    // Allocate the secondary framebuffer obejcts for rendering textures to (post process effects)
+    // These do not require depth attachments
+    m_framebufferObjects["fbo_1"] = new QGLFramebufferObject(width, height, QGLFramebufferObject::NoAttachment,
+                                                             GL_TEXTURE_2D, GL_RGB16F_ARB);
+
+    m_framebufferObjects["fbo_2"] = new QGLFramebufferObject(width, height, QGLFramebufferObject::NoAttachment,
+                                                             GL_TEXTURE_2D, GL_RGB16F_ARB);
+}
+
+/**
+  Run a gaussian blur on the texture stored in fbo 2 and
+  put the result in fbo 1.  The blur should have a radius of 2.
+
+  @param width: the viewport width
+  @param height: the viewport height
+**/
+void GLWidget::renderBlur(int width, int height)
+{
+    int radius = 2;
+    int dim = radius * 2 + 1;
+    GLfloat kernel[dim * dim];
+    GLfloat offsets[dim * dim * 2];
+    createBlurKernel(radius, width, height, &kernel[0], &offsets[0]);
+
+    // TODO: Step 2 - Finish filling this in
+//    m_framebufferObjects["fbo_1"]->bind();
+
+//    m_shaderPrograms["blur"]->bind();
+//    m_shaderPrograms["blur"]->setUniformValue("arraySize", dim * dim);
+//    m_shaderPrograms["blur"]->setUniformValueArray("offsets", offsets, dim * dim * 2, 2);
+//    m_shaderPrograms["blur"]->setUniformValueArray("kernel", kernel, dim * dim, 1);
+
+//    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_2"]->texture());
+
+//    renderTexturedQuad(width, height);
+
+//    m_shaderPrograms["blur"]->release();;
+//    glBindTexture(GL_TEXTURE_2D, 0);
+//    m_framebufferObjects["fbo_1"]->release();
+}
+
+/**
+Creates a gaussian blur kernel with the specified radius.  The kernel values
+and offsets are stored.
+
+@param radius: The radius of the kernel to create.
+@param width: The width of the image.
+@param height: The height of the image.
+@param kernel: The array to write the kernel values to.
+@param offsets: The array to write the offset values to.
+**/
+void GLWidget::createBlurKernel(int radius, int width, int height,
+                                                  GLfloat* kernel, GLfloat* offsets)
+{
+  int size = radius * 2 + 1;
+  float sigma = radius / 3.0f;
+  float twoSigmaSigma = 2.0f * sigma * sigma;
+  float rootSigma = sqrt(twoSigmaSigma * M_PI);
+  float total = 0.0f;
+  float xOff = 1.0f / width, yOff = 1.0f / height;
+  int offsetIndex = 0;
+  for (int y = -radius, idx = 0; y <= radius; ++y)
+  {
+      for (int x = -radius; x <= radius; ++x,++idx)
+      {
+          float d = x * x + y * y;
+          kernel[idx] = exp(-d / twoSigmaSigma) / rootSigma;
+          total += kernel[idx];
+          offsets[offsetIndex++] = x * xOff;
+          offsets[offsetIndex++] = y * yOff;
+      }
+  }
+  for (int i = 0; i < size * size; ++i)
+  {
+      kernel[i] /= total;
+  }
 }
 
 void GLWidget::mousePressEvent(QMouseEvent *event)

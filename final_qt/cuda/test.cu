@@ -60,7 +60,7 @@ void testVector() {
         fflush(stdout);
         for( int i = 0; i < N; i++ )
         {
-            printf("%f", h_C[i] );
+//            printf("%f", h_C[i] );
         }
         // Free device memory
         cudaFree(d_A);
