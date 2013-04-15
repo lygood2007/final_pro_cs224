@@ -24,6 +24,11 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
+//added by hcreynol
+#define USE_HEIGHTMAP
+//#define HEIGHTMAP_FILENAME "./aaa.jpg"
+#define HEIGHTMAP_FILENAME "./s3.jpg"
+
 class QGLShaderProgram;
 class QGLFramebufferObject;
 
@@ -41,7 +46,6 @@ private:
     QTimer m_timer; // The timer variable
     OrbitCamera m_camera; // Camera
     Terrain* m_terrain;
-    float m_prevFps, m_fps;
 
     QHash<QString, QGLShaderProgram *> m_shaderPrograms; // hash map of all shader programs
     QHash<QString, QGLFramebufferObject *> m_framebufferObjects; // hash map of all framebuffer objects
@@ -54,6 +58,10 @@ private:
     bool m_mouseRightDown; // True if mouse right is down
 
     bool m_drawFrame; // True if draw in wireframe mode
+
+    int m_prevTime;
+    float m_prevFps, m_fps;
+    float m_delta;
 private:
     // Private functions
     /** Initliaze the variables in the class*/
@@ -87,6 +95,15 @@ private:
      * and modelview matrices to match the values in m_camera.
      */
     void updateCamera();
+
+    /**
+     * Render the text. If you want to add more texts, put it here
+     **/
+    void paintText();
+    /**
+     * Update the time variables
+     **/
+    void timeUpdate();
 
     //copied from CS123 lab 09 - SH
     void loadCubeMap();

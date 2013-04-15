@@ -12,10 +12,22 @@
 #include <qgl.h>
 #include "vector.h"
 
+//debugging
+#include <iostream>
+
+//added by hcreynol
+#include <QFile>
+#include <assert.h>
+
 #define DEFAULT_DEPTH 8
 #define DEFAULT_DECAY 2
 #define DEFAULT_ROUGHNESS 2
 #define TEXTURE_DIR "./resource/terrain.jpg"
+
+//added by hcreynol
+#define DEFAULT_GRID_BOUNDS 10
+#define DEFAULT_MIN_HEIGHT -2
+#define DEFAULT_MAX_HEIGHT 6
 
 typedef Vector2 GridIndex;
 
@@ -26,6 +38,7 @@ public:
 
     Terrain();
     Terrain(const int decay, const float roughness, const int depth, const bool renderNormals);
+    Terrain(QString filename); //added by hcreynol
     ~Terrain();
 
     /**
@@ -33,6 +46,7 @@ public:
      */
     void init(const int decay = DEFAULT_DEPTH, const int depth = DEFAULT_DECAY,
               const float roughness = DEFAULT_ROUGHNESS, const bool renderNormals = false);
+
     /**
       * Converts a grid coordinate (row, column) to an index into a 1-dimensional array.
       * Can be used to index into m_terrain or m_normalMap.
@@ -80,6 +94,11 @@ public:
      * to begin the terrain generation process. You do not need to modify this function.
      */
     void populateTerrain();
+
+    void populateTerrainFromHeightmap(); //added by hcreynol
+    double determinePosition(double gridPosition); //added by hcreynol
+    double interpolateHeight(QImage heightMap, double x, double y); //added by hcreynol
+
     /**
      * Draws a line at each vertex showing the direction of that vertex's normal. You may find
      * this to be a useful tool if you're having trouble getting the lighting to look right.
@@ -128,6 +147,9 @@ private:
     bool m_renderNormals; // Flag for rendering normals
     int m_gridLength; // The grid length
     GLuint m_textureId; // The texture id
+
+    // added by hcreynol
+    QString m_filename; // filename of the heightmap file
 };
 
 #endif // TERRAIN_H

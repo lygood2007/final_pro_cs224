@@ -7,6 +7,7 @@
 
 #include "GL/glut.h"
 #include "glwidget.h"
+#include "types.h"
 #include <QApplication>
 #include <QKeyEvent>
 //added by SH
@@ -24,7 +25,14 @@ extern "C"
     extern void APIENTRY glActiveTexture(GLenum);
 }
 
+/**
+ * Local variables in this cpp scope
+ */
+static color4f clearColor = {0.f, 0.f, 0.f, 0.f};
+
 GLWidget::GLWidget(QWidget *parent) : QGLWidget(parent)
+  ,m_timer(this),m_prevTime(0), m_prevFps(0.f), m_fps(0.f),
+    m_font("Deja Vu Sans Mono", 8,  4)
 {
     init();
 }
@@ -50,11 +58,14 @@ void GLWidget::init()
     // The game loop is implemented using a timer
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
+#ifdef USE_HEIGHTMAP
+    m_terrain = new Terrain(HEIGHTMAP_FILENAME); //added by hcreynol
+#else
     m_terrain = new Terrain();
+#endif
 
     // Start a timer that will try to get 60 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
-    m_time.start();
     m_timer.start(1000 / 60);
 
     m_mouseLeftDown = false;
@@ -82,7 +93,7 @@ void GLWidget::initializeGL()
     // method. Before this method is called, there is no active OpenGL
     // context and all OpenGL calls have no effect.
 
-    glClearColor(0, 0, 0, 0);   // Always reset the screen to black before drawing anything
+    glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);   // Always reset the screen to black before drawing anything
     glEnable(GL_DEPTH_TEST);    // When drawing a triangle, only keep pixels closer to the camera than what's already been drawn
      glDisable(GL_DITHER);
      glShadeModel(GL_SMOOTH);
@@ -118,6 +129,7 @@ void GLWidget::initializeGL()
 
 void GLWidget::paintGL()
 {
+    timeUpdate();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // TODO: Implement the demo rendering here
@@ -125,6 +137,7 @@ void GLWidget::paintGL()
     m_terrain->draw();
 #endif
 
+<<<<<<< HEAD:final_qt/glwidget.cpp
     //The lighting stuff - SH
     // Render the scene to a framebuffer
 //    m_framebufferObjects["fbo_0"]->bind();
@@ -173,6 +186,9 @@ void GLWidget::paintGL()
 //        glBindTexture(GL_TEXTURE_2D, 0);
 //    }
 
+=======
+    paintText();
+>>>>>>> a7128913e2b46ab0bf1ab9ebfe9489b1edf9994f:final_qt/support/glwidget.cpp
 }
 
 /**
@@ -472,10 +488,40 @@ void GLWidget::updateCamera()
     m_camera.applyPerspectiveCamera(width(),height());
 }
 
+/**
+ * Render the text. If you want to add more texts, put it here
+ **/
+void GLWidget::paintText()
+{
+    // Combine the previous and current framerate
+    if (m_fps >= 0 && m_fps < 1000)
+    {
+       m_prevFps *= 0.95f;
+       m_prevFps += m_fps * 0.05f;
+    }
+
+    glColor3f(1.f,1.f,1.f);
+    // QGLWidget's renderText takes xy coordinates, a string, and a font
+    renderText(10, 20, "FPS: " + QString::number((int) (m_prevFps)), m_font);
+    renderText(10, 35, "Delta: " + QString::number((float) (m_delta)), m_font);
+    renderText(10, 50, "S: Save screenshot", m_font);
+}
+
+/**
+ * Update the time variables
+ **/
+void GLWidget::timeUpdate()
+{
+    long time = m_time.elapsed();
+    m_delta = (time-m_prevTime)/1000.f;
+    m_fps = 1000.f /  (time-m_prevTime);
+    m_prevTime = time;
+}
+
 void GLWidget::tick()
 {
     // Get the number of seconds since the last tick (variable update rate)
-    float seconds = m_time.restart() * 0.001f;
+ //   float seconds = m_time.restart() * 0.001f;
 
     // Flag this view for repainting (Qt will call paintGL() soon after)
     update();
