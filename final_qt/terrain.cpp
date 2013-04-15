@@ -261,11 +261,9 @@ void Terrain::populateTerrain()
 }
 
 void Terrain::populateTerrainFromHeightmap(){
-    //@TODO write this code
-
     //get the file
     QFile file(m_filename);
-    assert(file.exists() && "The texture does not exist");
+    assert(file.exists() && "The height does not exist");
 
     //load the file
     QImage image;
@@ -274,15 +272,29 @@ void Terrain::populateTerrainFromHeightmap(){
     //iterate through grid
     for(int i = 0; i < m_gridLength; i++){
         for(int j = 0; j < m_gridLength; j++){
-            //interpolate the height for this vertex
-            int interpolatedHeight = interpolateHeight(image, (double)i / (double)m_gridLength, (double)j / (double)m_gridLength);
+            //interpolate the x, y, z positions
+            double iProp = (double)i / (double)(m_gridLength - 1);
+            double jProp = (double)j / (double)(m_gridLength - 1);
+
+            double currX = determinePosition(jProp);
+            double currZ = determinePosition(iProp);
+            double currY = interpolateHeight(image, jProp, iProp);
+
+            //set the values
             Vector3 &currVertex = m_vertices[getIndex(i, j)];
-            currVertex.y = (double)interpolatedHeight;
+            currVertex.x = currX;
+            currVertex.y = currY;
+            currVertex.z = currZ;
         }
     }
 }
 
+double Terrain::determinePosition(double gridPosition){
+    return -(DEFAULT_GRID_BOUNDS - (2.0 * gridPosition * DEFAULT_GRID_BOUNDS));
+}
+
 double Terrain::interpolateHeight(QImage heightMap, double x, double y){
+
     //get width and height of the map
     int width = heightMap.width();
     int height = heightMap.height();
@@ -292,40 +304,27 @@ double Terrain::interpolateHeight(QImage heightMap, double x, double y){
     double currY = y * (double)height;
 
     //get the indices of the map
-    double lowX = floor(currX);
-    double highX = ceil(currX);
-    double lowY = floor(currY);
-    double highY = ceil(currY);
+    double lowX = min(max(floor(currX), 0), width - 1);
+    double highX = min(max(ceil(currX), 0), width - 1);
+    double lowY = min(max(floor(currY), 0), height - 1);
+    double highY = min(max(ceil(currY), 0), height - 1);
 
-    //get the distance between the current position and the lower bound
+    //get the proportions
     double xDist = 1 - (currX - lowX);
     double yDist = 1 - (currY - lowY);
 
-    //get the colors
-    //int lowXlowYgray = qGray(heightMap.color(heightMap.pixelIndex((int)lowX, (int)lowY)));
-    //int lowXhighYgray = qGray(heightMap.color(heightMap.pixelIndex((int)lowX, (int)highY)));
-    //int highXlowYgray = qGray(heightMap.color(heightMap.pixelIndex((int)highX, (int)lowY)));
-    //int highXhighYgray = qGray(heightMap.color(heightMap.pixelIndex((int)highX, (int)highY)));
+    int lowXlowYgray = qGray(heightMap.pixel((int)lowX, (int)lowY));
+    int lowXhighYgray = qGray(heightMap.pixel((int)lowX, (int)highY));
+    int highXlowYgray = qGray(heightMap.pixel((int)highX, (int)lowY));
+    int highXhighYgray = qGray(heightMap.pixel((int)highX, (int)highY));
 
-    std::cout << "Checkpoint 1" << std::endl;
+    double grayProp = (xDist * yDist * (double)lowXlowYgray) +
+            (xDist * (1 - yDist) * (double)lowXhighYgray) +
+            ((1 - xDist) * yDist * (double)highXlowYgray) +
+            ((1 - xDist) * (1 - yDist) * (double)highXhighYgray);
+    grayProp = grayProp / 255.0;
 
-    QRgb lowXlowYgray = heightMap.color(((int)lowX * width) + (int)lowY);
-    QRgb lowXhighYgray = heightMap.color(((int)lowX * width) + (int)highY);
-    QRgb highXlowYgray = heightMap.color(((int)highX * width) + (int)lowY);
-    QRgb highXhighYgray = heightMap.color(((int)highX * width) + (int)highY);
-
-    std::cout << qRed(lowXlowYgray) << " " << qGreen(lowXlowYgray) << " " << qBlue(lowXlowYgray) << " " << qGray(lowXlowYgray) << std::endl;
-    std::cout << qRed(lowXhighYgray) << " " << qGreen(lowXhighYgray) << " " << qBlue(lowXhighYgray) << " " << qGray(lowXhighYgray) << std::endl;
-    std::cout << qRed(highXlowYgray) << " " << qGreen(highXlowYgray) << " " << qBlue(highXlowYgray) << " " << qGray(highXlowYgray) << std::endl;
-    std::cout << qRed(highXhighYgray) << " " << qGreen(highXhighYgray) << " " << qBlue(highXhighYgray) << " " << qGray(highXhighYgray) << std::endl;
-
-    /*int returnGray = (xDist * yDist * (double)lowXlowYgray) + (xDist * (1 - yDist) * (double)lowXhighYgray) +
-            ((1 - xDist) * yDist * (double)highXlowYgray) + ((1 - xDist) * (1 - yDist) * (double)highXhighYgray);
-
-    std::cout << "Return Gray: " << returnGray;
-
-    return returnGray;*/
-    return 1.1;
+    return DEFAULT_MIN_HEIGHT + (grayProp * (DEFAULT_MAX_HEIGHT - DEFAULT_MIN_HEIGHT));
 }
 
 /**

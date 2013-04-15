@@ -24,6 +24,11 @@
 #define DEFAULT_ROUGHNESS 2
 #define TEXTURE_DIR "./resource/terrain.jpg"
 
+//added by hcreynol
+#define DEFAULT_GRID_BOUNDS 10
+#define DEFAULT_MIN_HEIGHT -2
+#define DEFAULT_MAX_HEIGHT 6
+
 typedef Vector2 GridIndex;
 
 extern GLuint loadTexture(const QString &filename);
@@ -91,6 +96,7 @@ public:
     void populateTerrain();
 
     void populateTerrainFromHeightmap(); //added by hcreynol
+    double determinePosition(double gridPosition); //added by hcreynol
     double interpolateHeight(QImage heightMap, double x, double y); //added by hcreynol
 
     /**

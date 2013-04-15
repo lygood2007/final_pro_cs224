@@ -47,7 +47,7 @@ void GLWidget::init()
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
 #ifdef USE_HEIGHTMAP
-    m_terrain = new Terrain("./aaa.jpg"); //added by hcreynol
+    m_terrain = new Terrain(HEIGHTMAP_FILENAME); //added by hcreynol
 #else
     m_terrain = new Terrain();
 #endif

@@ -25,7 +25,8 @@
 
 //added by hcreynol
 #define USE_HEIGHTMAP
-#define HEIGHTMAP_FILENAME "./aaa.jpg"
+//#define HEIGHTMAP_FILENAME "./aaa.jpg"
+#define HEIGHTMAP_FILENAME "./s3.jpg"
 
 class QGLShaderProgram;
 class QGLFramebufferObject;
