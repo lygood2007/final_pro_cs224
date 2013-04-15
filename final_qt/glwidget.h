@@ -15,6 +15,7 @@
 #include <QString>
 #include "camera.h"
 #include "terrain.h"
+#include "resourceloader.h"
 
 // We fix the size
 #define WIN_W 800.0
@@ -61,6 +62,9 @@ private:
     void initializeGL();
     /** The render function, will be called every frame */
     void paintGL();
+    void renderScene();
+    void renderTexturedQuad(int width, int height);
+
     /** Updates the current OpenGL state to avoid object distortion when the window is resized. */
     void resizeGL(int w, int h);
 

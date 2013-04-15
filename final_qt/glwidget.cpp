@@ -19,6 +19,11 @@ extern "C"
     void testVector();
 }
 
+extern "C"
+{
+    extern void APIENTRY glActiveTexture(GLenum);
+}
+
 GLWidget::GLWidget(QWidget *parent) : QGLWidget(parent)
 {
     init();
@@ -28,11 +33,10 @@ GLWidget::~GLWidget()
 {
     if( m_terrain )
         delete m_terrain;
-
-//    foreach (QGLShaderProgram *sp, m_shaderPrograms)
-//        delete sp;
-//    foreach (QGLFramebufferObject *fbo, m_framebufferObjects)
-//        delete fbo;
+    foreach (QGLShaderProgram *sp, m_shaderPrograms)
+        delete sp;
+    foreach (QGLFramebufferObject *fbo, m_framebufferObjects)
+        delete fbo;
 }
 
 void GLWidget::init()
@@ -121,7 +125,98 @@ void GLWidget::paintGL()
     m_terrain->draw();
 #endif
 
+    //The lighting stuff - SH
+    // Render the scene to a framebuffer
+//    m_framebufferObjects["fbo_0"]->bind();
+//    applyPerspectiveCamera(width, height);
+//    renderScene();
+//    m_framebufferObjects["fbo_0"]->release();
+
+//    // Copy the rendered scene into framebuffer 1
+//    m_framebufferObjects["fbo_0"]->blitFramebuffer(m_framebufferObjects["fbo_1"],
+//                                                   QRect(0, 0, width, height), m_framebufferObjects["fbo_0"],
+//                                                   QRect(0, 0, width, height), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+//    // TODO: Step 0 - draw the scene to the screen as a textured quad
+//    applyOrthogonalCamera(width, height);
+//    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+//    renderTexturedQuad(width, height);
+//    glBindTexture(GL_TEXTURE_2D, 0);
+
+//    // TODO: Step 1 - use the brightpass shader to render bright areas
+//    // only to fbo_2
+//    m_framebufferObjects["fbo_2"]->bind();
+//    m_shaderPrograms["brightpass"]->bind();
+//    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+//    renderTexturedQuad(width, height);
+//    m_shaderPrograms["brightpass"]->release();
+//    glBindTexture(GL_TEXTURE_2D, 0);
+//    m_framebufferObjects["fbo_2"]->release();
+
+//    // TODO: Uncomment this section in step 2 of the lab
+//    float scales[] = {4.f,8.f};
+//    for (int i = 0; i < 2; ++i)
+//    {
+//        // Render the blurred brightpass filter result to fbo 1
+//       renderBlur(width / scales[i], height / scales[i]);
+
+//       // Bind the image from fbo to a texture
+//        glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+//        // Enable alpha blending and render the texture to the screen
+//        glEnable(GL_BLEND);
+//        glBlendFunc(GL_ONE, GL_ONE);
+//        renderTexturedQuad(width * scales[i], height * scales[i]);
+//        glDisable(GL_BLEND);
+//        glBindTexture(GL_TEXTURE_2D, 0);
+//    }
+
 }
+
+/**
+  Renders the scene.  May be called multiple times by paintGL() if necessary.
+**/
+void GLWidget::renderScene()
+{
+    // Enable depth testing
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    // Enable cube maps and draw the skybox
+//    glEnable(GL_TEXTURE_CUBE_MAP);
+//    glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
+//    glCallList(m_skybox);
+
+    // Enable culling (back) faces for rendering the fluid
+//    glEnable(GL_CULL_FACE);
+
+    // Render the fluid with the refraction shader bound
+    glActiveTexture(GL_TEXTURE0);
+    m_shaderPrograms["refract"]->bind();
+    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
+//    glPushMatrix();
+//    glTranslatef(-1.25f, 0.f, 0.f);
+//    glCallList(m_dragon.idx);
+//    glPopMatrix();
+    m_shaderPrograms["refract"]->release();
+
+    // Render the fluid with the reflection shader bound
+    m_shaderPrograms["reflect"]->bind();
+    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
+//    glPushMatrix();
+//    glTranslatef(1.25f,0.f,0.f);
+//    glCallList(m_dragon.idx);
+//    glPopMatrix();
+    m_shaderPrograms["reflect"]->release();
+    // Disable culling, depth testing and cube maps
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
+    glDisable(GL_TEXTURE_CUBE_MAP);
+}
+
 
 void GLWidget::resizeGL(int w, int h)
 {
@@ -153,11 +248,11 @@ void GLWidget::loadCubeMap()
  **/
 void GLWidget::createShaderPrograms()
 {
-//    const QGLContext *ctx = context();
-//    m_shaderPrograms["reflect"] = ResourceLoader::newShaderProgram(ctx, "shaders/reflect.vert", "shaders/reflect.frag");
-//    m_shaderPrograms["refract"] = ResourceLoader::newShaderProgram(ctx, "shaders/refract.vert", "shaders/refract.frag");
-//    m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
-//    m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
+    const QGLContext *ctx = context();
+    m_shaderPrograms["reflect"] = ResourceLoader::newShaderProgram(ctx, "shaders/reflect.vert", "shaders/reflect.frag");
+    m_shaderPrograms["refract"] = ResourceLoader::newShaderProgram(ctx, "shaders/refract.vert", "shaders/refract.frag");
+    m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
+    m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
 }
 
 /**
@@ -198,20 +293,20 @@ void GLWidget::renderBlur(int width, int height)
     createBlurKernel(radius, width, height, &kernel[0], &offsets[0]);
 
     // TODO: Step 2 - Finish filling this in
-//    m_framebufferObjects["fbo_1"]->bind();
+    m_framebufferObjects["fbo_1"]->bind();
 
-//    m_shaderPrograms["blur"]->bind();
-//    m_shaderPrograms["blur"]->setUniformValue("arraySize", dim * dim);
-//    m_shaderPrograms["blur"]->setUniformValueArray("offsets", offsets, dim * dim * 2, 2);
-//    m_shaderPrograms["blur"]->setUniformValueArray("kernel", kernel, dim * dim, 1);
+    m_shaderPrograms["blur"]->bind();
+    m_shaderPrograms["blur"]->setUniformValue("arraySize", dim * dim);
+    m_shaderPrograms["blur"]->setUniformValueArray("offsets", offsets, dim * dim * 2, 2);
+    m_shaderPrograms["blur"]->setUniformValueArray("kernel", kernel, dim * dim, 1);
 
-//    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_2"]->texture());
+    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_2"]->texture());
 
-//    renderTexturedQuad(width, height);
+    renderTexturedQuad(width, height);
 
-//    m_shaderPrograms["blur"]->release();;
-//    glBindTexture(GL_TEXTURE_2D, 0);
-//    m_framebufferObjects["fbo_1"]->release();
+    m_shaderPrograms["blur"]->release();;
+    glBindTexture(GL_TEXTURE_2D, 0);
+    m_framebufferObjects["fbo_1"]->release();
 }
 
 /**
@@ -250,6 +345,33 @@ void GLWidget::createBlurKernel(int radius, int width, int height,
       kernel[i] /= total;
   }
 }
+
+/**
+  Draws a textured quad. The texture must be bound and unbound
+  before and after calling this method - this method assumes that the texture
+  has been bound beforehand.
+
+  @param w: the width of the quad to draw
+  @param h: the height of the quad to draw
+**/
+void GLWidget::renderTexturedQuad(int width, int height) {
+    // Clamp value to edge of texture when texture index is out of bounds
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // Draw the  quad
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f);
+    glVertex2f(0.0f, 0.0f);
+    glTexCoord2f(1.0f, 0.0f);
+    glVertex2f(width, 0.0f);
+    glTexCoord2f(1.0f, 1.0f);
+    glVertex2f(width, height);
+    glTexCoord2f(0.0f, 1.0f);
+    glVertex2f(0.0f, height);
+    glEnd();
+}
+
 
 void GLWidget::mousePressEvent(QMouseEvent *event)
 {
