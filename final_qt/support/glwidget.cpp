@@ -22,7 +22,7 @@ extern "C"
 
 extern "C"
 {
-    extern void APIENTRY glActiveTexture(GLenum);
+//    extern void APIENTRY glActiveTexture(GLenum);
 }
 
 /**
@@ -137,7 +137,6 @@ void GLWidget::paintGL()
     m_terrain->draw();
 #endif
 
-<<<<<<< HEAD:final_qt/glwidget.cpp
     //The lighting stuff - SH
     // Render the scene to a framebuffer
 //    m_framebufferObjects["fbo_0"]->bind();
@@ -186,9 +185,7 @@ void GLWidget::paintGL()
 //        glBindTexture(GL_TEXTURE_2D, 0);
 //    }
 
-=======
     paintText();
->>>>>>> a7128913e2b46ab0bf1ab9ebfe9489b1edf9994f:final_qt/support/glwidget.cpp
 }
 
 /**
@@ -209,7 +206,7 @@ void GLWidget::renderScene()
 //    glEnable(GL_CULL_FACE);
 
     // Render the fluid with the refraction shader bound
-    glActiveTexture(GL_TEXTURE0);
+//    glActiveTexture(GL_TEXTURE0);
     m_shaderPrograms["refract"]->bind();
     m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
 //    glPushMatrix();
