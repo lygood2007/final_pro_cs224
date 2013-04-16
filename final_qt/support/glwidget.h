@@ -68,6 +68,9 @@ private:
     void initializeGL();
     /** The render function, will be called every frame */
     void paintGL();
+
+    void applyOrthogonalCamera(float width, float height);
+    void applyPerspectiveCamera(float width, float height);
     void renderScene();
     void renderTexturedQuad(int width, int height);
 

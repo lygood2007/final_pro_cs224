@@ -12,6 +12,7 @@
 
 OrbitCamera::OrbitCamera()
 {
+    m_center = Vector3(0.f, 0.f, 0.f);
     m_up = Vector3(0.f, 1.f, 0.f);
     m_zoom = 30.f;
     m_theta = M_PI * 1.5f;

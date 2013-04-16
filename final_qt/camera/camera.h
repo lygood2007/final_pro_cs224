@@ -28,8 +28,8 @@ public:
     Vector4 getEyePos();
     void setRatio( float ratio );
 
-private:
-    Vector3 m_up;
+//private: //I need all of these for rendering the lighting - SH
+    Vector3 m_center, m_up;
     float m_theta, m_phi;
     float m_fovy;
     float m_zoom;

@@ -21,11 +21,7 @@
 extern "C"
 {
     void testVector();
-}
-
-extern "C"
-{
-//    extern void APIENTRY glActiveTexture(GLenum);
+//    extern void APIENTRYP glActiveTexture(GLenum);
 }
 
 /**
@@ -141,6 +137,9 @@ void GLWidget::paintGL()
 #endif
 
     //The lighting stuff - SH
+    int width = this->width();
+    int height = this->height();
+
     // Render the scene to a framebuffer
 //    m_framebufferObjects["fbo_0"]->bind();
 //    applyPerspectiveCamera(width, height);
@@ -197,8 +196,8 @@ void GLWidget::paintGL()
 void GLWidget::renderScene()
 {
     // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
+//    glEnable(GL_DEPTH_TEST);
+//    glClear(GL_DEPTH_BUFFER_BIT);
 
     // Enable cube maps and draw the skybox
 //    glEnable(GL_TEXTURE_CUBE_MAP);
@@ -210,27 +209,27 @@ void GLWidget::renderScene()
 
     // Render the fluid with the refraction shader bound
 //    glActiveTexture(GL_TEXTURE0);
-    m_shaderPrograms["refract"]->bind();
-    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
-//    glPushMatrix();
-//    glTranslatef(-1.25f, 0.f, 0.f);
-//    glCallList(m_dragon.idx);
-//    glPopMatrix();
-    m_shaderPrograms["refract"]->release();
+//    m_shaderPrograms["refract"]->bind();
+//    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
+////    glPushMatrix();
+////    glTranslatef(-1.25f, 0.f, 0.f);
+////    glCallList(m_dragon.idx);
+////    glPopMatrix();
+//    m_shaderPrograms["refract"]->release();
 
-    // Render the fluid with the reflection shader bound
-    m_shaderPrograms["reflect"]->bind();
-    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
-//    glPushMatrix();
-//    glTranslatef(1.25f,0.f,0.f);
-//    glCallList(m_dragon.idx);
-//    glPopMatrix();
-    m_shaderPrograms["reflect"]->release();
+//    // Render the fluid with the reflection shader bound
+//    m_shaderPrograms["reflect"]->bind();
+//    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
+////    glPushMatrix();
+////    glTranslatef(1.25f,0.f,0.f);
+////    glCallList(m_dragon.idx);
+////    glPopMatrix();
+//    m_shaderPrograms["reflect"]->release();
     // Disable culling, depth testing and cube maps
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
-    glDisable(GL_TEXTURE_CUBE_MAP);
+//    glDisable(GL_CULL_FACE);
+//    glDisable(GL_DEPTH_TEST);
+//    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
+//    glDisable(GL_TEXTURE_CUBE_MAP);
 }
 
 
@@ -386,6 +385,43 @@ void GLWidget::renderTexturedQuad(int width, int height) {
     glTexCoord2f(0.0f, 1.0f);
     glVertex2f(0.0f, height);
     glEnd();
+}
+
+/**
+  Called to switch to an orthogonal OpenGL camera.
+  Useful for rending a textured quad across the whole screen.
+
+  @param width: the viewport width
+  @param height: the viewport height
+**/
+void GLWidget::applyOrthogonalCamera(float width, float height)
+{
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0.f, width, 0.f, height);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
+
+/**
+  Called to switch to a perspective OpenGL camera.
+
+  @param width: the viewport width
+  @param height: the viewport height
+**/
+void GLWidget::applyPerspectiveCamera(float width, float height)
+{
+    float ratio = ((float) width) / height;
+    Vector3 dir(-Vector3::fromAngles(m_camera.m_theta, m_camera.m_phi));
+    Vector3 eye(m_camera.m_center - dir * m_camera.m_zoom);
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(m_camera.m_fovy, ratio, 0.1f, 1000.f);
+    gluLookAt(eye.x, eye.y, eye.z, eye.x + dir.x, eye.y + dir.y, eye.z + dir.z,
+              m_camera.m_up.x, m_camera.m_up.y, m_camera.m_up.z);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 }
 
 
