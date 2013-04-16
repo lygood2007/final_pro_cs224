@@ -14,7 +14,6 @@
 #include <QHash>
 #include <QString>
 #include "camera.h"
-#include "terrain.h"
 #include "resourceloader.h"
 
 // We fix the size
@@ -26,11 +25,10 @@
 
 //added by hcreynol
 #define USE_HEIGHTMAP
-//#define HEIGHTMAP_FILENAME "./aaa.jpg"
-#define HEIGHTMAP_FILENAME "./s3.jpg"
 
 class QGLShaderProgram;
 class QGLFramebufferObject;
+class Terrain;
 
 class GLWidget : public QGLWidget
 {

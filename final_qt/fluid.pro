@@ -34,7 +34,9 @@ SOURCES += \
     loader/textureloader.cpp \
     common/CS123Matrix.cpp \
     common/CS123Matrix.inl \
-    common/CS123Vector.inl
+    common/CS123Vector.inl \
+    terrain/random_terrain.cpp \
+    terrain/heightmap_terrain.cpp
 
 HEADERS  += \
     camera/camera.h \
@@ -50,7 +52,9 @@ HEADERS  += \
     common/CS123Algebra.h \
     common/CS123Common.h \
     common/types.h \
-    common/vector.h
+    common/vector.h \
+    terrain/random_terrain.h \
+    terrain/heightmap_terrain.h
 
 OTHER_FILES += cuda/test.cu \
     shaders/refract.vert \

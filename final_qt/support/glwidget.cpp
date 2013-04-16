@@ -8,6 +8,9 @@
 #include "GL/glut.h"
 #include "glwidget.h"
 #include "types.h"
+#include "terrain.h"
+#include "random_terrain.h"
+#include "heightmap_terrain.h"
 #include <QApplication>
 #include <QKeyEvent>
 //added by SH
@@ -59,7 +62,7 @@ void GLWidget::init()
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
 #ifdef USE_HEIGHTMAP
-    m_terrain = new Terrain(HEIGHTMAP_FILENAME); //added by hcreynol
+    m_terrain = new HeightmapTerrain(); //added by hcreynol
 #else
     m_terrain = new Terrain();
 #endif
