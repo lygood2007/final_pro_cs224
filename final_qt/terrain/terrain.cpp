@@ -8,17 +8,13 @@
 
 Terrain::Terrain()
 {
-    init();
-}
-
-Terrain::Terrain( const int decay, const float roughness, const int depth, const bool renderNormals)
-{
-    init(decay, roughness, depth, renderNormals);
-}
-
-Terrain::Terrain(QString filename){
-    m_filename = filename;
-    init();
+    m_depth =  DEFAULT_DEPTH;
+    m_gridLength = (1<<m_depth)+1;
+    int terrain_array_size = m_gridLength*m_gridLength;
+    m_vertices = new Vector3[terrain_array_size];
+    m_normals = new Vector3[terrain_array_size];
+    m_renderNormals = false;
+    m_textureId = 0;
 }
 
 Terrain::~Terrain()
@@ -30,23 +26,6 @@ Terrain::~Terrain()
 
     if( m_textureId != 0 )
         glDeleteTextures(1,&m_textureId);
-}
-
-/**
- * Initialize the variables in the class
- */
-void Terrain::init(const int decay, const int depth,
-                   const float roughness, const bool renderNormals)
-{
-    m_decay = 2;
-    m_depth = 6;
-    m_roughness  = 5;
-    m_gridLength = (1<<m_depth)+1;
-    int terrain_array_size = m_gridLength*m_gridLength;
-    m_vertices = new Vector3[terrain_array_size];
-    m_normals = new Vector3[terrain_array_size];
-    m_renderNormals = renderNormals;
-    m_textureId = 0;
 }
 
 /**
@@ -70,20 +49,6 @@ inline int Terrain::getIndex(const int row, const int col) const
         return -1;
 
     return row * m_gridLength + col;
-}
-
-/**
- * Computes the amount to perturb the height of the vertex currently being processed.
- * Feel free to modify this.
- *
- * @param depth The current recursion depth
- */
-double Terrain::getPerturb(const int cur_depth) const
-{
-    /** roughness = (cur_depth/m_depth).^m_decay*k, where k is between -1 and 1*/
-    return m_roughness
-           * pow((double)cur_depth / m_depth, m_decay)
-           * ((rand() % 200-100) / 100.0);
 }
 
 /**
@@ -116,79 +81,6 @@ QList<Vector3*> Terrain::getSurroundingVertices(const GridIndex &coordinate) con
     }
 
     return vecs;
-}
-
-/**
-* Subdivides a square by finding the vertices at its corners, the midpoints of each side, and
-* the center (as the algorithm describes). Then recurs on each of the four sub-squares created.
-*
-* @param topLeft The grid coordinate of the top-left corner of the square to subdivide
-* @param bottomRight The grid coordinate of the bottom-right corner of the square to subdivide
-* @param depth The current recursion depth, decreasing as this function recurses deeper. The
-*              function should stop recurring when this value reaches zero.
-*/
-void Terrain::subdivideSquare(GridIndex topleft, GridIndex botright, GLint curDepth)
-{
-
-    // TL--TM--TR    +---> x
-    // |   |   |     |
-    // ML--MM--MR    V
-    // |   |   |     y
-    // BL--BM--BR
-
-    // corner coordinates (in the grid space [x,y])
-    GridIndex TL = GridIndex(topleft.x, topleft.y);
-    GridIndex TR = GridIndex(botright.x, topleft.y);
-    GridIndex BL = GridIndex(topleft.x, botright.y);
-    GridIndex BR = GridIndex(botright.x, botright.y);
-
-    // corner vertices on the terrain (in the grid space [x,y,z])
-    Vector3 &vTL = m_vertices[getIndex(TL)];
-    Vector3 &vTR = m_vertices[getIndex(TR)];
-    Vector3 &vBL = m_vertices[getIndex(BL)];
-    Vector3 &vBR = m_vertices[getIndex(BR)];
-
-    if( curDepth  == 0 )
-        return ;
-
-    GridIndex ML = GridIndex( topleft.x, (topleft.y + botright.y)/2.0 );
-    GridIndex TM = GridIndex( (topleft.x + botright.x)/2.0, topleft.y );
-    GridIndex MR = GridIndex( botright.x, (topleft.y + botright.y )/2.0 );
-    GridIndex BM = GridIndex( (topleft.x + botright.x )/2.0, botright.y );
-    GridIndex MM = GridIndex( (topleft.x + botright.x )/2.0, (topleft.y + botright.y )/2.0 );
-
-
-    Vector3 &vML = m_vertices[getIndex(ML)];
-    Vector3 &vTM = m_vertices[getIndex(TM)];
-    Vector3 &vMR = m_vertices[getIndex(MR)];
-    Vector3 &vBM = m_vertices[getIndex(BM)];
-    Vector3 &vMM = m_vertices[getIndex(MM)];
-
-    vML.x = 0.5*(vTL.x + vBL.x);
-    vML.z = 0.5*(vTL.z + vBL.z);
-    vML.y = 0.5*(vTL.y + vBL.y );
-
-    vTM.x = 0.5*(vTL.x + vTR.x);
-    vTM.z = 0.5*(vTL.z + vTR.z);
-    vTM.y = 0.5*( vTL.y + vTR.y );
-
-    vMR.x = 0.5*(vTR.x + vBR.x);
-    vMR.z = 0.5*(vTR.z + vBR.z);
-    vMR.y = 0.5*( vTR.y + vBR.y );
-
-    vBM.x = 0.5*(vBL.x + vBR.x);
-    vBM.z = 0.5*(vBL.z + vBR.z);
-    vBM.y = 0.5*( vBL.y + vBR.y );
-
-    vMM.x = 0.25*( vTL.x + vTR.x + vBL.x + vBR.x);
-    vMM.z = 0.25*( vTL.z + vTR.z + vBL.z + vBR.z);
-    vMM.y = 0.25*( vTL.y + vTR.y + vBL.y + vBR.y ) + getPerturb( curDepth);
-
-
-    subdivideSquare( TL, MM, curDepth-1 );
-    subdivideSquare( TM, MR, curDepth-1 );
-    subdivideSquare( MM, BR, curDepth-1 );
-    subdivideSquare( ML, BM, curDepth-1 );
 }
 
  void Terrain::computeNormals()
@@ -238,94 +130,6 @@ void Terrain::subdivideSquare(GridIndex topleft, GridIndex botright, GLint curDe
          }
      }
  }
-
-/**
- * Sets default values for the four corners of the terrain grid and calls subdivideSquare()
- * to begin the terrain generation process. You do not need to modify this function.
- */
-void Terrain::populateTerrain()
-{
-    Vector3 tl(-10, 2, -10);
-    Vector3 tr(10, 2, -10);
-    Vector3 bl(-10, 2, 10);
-    Vector3 br(10, 2, 10);
-    GridIndex tlg(0,0);
-    GridIndex trg(0,m_gridLength-1);
-    GridIndex blg(m_gridLength-1, 0);
-    GridIndex brg(m_gridLength-1, m_gridLength-1);
-    m_vertices[getIndex(tlg)] = tl;
-    m_vertices[getIndex(trg)] = tr;
-    m_vertices[getIndex(blg)] = bl;
-    m_vertices[getIndex(brg)] = br;
-    subdivideSquare(tlg, brg, m_depth);
-}
-
-void Terrain::populateTerrainFromHeightmap(){
-    //get the file
-    QFile file(m_filename);
-    assert(file.exists() && "The height does not exist");
-
-    //load the file
-    QImage image;
-    image.load(file.fileName());
-
-    //iterate through grid
-    for(int i = 0; i < m_gridLength; i++){
-        for(int j = 0; j < m_gridLength; j++){
-            //interpolate the x, y, z positions
-            double iProp = (double)i / (double)(m_gridLength - 1);
-            double jProp = (double)j / (double)(m_gridLength - 1);
-
-            double currX = determinePosition(jProp);
-            double currZ = determinePosition(iProp);
-            double currY = interpolateHeight(image, jProp, iProp);
-
-            //set the values
-            Vector3 &currVertex = m_vertices[getIndex(i, j)];
-            currVertex.x = currX;
-            currVertex.y = currY;
-            currVertex.z = currZ;
-        }
-    }
-}
-
-double Terrain::determinePosition(double gridPosition){
-    return -(DEFAULT_GRID_BOUNDS - (2.0 * gridPosition * DEFAULT_GRID_BOUNDS));
-}
-
-double Terrain::interpolateHeight(QImage heightMap, double x, double y){
-
-    //get width and height of the map
-    int width = heightMap.width();
-    int height = heightMap.height();
-
-    //get the current x and y positions
-    double currX = x * (double)width;
-    double currY = y * (double)height;
-
-    //get the indices of the map
-    double lowX = min(max(floor(currX), 0), width - 1);
-    double highX = min(max(ceil(currX), 0), width - 1);
-    double lowY = min(max(floor(currY), 0), height - 1);
-    double highY = min(max(ceil(currY), 0), height - 1);
-
-    //get the proportions
-    double xDist = 1 - (currX - lowX);
-    double yDist = 1 - (currY - lowY);
-
-    int lowXlowYgray = qGray(heightMap.pixel((int)lowX, (int)lowY));
-    int lowXhighYgray = qGray(heightMap.pixel((int)lowX, (int)highY));
-    int highXlowYgray = qGray(heightMap.pixel((int)highX, (int)lowY));
-    int highXhighYgray = qGray(heightMap.pixel((int)highX, (int)highY));
-
-    double grayProp = (xDist * yDist * (double)lowXlowYgray) +
-            (xDist * (1 - yDist) * (double)lowXhighYgray) +
-            ((1 - xDist) * yDist * (double)highXlowYgray) +
-            ((1 - xDist) * (1 - yDist) * (double)highXhighYgray);
-    grayProp = grayProp / 255.0;
-
-    return DEFAULT_MIN_HEIGHT + (grayProp * (DEFAULT_MAX_HEIGHT - DEFAULT_MIN_HEIGHT));
-}
 
 /**
  * Draws a line at each vertex showing the direction of that vertex's normal. You may find
@@ -431,15 +235,7 @@ void Terrain::loadTextureToTerrain()
 
 void Terrain::generate()
 {
-    if(m_filename.size() > 0){
-        //added by hcreynol
-        loadTextureToTerrain();
-        populateTerrainFromHeightmap();
-        computeNormals();
-    } else {
-        //original code
         loadTextureToTerrain();
         populateTerrain();
         computeNormals();
-    }
 }
