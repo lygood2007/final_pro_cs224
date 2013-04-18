@@ -107,10 +107,11 @@ void RandomTerrain::subdivideSquare(GridIndex topleft, GridIndex botright, GLint
 
 void RandomTerrain::populateTerrain()
 {
-    Vector3 tl(-10, 2, -10);
-        Vector3 tr(10, 2, -10);
-        Vector3 bl(-10, 2, 10);
-        Vector3 br(10, 2, 10);
+    int avgHeight = (TERRAIN_MAX_HEIGHT + TERRAIN_MIN_HEIGHT)*0.5;
+    Vector3 tl(-TERRAIN_BOUND, avgHeight, -TERRAIN_BOUND);
+        Vector3 tr(TERRAIN_BOUND, avgHeight, -TERRAIN_BOUND);
+        Vector3 bl(-TERRAIN_BOUND, avgHeight, TERRAIN_BOUND);
+        Vector3 br(TERRAIN_BOUND, avgHeight, TERRAIN_BOUND);
         GridIndex tlg(0,0);
         GridIndex trg(0,m_gridLength-1);
         GridIndex blg(m_gridLength-1, 0);

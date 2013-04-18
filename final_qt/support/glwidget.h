@@ -26,9 +26,12 @@
 //added by hcreynol
 #define USE_HEIGHTMAP
 
+#define RENDER_FLUID
+
 class QGLShaderProgram;
 class QGLFramebufferObject;
 class Terrain;
+class Fluid;
 
 class GLWidget : public QGLWidget
 {
@@ -44,6 +47,7 @@ private:
     QTimer m_timer; // The timer variable
     OrbitCamera m_camera; // Camera
     Terrain* m_terrain;
+    Fluid* m_fluid;
 
     QHash<QString, QGLShaderProgram *> m_shaderPrograms; // hash map of all shader programs
     QHash<QString, QGLFramebufferObject *> m_framebufferObjects; // hash map of all framebuffer objects

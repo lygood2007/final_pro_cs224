@@ -82,7 +82,6 @@ QList<Vector3*> Terrain::getSurroundingVertices(const GridIndex &coordinate) con
 
     return vecs;
 }
-
  void Terrain::computeNormals()
  {
      // For each vertex in the 2D grid...
@@ -207,10 +206,10 @@ void Terrain::draw() const
     glBegin(GL_QUADS);
     glNormal3f(0.f,1.f,0.f);
     glColor3f(0.3f,0.3f,1.f);
-    glVertex3f(-10,4,-10);
-    glVertex3f(-10,4,10);
-    glVertex3f(10,4,10);
-    glVertex3f(10,4,-10);
+    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
+    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
+    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
+    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
     glEnd();
     glDisable(GL_BLEND);
     drawNormals();
