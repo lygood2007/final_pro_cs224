@@ -12,12 +12,14 @@ TEMPLATE = app
 INCLUDEPATH += common \
     support \
     terrain \
+    water \
     camera \
     loader
 
 DEPENDPATH += common \
     support \
     terrain \
+    water \
     camera  \
     loader
 
@@ -36,7 +38,8 @@ SOURCES += \
     common/CS123Matrix.inl \
     common/CS123Vector.inl \
     terrain/random_terrain.cpp \
-    terrain/heightmap_terrain.cpp
+    terrain/heightmap_terrain.cpp \
+    common/utils.cpp
 
 HEADERS  += \
     camera/camera.h \
@@ -54,7 +57,10 @@ HEADERS  += \
     common/types.h \
     common/vector.h \
     terrain/random_terrain.h \
-    terrain/heightmap_terrain.h
+    terrain/heightmap_terrain.h \
+    common/debug_marco.h \
+    common/utils.h \
+    common/grid.h
 
 OTHER_FILES += cuda/test.cu \
     shaders/refract.vert \
