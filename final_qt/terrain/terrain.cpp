@@ -201,6 +201,7 @@ void Terrain::draw() const
     }
     glDisable( GL_TEXTURE_2D);
 
+    /*
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE,GL_ONE);
     glBegin(GL_QUADS);
@@ -211,7 +212,7 @@ void Terrain::draw() const
     glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
     glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
     glEnd();
-    glDisable(GL_BLEND);
+    glDisable(GL_BLEND);*/
     drawNormals();
 
     glPopMatrix();

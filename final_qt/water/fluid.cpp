@@ -22,6 +22,7 @@
 #include <string.h>
 #include <iostream>
 #include <sstream>
+#include "CS123Common.h"
 #include "debug_marco.h"
 
 const float defaultHeight = TERRAIN_MAX_HEIGHT*1.5;
@@ -74,11 +75,11 @@ void Fluid::draw() const
     //Height field fluid simulation - Sec 2.1
         //discretize the simulation domain where the heights are stored at the cell centers
         //and the velocity components on faces
-    glPolygonMode(GL_FRONT, GL_LINE);
+    //glPolygonMode(GL_FRONT, GL_LINE);
     drawFluid( DRAW_MESH );
   if( m_renderNormals )
         drawNormal();
-  glPolygonMode(GL_FRONT,GL_FILL);
+//  glPolygonMode(GL_FRONT,GL_FILL);
         //employing time splitting by first solving for self advection of the velocity field
             //advection is the unconditionally stable modified MacCormack method
             //but we fall back onto the semi-Lagrangian method if the first equation result is out of bounds
@@ -159,8 +160,13 @@ void Fluid::update(const float dt)
 
     m_timeElapsed += dt;
     m_updateCount++;
- //   if( (m_updateCount%2) == 0 )
- //       writeToImage( HEIGHT );
+
+#ifdef SAVE_IMAGE
+    const int savePerFrames = 5;
+    if( (m_updateCount%savePerFrames) == 0 )
+        saveToImage( VELOCITY );
+#endif
+
 }
 
 /**
@@ -426,8 +432,61 @@ void Fluid::checkBoundary()
 /**
  * @brief Write the height field or velocity to image
  */
-void Fluid::writeToImage( FieldType type )
+void Fluid::saveToImage( FieldType type )
 {
+    QImage saveImage = QImage(m_gridSize,m_gridSize,QImage::Format_RGB32);
+    BGRA* data =(BGRA*)saveImage.bits();
+    float maxH = maxHeight*1.2;
+    float minH = defaultHeight*0.5;
+    float minV = -2;
+    float maxV = 2;
+    for( int i = 0; i < m_gridSize; i++ )
+    {
+        for( int j = 0; j < m_gridSize; j++ )
+        {
+            float curH = m_heightField[i][j];
+            int gray = (int)((curH - minH)/(maxH - minH)*255);
+            const int index = i*m_gridSize + j;
+            data[index].r = gray;
+            data[index].g = gray;
+            data[index].b = gray;
+            data[index].a = 255;
+            if( type == VELOCITY )
+            {
+                float u = 0.5*(m_velocityU[i][j] + m_velocityU[i][j+1]);
+                float w = 0.5*(m_velocityW[i][j] + m_velocityW[i+1][j]);
+                int iu = (int)(((u - minV)/(maxV - minV))*100.f);
+                int iw = (int)(((w - minV)/(maxV - minV))*100.f);
+                data[index].r +=  iu;
+                data[index].g += iw;
+                if( data[index].r > 255 )
+                    data[index].r = 255;
+                if( data[index].g > 255 )
+                    data[index].b = 255;
+            }
+        }
+    }
+    std::stringstream ss;
+    std::string fileName;
+    std::string form = ".png";
+    if( type == HEIGHT )
+    {
+        std::string name = SAVE_NAME_HEIGHT;
+        ss<<name<<m_updateCount<<form;
+        fileName = ss.str();
+    }
+    else if( type == VELOCITY )
+    {
+        std::string name = SAVE_NAME_VELOCITY;
+        ss<<name<<m_updateCount<<form;
+        fileName = ss.str();
+    }
+    else
+    {
+        assert(0);
+    }
+    assert( fileName.size() > 0 );
+    saveImage.save( fileName.c_str() );
 }
 
 /**
@@ -453,6 +512,8 @@ void Fluid::drawFluid( DrawMethod method ) const
     }
     else if ( method == DRAW_MESH )
     {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE,GL_ONE);
         for( int i = 0; i < m_gridSize-1; i++ )
         {
 
@@ -468,6 +529,7 @@ void Fluid::drawFluid( DrawMethod method ) const
             }
             glEnd();
         }
+        glDisable(GL_BLEND);
     }
     else
     {

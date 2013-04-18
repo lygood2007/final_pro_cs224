@@ -16,9 +16,13 @@
 #define GRID_SIZE TERRAIN_BOUND*2
 #define DOMAIN_SIZE TERRAIN_BOUND
 #define GRAVITY -10
+#define SAVE_NAME_HEIGHT "height"
+#define SAVE_NAME_VELOCITY "velocity"
+//#define SAVE_IMAGE
 
 extern float bilinearInterp( QVector<QVector<float > > &vec, const float x, const float z );
 extern float randomFloatGenerator( float min = 0.f, float max = 1.f);
+
 
 class Fluid
 {
@@ -117,7 +121,7 @@ public:
     /**
      * @brief Write the height field or velocity to image
      */
-    void writeToImage( FieldType type );
+    void saveToImage( FieldType type );
 
     /**
      * @brief drawFluid Draw the fluid with different method
