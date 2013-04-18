@@ -53,7 +53,7 @@ void HeightmapTerrain::populateTerrain()
 
 double HeightmapTerrain::determinePosition(double gridPosition)
 {
-    return -(DEFAULT_GRID_BOUNDS - (2.0 * gridPosition * DEFAULT_GRID_BOUNDS));
+    return -(TERRAIN_BOUND - (2.0 * gridPosition * TERRAIN_BOUND));
 }
 
 double HeightmapTerrain::interpolateHeight(QImage heightMap, double x, double y)
@@ -87,5 +87,5 @@ double HeightmapTerrain::interpolateHeight(QImage heightMap, double x, double y)
             ((1 - xDist) * (1 - yDist) * (double)highXhighYgray);
     grayProp = grayProp / 255.0;
 
-    return DEFAULT_MIN_HEIGHT + (grayProp * (DEFAULT_MAX_HEIGHT - DEFAULT_MIN_HEIGHT));
+    return TERRAIN_MIN_HEIGHT + (grayProp * (TERRAIN_MAX_HEIGHT - TERRAIN_MIN_HEIGHT));
 }

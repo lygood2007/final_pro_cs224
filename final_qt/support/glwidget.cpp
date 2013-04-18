@@ -8,6 +8,7 @@
 #include "GL/glut.h"
 #include "glwidget.h"
 #include "types.h"
+#include "fluid.h"
 #include "terrain.h"
 #include "random_terrain.h"
 #include "heightmap_terrain.h"
@@ -27,7 +28,7 @@ extern "C"
 /**
  * Local variables in this cpp scope
  */
-static color4f clearColor = {0.f, 0.f, 0.f, 0.f};
+static Colorf clearColor = Colorf(0.f,0.f,0.f,0.f);
 
 GLWidget::GLWidget(QWidget *parent) : QGLWidget(parent)
   ,m_timer(this),m_prevTime(0), m_prevFps(0.f), m_fps(0.f),
@@ -40,6 +41,9 @@ GLWidget::~GLWidget()
 {
     if( m_terrain )
         delete m_terrain;
+    if( m_fluid )
+        delete m_fluid;
+
     foreach (QGLShaderProgram *sp, m_shaderPrograms)
         delete sp;
     foreach (QGLFramebufferObject *fbo, m_framebufferObjects)
@@ -57,6 +61,7 @@ void GLWidget::init()
     // The game loop is implemented using a timer
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
+    m_fluid =  new Fluid();
 #ifdef USE_HEIGHTMAP
     m_terrain = new HeightmapTerrain(); //added by hcreynol
 #else
@@ -92,7 +97,7 @@ void GLWidget::initializeGL()
     // method. Before this method is called, there is no active OpenGL
     // context and all OpenGL calls have no effect.
 
-    glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);   // Always reset the screen to black before drawing anything
+    glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);   // Always reset the screen to black before drawing anything
     glEnable(GL_DEPTH_TEST);    // When drawing a triangle, only keep pixels closer to the camera than what's already been drawn
      glDisable(GL_DITHER);
      glShadeModel(GL_SMOOTH);
@@ -131,14 +136,19 @@ void GLWidget::paintGL()
     timeUpdate();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // TODO: Implement the demo rendering here
 #ifdef DRAW_TERRAIN
     m_terrain->draw();
 #endif
 
+#ifdef RENDER_FLUID
+    // Fluid part
+    m_fluid->update( 0.02 );
+    m_fluid->draw();
+#endif
     //The lighting stuff - SH
     int width = this->width();
     int height = this->height();
+
 
     // Render the scene to a framebuffer
 //    m_framebufferObjects["fbo_0"]->bind();
@@ -435,6 +445,9 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     }
     else
     {
+#ifdef RENDER_FLUID
+    m_fluid->addRandomDrop();
+#endif
         m_mouseLeftDown = true;
     }
 }
@@ -505,6 +518,14 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         else
         {
             m_terrain->enableNormal();
+        }
+        if( m_fluid->isRenderingNormal() )
+        {
+            m_fluid->disableNormal();
+        }
+        else
+        {
+            m_fluid->enableNormal();
         }
         break;
     }

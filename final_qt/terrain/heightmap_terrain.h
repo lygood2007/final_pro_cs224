@@ -14,9 +14,6 @@
 
 #define HEIGHTMAP_FILENAME "./resource/h_map_1.jpg"
 //added by hcreynol
-#define DEFAULT_GRID_BOUNDS 10
-#define DEFAULT_MIN_HEIGHT -3
-#define DEFAULT_MAX_HEIGHT 5
 
 class HeightmapTerrain : public Terrain
 {
