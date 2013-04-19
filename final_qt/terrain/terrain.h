@@ -17,8 +17,8 @@
 
 #define DEFAULT_DEPTH 6
 #define TERRAIN_BOUND 50
-#define TERRAIN_MIN_HEIGHT -10
-#define TERRAIN_MAX_HEIGHT 20
+#define TERRAIN_MIN_HEIGHT 0
+#define TERRAIN_MAX_HEIGHT 50
 
 #define TEXTURE_DIR "./resource/terrain.jpg"
 
@@ -43,6 +43,11 @@ public:
     void drawNormals() const;
 
     /**
+     * Draw a virtual transparent boundary for the terrain
+     */
+    void drawBoundary() const;
+
+    /**
      * Render the terrain to screen.
      */
     void draw() const;
@@ -64,6 +69,24 @@ public:
      * Get m_renderNormal
      */
     inline bool isRenderingNormal() const {return m_renderNormals;}
+
+    /**
+     * @brief getGridLength Get the grid length
+     * @return The grid length
+     */
+    inline int getGridLength() const{ return m_gridLength; }
+
+    /**
+     * @brief getGridLength Get the bound
+     * @return The bound
+     */
+    inline int getBound() const{ return m_bound; }
+
+    /**
+     * @brief getVerts Get the vertices of the terrain
+     * @return
+     */
+    inline const Vector3* getVerts() const { return m_vertices; }
 
 private:
 
@@ -112,6 +135,7 @@ protected:
     int m_depth; // The number of recursion levels to use to generate terrain. Can be used as a level-of-detail parameter.
     bool m_renderNormals; // Flag for rendering normals
     int m_gridLength; // The grid length
+    int m_bound; // Specify the actual length of terrain, should be 2*m_bound*2*m_bound
     GLuint m_textureId; // The texture id
 };
 

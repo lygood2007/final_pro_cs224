@@ -8,7 +8,7 @@
 #define UTILS_H
 
 #include <QVector>
-
+#include "vector.h"
 /**
   * @brief bilinearInterp 2D dimension bilinear interpolation
   * @param vec The 2D array
@@ -25,5 +25,16 @@
   * @return The random float number we get
   */
  float randomFloatGenerator( float min = 0.f, float max = 1.f);
+
+ /**
+  * @brief doIntersectTriangles Check if the ray intersects the triangle
+  * @param eyePos The start point of the ray
+  * @param d The direction of ray
+  * @param v0 The vertex 0 of triangle
+  * @param v1 The vertex 1 of triangle
+  * @param v2 The vertex 2 of triangle
+  * @return True if the ray intersects
+  */
+ bool doIntersectTriangles( const Vector3& eyePos, const Vector3& d, const Vector3& v0, const Vector3& v1, const Vector3& v2 );
 
 #endif // UTILS_H

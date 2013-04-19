@@ -17,4 +17,34 @@ struct Colorf
     float a;
 };
 
+struct Index2D
+{
+    int indRow;
+    int indCol;
+};
+
+struct Index1D
+{
+    unsigned int ind;
+};
+
+union Tri
+{
+    struct
+    {
+        // 2D index
+        Index2D a2D;
+        Index2D b2D;
+        Index2D c2D;
+    };
+
+    struct
+    {
+        // 1D index
+        Index1D a1D;
+        Index1D b1D;
+        Index1D c1D;
+    };
+};
+
 #endif // TYPES_H

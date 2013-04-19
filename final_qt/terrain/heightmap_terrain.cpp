@@ -53,7 +53,7 @@ void HeightmapTerrain::populateTerrain()
 
 double HeightmapTerrain::determinePosition(double gridPosition)
 {
-    return -(TERRAIN_BOUND - (2.0 * gridPosition * TERRAIN_BOUND));
+    return -(m_bound - (2.0 * gridPosition * m_bound));
 }
 
 double HeightmapTerrain::interpolateHeight(QImage heightMap, double x, double y)

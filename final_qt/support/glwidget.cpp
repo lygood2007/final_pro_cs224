@@ -7,8 +7,10 @@
 
 #include "GL/glut.h"
 #include "glwidget.h"
+#include "CS123Algebra.h"
 #include "types.h"
 #include "fluid.h"
+#include "utils.h"
 #include "terrain.h"
 #include "random_terrain.h"
 #include "heightmap_terrain.h"
@@ -61,13 +63,13 @@ void GLWidget::init()
     // The game loop is implemented using a timer
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
-    m_fluid =  new Fluid();
+
 #ifdef USE_HEIGHTMAP
     m_terrain = new HeightmapTerrain(); //added by hcreynol
 #else
     m_terrain = new Terrain();
 #endif
-
+    m_fluid =  new Fluid(m_terrain);
     // Start a timer that will try to get 60 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
     m_timer.start(1000 / 60);
@@ -128,6 +130,7 @@ void GLWidget::initializeGL()
     glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     glEnable(GL_LIGHT0);
     m_terrain->generate();
+    m_fluid->backupHeight(m_terrain);
     m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
 }
 
@@ -446,7 +449,8 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     else
     {
 #ifdef RENDER_FLUID
-    m_fluid->addRandomDrop();
+         intersectFluid( event->x(), event->y() );
+    //m_fluid->addRandomDrop();
 #endif
         m_mouseLeftDown = true;
     }
@@ -573,6 +577,75 @@ void GLWidget::timeUpdate()
     m_delta = (time-m_prevTime)/1000.f;
     m_fps = 1000.f /  (time-m_prevTime);
     m_prevTime = time;
+}
+
+/**
+ * @brief intersectFluid Check if the ray shooting from position (x, y)  intersects the fluid
+ * @param x, The x position in screen space
+ * @param y, The y position in screen space
+ * @return Return if it is intersected
+ */
+void GLWidget::intersectFluid( const int x, const int y)
+{
+    Vector4 eyePos = m_camera.getEyePos();
+    Vector4 pFilmCam;
+    Matrix4x4 invViewTransMat = m_camera.getInvViewTransMatrix();
+    pFilmCam.x = ((REAL)(2*x))/width() - 1; pFilmCam.y = 1- ((REAL)(2*y))/height(); pFilmCam.z = -1;
+    pFilmCam.w = 1;
+
+    Vector4 pFilmWorld = invViewTransMat*pFilmCam;
+    Vector4 d = pFilmWorld - eyePos;
+    d = d.getNormalized();
+    Vector3 dir3 = Vector3(d.x,d.y,d.z);
+    Vector3 eye3 = Vector3(eyePos.x,eyePos.y,eyePos.z);
+    float halfDomain = m_fluid->m_domainSize/2;
+    float dx = m_fluid->m_dx;
+
+    const QVector<Tri>& temp = m_fluid->m_triangles;
+    const QVector<QVector<float> >& tempHeight = m_fluid->m_terrainHeightField;
+    const QVector<QVector<float> >& tempDepth = m_fluid->m_depthField;
+    int indexRow = -1;
+    int indexCol = -1;
+    const int gridSize = m_fluid->m_gridSize;
+
+    for( int i = 0; i < temp.size(); i++ )
+    {
+        Tri curTri = temp[i];
+        // Firstly check if the triangle is visible
+        int count = 0;
+        int r[3]; int c[3];
+        r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
+        r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
+        r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
+        for( int m = 0; m < 3; m++ )
+        {
+            if( m_fluid->m_depthField[r[m]][c[m]] > EPSILON )
+                count++;
+        }
+        if( count == 0 )
+            continue;
+        else
+        {
+            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[r[0]][c[0]] + tempDepth[r[0]][c[0]],
+                                      - halfDomain + r[0]*dx );
+            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[r[1]][c[1]] + tempDepth[r[1]][c[1]],
+                                      - halfDomain + r[1]*dx );
+            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[r[2]][c[2]] + tempDepth[r[2]][c[2]],
+                                      - halfDomain + r[2]*dx );
+
+             if( doIntersectTriangles( eye3, dir3, p0, p1, p2 ) )
+             {
+                 indexRow =  gridSize - c[0];
+                 indexCol = r[0];
+                 break;
+             }
+        }
+    }
+
+    if( indexRow != -1 && indexCol != -1 )
+    {
+        m_fluid->addDrop( indexCol, indexRow );
+    }
 }
 
 void GLWidget::tick()

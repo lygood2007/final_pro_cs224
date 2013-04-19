@@ -15,6 +15,9 @@ Terrain::Terrain()
     m_normals = new Vector3[terrain_array_size];
     m_renderNormals = false;
     m_textureId = 0;
+
+    // The actual size of terrain is hard coded
+    m_bound = TERRAIN_BOUND;
 }
 
 Terrain::~Terrain()
@@ -26,6 +29,147 @@ Terrain::~Terrain()
 
     if( m_textureId != 0 )
         glDeleteTextures(1,&m_textureId);
+}
+
+/**
+ * Render the terrain to screen
+ */
+void Terrain::draw() const
+{
+    // Clear the color buffer before you draw!
+
+    glDisable( GL_TEXTURE_2D);
+
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D,m_textureId);
+    glPushMatrix();
+
+    int index = 0;
+    for( int i = 0; i < m_gridLength-1; i++ )
+    {
+
+        glBegin( GL_TRIANGLE_STRIP );
+
+        for( int j = 0; j < m_gridLength; j++ )
+        {
+            index = i*m_gridLength + j;
+            glColor3f(1.0f,1.0f,1.0f);
+            glNormal3f( m_normals[index].x, m_normals[index].y, m_normals[index].z );
+            glTexCoord2f( ((float)(m_gridLength - i))/m_gridLength, ((float)j)/m_gridLength );
+            glVertex3f(  m_vertices[index].x, m_vertices[index].y, m_vertices[index].z );
+
+            index = (i+1)*m_gridLength+j;
+            glColor3f(1.0f,1.0f,1.0f);
+            glNormal3f( m_normals[index].x, m_normals[index].y, m_normals[index].z );
+            glTexCoord2f( ((float)(m_gridLength - i-1))/m_gridLength, ((float)j)/m_gridLength );
+            glVertex3f( m_vertices[index].x, m_vertices[index].y, m_vertices[index].z );
+        }
+        glEnd();
+    }
+    glDisable( GL_TEXTURE_2D);
+
+    /*
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE,GL_ONE);
+    glBegin(GL_QUADS);
+    glNormal3f(0.f,1.f,0.f);
+    glColor3f(0.3f,0.3f,1.f);
+    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
+    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
+    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
+    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
+    glEnd();
+    glDisable(GL_BLEND);*/
+    drawBoundary();
+    drawNormals();
+
+    glPopMatrix();
+    // Force OpenGL to perform all pending operations -- usually a good idea to call this
+    // We need that?
+    glFlush();
+    // We need that?
+    // Swap the buffers to show what we have just drawn onto the screen
+    //swapBuffers();
+}
+
+/**
+ * Draws a line at each vertex showing the direction of that vertex's normal. You may find
+ * this to be a useful tool if you're having trouble getting the lighting to look right.
+ * By default, this function is called in paintGL(), but only renders anything if
+ * m_renderNormals is true. You do not need to modify this function.
+ */
+void Terrain::drawNormals() const
+{
+    if (m_renderNormals)
+    {
+        glColor3f(1,1,1);
+
+        for (int row = 0; row < m_gridLength; row++)
+        {
+            for (int column = 0; column < m_gridLength; column++)
+            {
+                glBegin(GL_LINES);
+
+                Vector3 curVert = m_vertices[getIndex(row, column)];
+                Vector3 curNorm = m_normals[getIndex(row, column)];
+
+                glNormal3f(curNorm.x,curNorm.y,curNorm.z);
+                glVertex3f(curVert.x, curVert.y, curVert.z);
+                glVertex3f(curVert.x +curNorm.x,
+                           curVert.y + curNorm.y,
+                           curVert.z + curNorm.z);
+
+                glEnd();
+            }
+        }
+    }
+}
+
+/**
+ * Draw a virtual transparent boundary for the terrain
+ */
+void Terrain::drawBoundary() const
+{
+    glDisable(GL_CULL_FACE);
+
+//   glEnable(GL_BLEND);
+    glColor3f(0.8f,0.8f,0.8f);
+    glBegin( GL_QUADS );
+    //glNormal3f( 1.f,0.f,0.f);
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*0.6, m_bound );
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*0.6, -m_bound );
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*1.5, -m_bound );
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*1.5, m_bound );
+
+ //   glNormal3f(0.f, 0.f, 1.f );
+    glVertex3f( -m_bound, TERRAIN_MAX_HEIGHT*0.6, m_bound );
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*0.6, m_bound );
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*1.5, m_bound );
+    glVertex3f( -m_bound, TERRAIN_MAX_HEIGHT*1.5, m_bound );
+
+   // glNormal3f(-1.f, 0.f, 0.f );
+    glVertex3f( -m_bound, TERRAIN_MAX_HEIGHT*0.6, -m_bound );
+    glVertex3f( -m_bound, TERRAIN_MAX_HEIGHT*0.6, m_bound );
+    glVertex3f( -m_bound, TERRAIN_MAX_HEIGHT*1.5, m_bound );
+    glVertex3f( -m_bound, TERRAIN_MAX_HEIGHT*1.5, -m_bound );
+
+   // glNormal3f( 0.f, 0.f, -1.f );
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*0.6, -m_bound );
+    glVertex3f( -m_bound,TERRAIN_MAX_HEIGHT*0.6, -m_bound );
+    glVertex3f( -m_bound, TERRAIN_MAX_HEIGHT*1.5, -m_bound );
+    glVertex3f( m_bound, TERRAIN_MAX_HEIGHT*1.5, -m_bound );
+    glEnd();
+//    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
+    //glDisable(GL_BLEND);
+}
+
+void Terrain::generate()
+{
+        loadTextureToTerrain();
+        populateTerrain();
+        computeNormals();
 }
 
 /**
@@ -131,100 +275,6 @@ QList<Vector3*> Terrain::getSurroundingVertices(const GridIndex &coordinate) con
  }
 
 /**
- * Draws a line at each vertex showing the direction of that vertex's normal. You may find
- * this to be a useful tool if you're having trouble getting the lighting to look right.
- * By default, this function is called in paintGL(), but only renders anything if
- * m_renderNormals is true. You do not need to modify this function.
- */
-void Terrain::drawNormals() const
-{
-    if (m_renderNormals)
-    {
-        glColor3f(1,1,1);
-
-        for (int row = 0; row < m_gridLength; row++)
-        {
-            for (int column = 0; column < m_gridLength; column++)
-            {
-                glBegin(GL_LINES);
-
-                Vector3 curVert = m_vertices[getIndex(row, column)];
-                Vector3 curNorm = m_normals[getIndex(row, column)];
-
-                glNormal3f(curNorm.x,curNorm.y,curNorm.z);
-                glVertex3f(curVert.x, curVert.y, curVert.z);
-                glVertex3f(curVert.x +curNorm.x,
-                           curVert.y + curNorm.y,
-                           curVert.z + curNorm.z);
-
-                glEnd();
-            }
-        }
-    }
-}
-
-/**
- * Render the terrain to screen
- */
-void Terrain::draw() const
-{
-    // Clear the color buffer before you draw!
-
-    glDisable( GL_TEXTURE_2D);
-
-
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D,m_textureId);
-    glPushMatrix();
-
-    int index = 0;
-    for( int i = 0; i < m_gridLength-1; i++ )
-    {
-
-        glBegin( GL_TRIANGLE_STRIP );
-
-        for( int j = 0; j < m_gridLength; j++ )
-        {
-            index = i*m_gridLength + j;
-            glColor3f(1.0f,1.0f,1.0f);
-            glNormal3f( m_normals[index].x, m_normals[index].y, m_normals[index].z );
-            glTexCoord2f( ((float)(m_gridLength - i))/m_gridLength, ((float)j)/m_gridLength );
-            glVertex3f(  m_vertices[index].x, m_vertices[index].y, m_vertices[index].z );
-
-            index = (i+1)*m_gridLength+j;
-            glColor3f(1.0f,1.0f,1.0f);
-            glNormal3f( m_normals[index].x, m_normals[index].y, m_normals[index].z );
-            glTexCoord2f( ((float)(m_gridLength - i-1))/m_gridLength, ((float)j)/m_gridLength );
-            glVertex3f( m_vertices[index].x, m_vertices[index].y, m_vertices[index].z );
-        }
-        glEnd();
-    }
-    glDisable( GL_TEXTURE_2D);
-
-    /*
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE,GL_ONE);
-    glBegin(GL_QUADS);
-    glNormal3f(0.f,1.f,0.f);
-    glColor3f(0.3f,0.3f,1.f);
-    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
-    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
-    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
-    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
-    glEnd();
-    glDisable(GL_BLEND);*/
-    drawNormals();
-
-    glPopMatrix();
-    // Force OpenGL to perform all pending operations -- usually a good idea to call this
-    // We need that?
-    glFlush();
-    // We need that?
-    // Swap the buffers to show what we have just drawn onto the screen
-    //swapBuffers();
-}
-
-/**
  ** Load the texture into memory
  **/
 
@@ -233,9 +283,3 @@ void Terrain::loadTextureToTerrain()
     m_textureId = loadTexture(TEXTURE_DIR);
 }
 
-void Terrain::generate()
-{
-        loadTextureToTerrain();
-        populateTerrain();
-        computeNormals();
-}

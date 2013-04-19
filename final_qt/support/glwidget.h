@@ -13,6 +13,7 @@
 #include <QTimer>
 #include <QHash>
 #include <QString>
+#include "utils.h"
 #include "camera.h"
 #include "resourceloader.h"
 
@@ -64,7 +65,7 @@ private:
     int m_prevTime;
     float m_prevFps, m_fps;
     float m_delta;
-private:
+public:
     // Private functions
     /** Initliaze the variables in the class*/
     void init();
@@ -109,6 +110,14 @@ private:
      * Update the time variables
      **/
     void timeUpdate();
+
+    /**
+     * @brief intersectFluid Check if the ray shooting from position (x, y)  intersects the fluid
+     * @param x, The x position in screen space
+     * @param y, The y position in screen space
+     * @return Return if it is intersected
+     */
+    void intersectFluid( const int x, const int y);
 
     //copied from CS123 lab 09 - SH
     void loadCubeMap();

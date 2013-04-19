@@ -25,10 +25,12 @@
 #include "CS123Common.h"
 #include "debug_marco.h"
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT*1.5;
+using std::cout;
+using std::endl;
+const float defaultHeight = TERRAIN_MAX_HEIGHT- 5;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
-const float maxHeight = TERRAIN_MAX_HEIGHT*2;
+const float maxHeight = TERRAIN_MAX_HEIGHT+10;
 /**
  * @brief printMat For debugging
  * @param vec The 2D vector you want to draw
@@ -54,6 +56,11 @@ Fluid::Fluid()
 Fluid::Fluid(const int gridSize, const float domainSize)
 {
     init( gridSize, domainSize );
+}
+
+Fluid::Fluid( Terrain *t )
+{
+    init( t->getGridLength(), 2*t->getBound() );
 }
 
 Fluid::~Fluid()
@@ -141,12 +148,14 @@ void Fluid::update(const float dt)
     if( dt > 0.05 )
     {
         // We assume this is not stable
+        // In fact, delta t should be smaller than delta_x/(g*D), where D is the maximum depth of the fluid
         return;
     }
 
+
     m_dt = dt;
 
-    advect( HEIGHT, m_heightField );
+    advect( HEIGHT, m_depthField );
     advect( VELOCITY_U, m_velocityU );
     advect( VELOCITY_W, m_velocityW );
 
@@ -170,13 +179,40 @@ void Fluid::update(const float dt)
 }
 
 /**
- * @brief Add the drop to the water
- * @param poosX The x position
- * @param posZ The y position
+ * @brief Increment the height of the rectangular region around (posX, posZ) by incHeight
+ * @param posX The x position
+ * @param posZ The z position
+ * @param radius The radius
+ * @param incHeight The amount of height added
  */
+void Fluid::incrementH(const int posX, const int posZ, const int radius, const float incHeight )
+{
+    for( int i = posZ - radius; i < posZ + radius + 1; i++ )
+    {
+        for( int j = posX - radius; j < posX + radius + 1; j++ )
+        {
+            if( i < 0 || i >= m_gridSize  || j < 0 || j >= m_gridSize )
+            {
+                continue;
+            }
+            else
+            {
+                m_depthField[i][j] += incHeight;
+                if( m_depthField[i][j] > maxHeight )
+                    m_depthField[i][j] = maxHeight;
+            }
+        }
+    }
+}
+
 void Fluid::addDrop(const int posX, const int posZ)
 {
-
+    // Fixed size
+    int radius = m_gridSize/20;
+    if( radius < 1 )
+        radius = 1;
+    float incH = 8;
+    incrementH( posX, posZ, radius, incH );
 }
 
 /**
@@ -185,12 +221,18 @@ void Fluid::addDrop(const int posX, const int posZ)
  */
 void Fluid::addRandomDrop( const float freq )
 {
+    // freq is not useful right now
     //float rnd = randomFloatGenerator();
-        int posX = rand()%m_gridSize;
-        int posY = rand()%m_gridSize;
-        int radius = rand()%(m_gridSize/15);
+        //int posX = rand()%m_gridSize;
+        //int posY = rand()%m_gridSize;
+       // int radius = rand()%(m_gridSize/15);
 
+        int posX = 0.5*m_gridSize;
+        int posZ = 0.5*m_gridSize;
+        int radius = rand()%(m_gridSize/15);
     float rndHeight = randomFloatGenerator( 5, 15 );
+
+    incrementH( posX, posZ, radius, rndHeight );
    // float rndHeight =3;
         /*
         int posX = 0.4*m_gridSize;
@@ -199,7 +241,7 @@ void Fluid::addRandomDrop( const float freq )
     float rndHeight = 0.05;
         if( radius == 0 )
             radius = 1;*/
-        for( int i = posY - radius; i < posY + radius + 1; i++ )
+    /*    for( int i = posY - radius; i < posY + radius + 1; i++ )
         {
             for( int j = posX - radius; j < posX + radius + 1; j++ )
             {
@@ -209,12 +251,13 @@ void Fluid::addRandomDrop( const float freq )
                 }
                 else
                 {
-                    m_heightField[i][j] += rndHeight;
-                    if( m_heightField[i][j] > maxHeight )
-                        m_heightField[i][j] = maxHeight;
+                    m_depthField[i][j] += rndHeight;
+                    if( m_depthField[i][j] > maxHeight )
+                        m_depthField[i][j] = maxHeight;
                 }
             }
         }
+        */
 }
 
 /**
@@ -224,6 +267,25 @@ void Fluid::addRandomDrop( const float freq )
 void Fluid::setColor(const Colorf color)
 {
     m_color = color;
+}
+
+void Fluid::backupHeight( Terrain* t )
+{
+    std::cout<<"Back up terrain heights into fluid..."<<std::endl;
+    assert( t->getGridLength() == m_gridSize );
+    assert( t->getBound() == m_domainSize/2 );
+   const Vector3* terrainVertices = t->getVerts();
+   for( int i = 0; i < m_gridSize; i++ )
+   {
+       for( int j = 0; j < m_gridSize; j++ )
+       {
+           const int index = i*m_gridSize + j;
+           m_terrainHeightField[i][j] = terrainVertices[index].y;
+       }
+   }
+    initDepthField();
+//   printMat( m_terrainHeightField );
+   std::cout<<"Finshed backup"<<std::endl;
 }
 
 /**
@@ -238,37 +300,39 @@ void Fluid::init(const int gridSize, const float domainSize)
     m_dxInv = 1.f/m_dx;
 
     /**
-     * The height array should be (GRID_SIZE)x(GRID_SIZE)
-     * The u array should be (GRID_SIZE)x(GRID_SZIE+1)
-     * The v array should be (GRID_SIZE+1)x(GRID_SIZE)
+     * The height array should be (m_girdSize)x(m_gridSize)
+     * The u array should be (m_gridSize)x(m_gridSize+1)
+     * The v array should be (m_gridSize+1)x(m_gridSize)
      */
 
-    m_heightField.resize(m_gridSize);
+    m_depthField.resize(m_gridSize);
     m_normalField.resize( m_gridSize );
+    m_terrainHeightField.resize( m_gridSize );
     m_velocityU.resize(m_gridSize);
     m_velocityW.resize(m_gridSize+1);
 
     for( int i = 0; i < m_gridSize; i++ )
     {
-        m_heightField[i].resize(m_gridSize);
-        m_heightField[i].fill(defaultHeight);
+        m_depthField[i].resize(m_gridSize);
+        //m_depthField[i].fill(defaultHeight);
         m_normalField[i].resize(m_gridSize);
         m_normalField[i].fill( Vector3(0.f,1.f,0.f));
 
+        m_terrainHeightField[i].resize(m_gridSize);
+        m_terrainHeightField[i].fill(0.0);
         m_velocityU[i].resize(m_gridSize+1);
         m_velocityU[i].fill(defaultU);
 
         m_velocityW[i].resize(m_gridSize);
         m_velocityW[i].fill(defaultW);
-
     }
     m_velocityW[m_gridSize].resize(m_gridSize);
     m_velocityW[m_gridSize].fill(defaultW);
 
-    assert( m_heightField.size() == m_gridSize && m_heightField[0].size() == m_gridSize );
+    assert( m_depthField.size() == m_gridSize && m_depthField[0].size() == m_gridSize );
     assert( m_velocityU.size() == m_gridSize && m_velocityU[0].size() == m_gridSize+1 );
     assert( m_velocityW.size() == m_gridSize+1&& m_velocityW[0].size() == m_gridSize );
-
+    buildTriangleList();
     m_tempBuffer = new float*[m_gridSize+1];
     for( int i = 0; i < m_gridSize + 1; i++ )
     {
@@ -282,7 +346,6 @@ void Fluid::init(const int gridSize, const float domainSize)
     m_timeElapsed = 0.f;
     // Default color
     m_color = Colorf(0.f,0.2f,0.8f,0.5f);
-
     m_renderNormals = false;
 
 #ifdef FLUID_DEBUG
@@ -300,7 +363,7 @@ void Fluid::init(const int gridSize, const float domainSize)
             writeToImage(VELOCITY);
         count++;
         printf("Count:%d\n", count);
-       printMat( m_heightField );
+       printMat( m_depthField );
         timeCount+= m_dt;
     }
     assert(0);
@@ -370,18 +433,26 @@ void Fluid::advect( FieldType type, QVector<QVector<float> >& vec )
  */
 void Fluid::updateVelocities()
 {
+    float h1,h2;
     for (int i=1;i<m_gridSize-1;i++)
     {
         for (int j=2;j<m_gridSize-1;j++)
         {
-                m_velocityU[i][j] += GRAVITY * m_dt * m_dxInv * ((m_heightField[i][j]-m_heightField[i][j-1]) );
+            h1 = max(0.0f, m_terrainHeightField[i][j] + m_depthField[i][j] );
+            h2 = max(0.0f, m_terrainHeightField[i][j-1] + m_depthField[i][j-1] );
+ //           m_velocityU[i][j] += GRAVITY * m_dt * m_dxInv * ((+m_depthField[i][j]-m_depthField[i][j-1]) );
+             m_velocityU[i][j] += GRAVITY * m_dt * m_dxInv * ( (h1-h2) );
         }
     }
     for (int i=2;i<m_gridSize-1;i++)
     {
         for (int j=1;j<m_gridSize-1;j++)
         {
-                m_velocityW[i][j] += GRAVITY* m_dt * m_dxInv * ((m_heightField[i][j]-m_heightField[i-1][j]) );
+            h1 = max(0.0f, m_terrainHeightField[i][j] + m_depthField[i][j] );
+            h2 = max(0.0f, m_terrainHeightField[i-1][j] + m_depthField[i-1][j] );
+      //          m_velocityW[i][j] += GRAVITY* m_dt * m_dxInv * ((m_depthField[i][j]-m_depthField[i-1][j]) );
+            m_velocityW[i][j] += GRAVITY* m_dt * m_dxInv * ((h1-h2));
+
         }
     }
 }
@@ -396,9 +467,9 @@ void Fluid::updateHeight()
     {
         for( int j = 1; j < m_gridSize - 1; j++ )
         {
-            float dh = -decay*m_heightField[i][j]*m_dxInv*((m_velocityU[i][j+1] - m_velocityU[i][j])
+            float dh = -decay*m_depthField[i][j]*m_dxInv*((m_velocityU[i][j+1] - m_velocityU[i][j])
                                                            +(m_velocityW[i+1][j] - m_velocityW[i][j]));
-            m_heightField[i][j] += dh*m_dt;
+            m_depthField[i][j] += dh*m_dt;
         }
     }
 }
@@ -410,14 +481,16 @@ void Fluid::applyBoundary()
 {
     for( int i = 0; i < m_gridSize; i++ )
     {
-        m_heightField[0][i] = m_heightField[1][i];
-        m_heightField[m_gridSize-1][i] = m_heightField[m_gridSize-2][i];
+        m_depthField[0][i] = max(0.f, m_terrainHeightField[1][i] + m_depthField[1][i] - m_terrainHeightField[0][i]);
+        m_depthField[m_gridSize-1][i] = max( 0.f, m_terrainHeightField[m_gridSize - 2][i]+m_depthField[m_gridSize-2][i]
+                - m_terrainHeightField[m_gridSize-1][i]);
     }
 
     for( int j = 0; j < m_gridSize; j++ )
     {
-        m_heightField[j][0] = m_heightField[j][1];
-        m_heightField[j][m_gridSize-1] = m_heightField[j][m_gridSize-2];
+        m_depthField[j][0] = max(0.f, m_terrainHeightField[j][1] + m_depthField[j][1] - m_terrainHeightField[j][0]);
+        m_depthField[j][m_gridSize-1] = max(0.f, m_terrainHeightField[j][m_gridSize-2] + m_depthField[j][m_gridSize-2]
+                - m_terrainHeightField[j][m_gridSize-1]);
     }
 }
 
@@ -444,7 +517,7 @@ void Fluid::saveToImage( FieldType type )
     {
         for( int j = 0; j < m_gridSize; j++ )
         {
-            float curH = m_heightField[i][j];
+            float curH = m_depthField[i][j];
             int gray = (int)((curH - minH)/(maxH - minH)*255);
             const int index = i*m_gridSize + j;
             data[index].r = gray;
@@ -486,6 +559,7 @@ void Fluid::saveToImage( FieldType type )
         assert(0);
     }
     assert( fileName.size() > 0 );
+    std::cout << "Save picture into "<<fileName<<std::endl;
     saveImage.save( fileName.c_str() );
 }
 
@@ -497,39 +571,82 @@ void Fluid::drawFluid( DrawMethod method ) const
 {
     if( method == DRAW_POINTS )
     {
+        glPushMatrix();
         glBegin(GL_POINTS);
         glColor4f( m_color.r,m_color.g, m_color.b, m_color.a );
         for( int i = 0; i < m_gridSize; i++ )
         {
             for( int j =0; j < m_gridSize; j++ )
             {
-                float posX = -TERRAIN_BOUND + j;
-                float posZ = -TERRAIN_BOUND + i;
-                glVertex3f(posX, m_heightField[i][j],posZ);
+                float posX = -m_domainSize+ j;
+                float posZ = -m_domainSize + i;
+                glVertex3f(posX, m_depthField[i][j],posZ);
             }
         }
+        glPopMatrix();
         glEnd();
     }
     else if ( method == DRAW_MESH )
     {
+        glPushMatrix();
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE,GL_ONE);
-        for( int i = 0; i < m_gridSize-1; i++ )
+        float halfDomain = m_domainSize/2;
+
+        const bool drawStrip = false;
+        if( drawStrip == true )
         {
-
-            glBegin( GL_TRIANGLE_STRIP );
-            glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-            for( int j = 0; j < m_gridSize; j++ )
+            for( int i = 0; i < m_gridSize-1; i++ )
             {
-                glNormal3f( m_normalField[i][j].x, m_normalField[i][j].y, m_normalField[i][j].z );
-                glVertex3f(  -TERRAIN_BOUND +j, m_heightField[i][j], -TERRAIN_BOUND +i );
 
-                glNormal3f( m_normalField[i+1][j].x, m_normalField[i+1][j].y, m_normalField[i+1][j].z );
-                glVertex3f(  -TERRAIN_BOUND +j, m_heightField[i+1][j], -TERRAIN_BOUND +i+1 );
+                glBegin( GL_TRIANGLE_STRIP );
+                glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+                for( int j = 0; j < m_gridSize; j++ )
+                {
+                    glNormal3f( m_normalField[i][j].x, m_normalField[i][j].y, m_normalField[i][j].z );
+                    glVertex3f(  -halfDomain+j*m_dx, m_terrainHeightField[i][j] + m_depthField[i][j], -halfDomain+i*m_dx );
+
+                    glNormal3f( m_normalField[i+1][j].x, m_normalField[i+1][j].y, m_normalField[i+1][j].z );
+                    glVertex3f(  -halfDomain +j*m_dx, m_terrainHeightField[i+1][j] + m_depthField[i+1][j], -halfDomain +(i+1)*m_dx );
+                }
+                glEnd();
+            }
+        }
+        else
+        {
+             // Else we use triangles mode to draw(This will hide the invisible triangles)
+            glBegin( GL_TRIANGLES );
+            glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+            for( int i = 0;  i < m_triangles.size(); i++ )
+            {
+                Tri curTri  = m_triangles[i];
+                int r[3]; int c[3];
+                r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
+                r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
+                r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
+                // Firstly check if the triangle is visible
+                int count = 0;
+                for( int m = 0; m < 3; m++ )
+                {
+                    if( m_depthField[r[m]][c[m]] > EPSILON )
+                        count++;
+                }
+                if( count == 0 )
+                    continue;
+                float tx, ty, tz;
+                for( int m = 0; m < 3; m++ )
+                {
+                    tx = -halfDomain + c[m]*m_dx;
+                    ty = m_terrainHeightField[r[m]][c[m]] + m_depthField[r[m]][c[m]];
+                    tz = - halfDomain + r[m]*m_dx;
+                    glNormal3f( m_normalField[r[m] ][c[m] ].x, m_normalField[r[m] ][c[m] ].y, m_normalField[r[m] ][c[m] ].z );
+                    glVertex3f( tx, ty, tz );
+                }
             }
             glEnd();
         }
         glDisable(GL_BLEND);
+        glPopMatrix();
     }
     else
     {
@@ -568,7 +685,7 @@ void Fluid::computeNormal()
 
             for( int m = 0; m < neighbors.size(); m++ )
             {
-                offsets[m] = Vector3(neighbors[m].x,m_heightField[neighbors[m].x][neighbors[m].y],neighbors[m].y) - Vector3(i,m_heightField[i][j],i);
+                offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y],neighbors[m].y) - Vector3(i,m_depthField[i][j],i);
             }
 
             Vector3 sum = Vector3::zero();
@@ -603,7 +720,7 @@ void Fluid::drawNormal() const
             {
                 glBegin(GL_LINES);
 
-                Vector3 curVert = Vector3(-TERRAIN_BOUND + column, m_heightField[row][column], -TERRAIN_BOUND +row);
+                Vector3 curVert = Vector3(-TERRAIN_BOUND + column, m_depthField[row][column], -TERRAIN_BOUND +row);
                 Vector3 curNorm = m_normalField[row][column];
 
                 glNormal3f(curNorm.x,curNorm.y,curNorm.z);
@@ -616,4 +733,52 @@ void Fluid::drawNormal() const
             }
         }
     }
+}
+
+/**
+ * @brief initDepthField Initialize the depth field
+ */
+void Fluid::initDepthField()
+{
+    for( int i = 0; i < m_gridSize; i++ )
+    {
+        for( int j =0; j < m_gridSize; j++ )
+        {
+            m_depthField[i][j] = max(0.f, defaultHeight - m_terrainHeightField[i][j] );
+        }
+    }
+}
+
+/**
+ * @brief build the triangle List
+ */
+void Fluid::buildTriangleList()
+{
+    assert( m_depthField.size() == m_gridSize );
+    assert( m_depthField[0].size() == m_gridSize );
+
+    cout<<"Build the triangle list..."<<endl;
+    for( int i = 0; i < m_gridSize-1; i++ )
+    {
+        for( int j = 0; j < m_gridSize-1; j++ )
+        {
+            Tri t1,t2;
+            t1.a2D.indRow = i;
+            t1.a2D.indCol = j;
+            t1.b2D.indRow = i+1;
+            t1.b2D.indCol = j;
+            t1.c2D.indRow = i;
+            t1.c2D.indCol = j+1;
+            m_triangles.push_back(t1);
+
+            t2.a2D.indRow = i;
+            t2.a2D.indCol = j+1;
+            t2.b2D.indRow = i+1;
+            t2.b2D.indCol = j;
+            t2.c2D.indRow = i+1;
+            t2.c2D.indCol = j+1;
+            m_triangles.push_back(t2);
+        }
+    }
+    cout<<"Finish building the triangle list."<<endl;
 }

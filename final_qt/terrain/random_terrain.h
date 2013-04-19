@@ -11,7 +11,7 @@
 #include "terrain.h"
 
 #define DEFAULT_DECAY 2
-#define DEFAULT_ROUGHNESS 2
+#define DEFAULT_ROUGHNESS 20
 
 
 class RandomTerrain : public Terrain
