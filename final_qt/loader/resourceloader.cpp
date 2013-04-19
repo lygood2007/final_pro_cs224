@@ -3,6 +3,7 @@
 #include <QGLShaderProgram>
 #include <QList>
 #include <QString>
+#include <GL/glu.h>
 #include "glm.h"
 
 
@@ -32,8 +33,8 @@ GLuint ResourceLoader::loadCubeMap(QList<QFile *> files)
         image = image.mirrored(false, true);
         texture = QGLWidget::convertToGLFormat(image);
         texture = texture.scaledToWidth(1024, Qt::SmoothTransformation);
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 3, 3, texture.width(), texture.height(), 0, GL_RGBA,GL_UNSIGNED_BYTE, texture.bits());
-//        gluBuild2DMipmaps(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 3, texture.width(), texture.height(), GL_RGBA, GL_UNSIGNED_BYTE, texture.bits());
+//        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 3, 3, texture.width(), texture.height(), 0, GL_RGBA,GL_UNSIGNED_BYTE, texture.bits());
+        gluBuild2DMipmaps(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 3, texture.width(), texture.height(), GL_RGBA, GL_UNSIGNED_BYTE, texture.bits());
     }
 
     // Set filter when pixel occupies more than one texture element

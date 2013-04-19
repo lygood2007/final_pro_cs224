@@ -77,6 +77,7 @@ private:
     void applyPerspectiveCamera(float width, float height);
     void renderScene();
     void renderTexturedQuad(int width, int height);
+    void renderSkybox();
 
     /** Updates the current OpenGL state to avoid object distortion when the window is resized. */
     void resizeGL(int w, int h);
