@@ -6,6 +6,7 @@
  **/
 
 #include "utils.h"
+#include "CS123Common.h"
 #include "debug_marco.h"
 /**
   * @brief bilinearInterp 2D dimension bilinear interpolation
@@ -69,3 +70,43 @@
      float result = min + (rand() / (RAND_MAX + 0.01f)*(max - min));
      return result;
  }
+
+ /**
+  * @brief doIntersectTriangles Check if the ray intersects the triangle
+  * @param eyePos The start point of the ray
+  * @param d The direction of ray
+  * @param v0 The vertex 0 of triangle
+  * @param v1 The vertex 1 of triangle
+  * @param v2 The vertex 2 of triangle
+  * @return True if the ray intersects
+  */
+ bool doIntersectTriangles( const Vector3& eyePos, const Vector3& d, const Vector3& v0, const Vector3& v1, const Vector3& v2 )
+ {
+         float a,f,u,v;
+         Vector3 e1 = v1 - v0;
+         Vector3 e2 = v2 - v0;
+         Vector3 h = d.cross(e2);
+
+         a = e1.dot(h);
+
+         if (a > -EPSILON && a < EPSILON)
+             return false;
+         f = 1/a;
+         Vector3 s = eyePos - v0;
+         u = f * s.dot(h) ;
+
+         if (u < 0.0 || u > 1.0)
+             return false;
+
+         Vector3 q = s.cross(e1);
+         v = f * d.dot(q);
+
+         if (v < 0.0 || u + v > 1.0)
+             return false;
+
+         float t = f * e2.dot(q);
+
+         if (t > EPSILON) // ray intersection
+             return true;
+ }
+

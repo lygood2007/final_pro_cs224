@@ -145,7 +145,7 @@ struct CS123Rectangle {
 #define M_PI 3.14159265f
 #endif
 
-#define _EPSILON_ 1e-8
+#define _EPSILON_ 1e-5
 #define EPSILON _EPSILON_
 
 #define EQ(a, b) (fabs((a) - (b)) < _EPSILON_)
