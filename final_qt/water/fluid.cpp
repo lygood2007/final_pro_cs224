@@ -847,50 +847,22 @@ void Fluid::buildTriangleList()
  * @brief dampen waves for open water scenes
  */
 void Fluid::dampenWaves(){
-    std::cout << "dampenWaves()" << std::endl;
-
     //compute hRest
     float hRest = computeHRest();
-    std::cout << "hRest = " << hRest << std::endl;
 
     //iterate through the dampening region
     for(int i = 1; i < m_gridSize - 1; i++){
         for(int j= 1; j < m_gridSize - 1; j++){
             if(i < DAMPENING_REGION || i >= m_gridSize - DAMPENING_REGION ||
                     j < DAMPENING_REGION || j >= m_gridSize - DAMPENING_REGION){
-                //NOTE: Equations 12 and 23 don't match
-                //seems like the multiplication should be sigma/gamma or phi/psi
-                //currently, its sigma/psi
-
-                //bool debug = (i == 1) && (j == 1);
-                bool debug = (i == m_gridSize - 2) && (j == m_gridSize - 2);
-
                 // Equation 10
                 // h(i,j) += ((-sigma(i,j) * (h(i,j) - hRest)) + phi(i,j)) * delta_t
                 // Equation 21
                 // h(i,j) += ((-gamma(i,j) * (h(i,j) - hRest)) + psi(i,j)) * delta_t
-                float currH = m_depthField[i][j];
+                float currH = m_depthField[i][j] + m_terrainHeightField[i][j];
                 float eq10 = ((-m_sigmaField[i][j] * (currH - hRest)) + m_phiField[i][j]) * m_dt;
                 float eq21 = ((-m_gammaField[i][j] * (currH - hRest)) + m_psiField[i][j]) * m_dt;
-                //m_depthField[i][j] += eq10 + eq21;
-
-                if(debug){
-                    std::cout << "Equations 10 and 21" << std::endl;
-                    std::cout << "currH = " << currH << std::endl;
-                    std::cout << "eq10 = " << eq10 << std::endl;
-                    std::cout << "eq21 = " << eq21 << std::endl;
-                    std::cout << "h = " << m_depthField[i][j] << std::endl;
-                }
-
-                /*if(debug){
-                    std::cout << "Before updates" << std::endl;
-                    std::cout << "u(i+0.5,j) = " << m_velocityU[i][j] << std::endl;
-                    std::cout << "w(i,j+0.5) = " << m_velocityW[i][j] << std::endl;
-                    std::cout << "sigma(i,j) = " << m_sigmaField[i][j] << std::endl;
-                    std::cout << "gamma(i,j) = " << m_gammaField[i][j] << std::endl;
-                    std::cout << "phi(i,j) = " << m_phiField[i][j] << std::endl;
-                    std::cout << "psi(i,j) = " << m_psiField[i][j] << std::endl;
-                }*/
+                m_depthField[i][j] += eq10 + eq21;
 
                 // Equation 11
                 // u(i+0.5,j) += -0.5 * (sigma(i+1,j) + sigma(i,j)) * u(i+0.5,j) * delta_t
@@ -917,16 +889,6 @@ void Fluid::dampenWaves(){
                 // Equation 24
                 // psi(i,j) *= LAMBDA_DECAY
                 m_psiField[i][j] *= LAMBDA_DECAY;
-
-                /*if(debug){
-                    std::cout << "After updates" << std::endl;
-                    std::cout << "u(i+0.5,j) = " << m_velocityU[i][j] << std::endl;
-                    std::cout << "w(i,j+0.5) = " << m_velocityW[i][j] << std::endl;
-                    std::cout << "sigma(i,j) = " << m_sigmaField[i][j] << std::endl;
-                    std::cout << "gamma(i,j) = " << m_gammaField[i][j] << std::endl;
-                    std::cout << "phi(i,j) = " << m_phiField[i][j] << std::endl;
-                    std::cout << "psi(i,j) = " << m_psiField[i][j] << std::endl;
-                }*/
             }
         }
     }
@@ -945,7 +907,7 @@ float Fluid::computeHRest(){
 
     for(int i = 0; i < m_gridSize; i++){
         for(int j = 0; j < m_gridSize; j++){
-            hRest += m_depthField[i][j];
+            hRest += m_depthField[i][j] + m_terrainHeightField[i][j];
         }
     }
 
