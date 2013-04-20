@@ -21,6 +21,16 @@
 #define SAVE_NAME_VELOCITY "velocity"
 //#define SAVE_IMAGE
 
+//#define DAMPEN_WAVES
+#define LAMBDA_DECAY 0.9
+#define LAMBDA_UPDATE 0.1
+#define DAMPENING_REGION 10
+#define QUADRATIC_A 0.0f
+#define QUADRATIC_B 0.0f
+#define QUADRATIC_C 0.0f
+#define INIT_SIGMA_GAMMA 0.0f
+#define INIT_PHI_PSI 0.0f
+
 //extern float bilinearInterp( QVector<QVector<float > > &vec, const float x, const float z );
 //extern float randomFloatGenerator( float min = 0.f, float max = 1.f);
 
@@ -167,6 +177,21 @@ public:
      */
     void buildTriangleList();
 
+    /**
+     * @brief apply when dampening the waves to simulate open water scenes
+     * implements section 2.1.4 and appendix 3.1
+     * to use, define DAMPEN_WAVES above
+     */
+    void dampenWaves();
+
+    /**
+     * @brief computes the resting height of the fluid
+     * the resting height is computed as the average across the depth field
+     * the result of this function is used in dampenWaves()
+     * @return h_rest
+     */
+    float computeHRest();
+
 private:
 // Variables
     int m_gridSize;
@@ -191,6 +216,11 @@ private:
     Colorf m_color; // The color of the water
 
     float** m_tempBuffer;
+
+    QVector<QVector<float> > m_sigmaField; // stores sigma values for wave dampening
+    QVector<QVector<float> > m_gammaField; // stores gamma values for wave dampening
+    QVector<QVector<float> > m_phiField; // stores phi values for wave dampening
+    QVector<QVector<float> > m_psiField; // stores psi values for wave dampening
 };
 
 #endif // FLUID_H

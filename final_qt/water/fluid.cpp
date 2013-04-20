@@ -166,6 +166,10 @@ void Fluid::update(const float dt)
     applyBoundary();
     checkBoundary();
 
+#ifdef DAMPEN_WAVES
+    dampenWaves();
+#endif
+
     computeNormal();
 
     m_timeElapsed += dt;
@@ -348,6 +352,60 @@ void Fluid::init(const int gridSize, const float domainSize)
     // Default color
     m_color = Colorf(0.f,0.2f,0.8f,0.5f);
     m_renderNormals = false;
+
+    // initializing wave dampening fields
+    m_sigmaField.resize(m_gridSize);
+    m_gammaField.resize(m_gridSize);
+    m_phiField.resize(m_gridSize);
+    m_psiField.resize(m_gridSize);
+
+    for(int i = 0; i < m_gridSize; i++){
+        m_sigmaField[i].resize(m_gridSize);
+        m_sigmaField[i].fill(INIT_SIGMA_GAMMA);
+
+        m_gammaField[i].resize(m_gridSize);
+        m_gammaField[i].fill(INIT_SIGMA_GAMMA);
+
+        m_phiField[i].resize(m_gridSize);
+        m_phiField[i].fill(INIT_PHI_PSI);
+
+        m_psiField[i].resize(m_gridSize);
+        m_psiField[i].fill(INIT_PHI_PSI);
+    }
+
+    //initialize sigma and gamma inside the dampening region
+    for(int i = 0; i < m_gridSize; i++){
+        for(int j= 0; j < m_gridSize; j++){
+            if(i < DAMPENING_REGION || i >= m_gridSize - DAMPENING_REGION ||
+                    j < DAMPENING_REGION || j >= m_gridSize - DAMPENING_REGION){
+                //horizontal and vertical distances
+                float iDistance = 0;
+                float jDistance = 0;
+                if(i < DAMPENING_REGION){
+                    iDistance = DAMPENING_REGION - i;
+                } else if(i >= m_gridSize - DAMPENING_REGION){
+                    iDistance = i - DAMPENING_REGION;
+                }
+                if(j < DAMPENING_REGION){
+                    jDistance = DAMPENING_REGION - j;
+                } else if(j >= m_gridSize - DAMPENING_REGION){
+                    jDistance = j - DAMPENING_REGION;
+                }
+
+                iDistance /= (float)DAMPENING_REGION;
+                jDistance /= (float)DAMPENING_REGION;
+
+                //distance
+                float distance = sqrt((iDistance * iDistance) + (jDistance * jDistance));
+
+                //quadratic function
+                float value = (QUADRATIC_A * distance * distance) + (QUADRATIC_B * distance) + QUADRATIC_C;
+
+                m_sigmaField[i][j] = value;
+                m_gammaField[i][j] = value;
+            }
+        }
+    }
 
 #ifdef FLUID_DEBUG
    // m_gridSize = 20;
@@ -783,4 +841,113 @@ void Fluid::buildTriangleList()
         }
     }
     cout<<"Finish building the triangle list."<<endl;
+}
+
+/**
+ * @brief dampen waves for open water scenes
+ */
+void Fluid::dampenWaves(){
+    std::cout << "dampenWaves()" << std::endl;
+
+    //compute hRest
+    float hRest = computeHRest();
+    std::cout << "hRest = " << hRest << std::endl;
+
+    //iterate through the dampening region
+    for(int i = 1; i < m_gridSize - 1; i++){
+        for(int j= 1; j < m_gridSize - 1; j++){
+            if(i < DAMPENING_REGION || i >= m_gridSize - DAMPENING_REGION ||
+                    j < DAMPENING_REGION || j >= m_gridSize - DAMPENING_REGION){
+                //NOTE: Equations 12 and 23 don't match
+                //seems like the multiplication should be sigma/gamma or phi/psi
+                //currently, its sigma/psi
+
+                //bool debug = (i == 1) && (j == 1);
+                bool debug = (i == m_gridSize - 2) && (j == m_gridSize - 2);
+
+                // Equation 10
+                // h(i,j) += ((-sigma(i,j) * (h(i,j) - hRest)) + phi(i,j)) * delta_t
+                // Equation 21
+                // h(i,j) += ((-gamma(i,j) * (h(i,j) - hRest)) + psi(i,j)) * delta_t
+                float currH = m_depthField[i][j];
+                float eq10 = ((-m_sigmaField[i][j] * (currH - hRest)) + m_phiField[i][j]) * m_dt;
+                float eq21 = ((-m_gammaField[i][j] * (currH - hRest)) + m_psiField[i][j]) * m_dt;
+                //m_depthField[i][j] += eq10 + eq21;
+
+                if(debug){
+                    std::cout << "Equations 10 and 21" << std::endl;
+                    std::cout << "currH = " << currH << std::endl;
+                    std::cout << "eq10 = " << eq10 << std::endl;
+                    std::cout << "eq21 = " << eq21 << std::endl;
+                    std::cout << "h = " << m_depthField[i][j] << std::endl;
+                }
+
+                /*if(debug){
+                    std::cout << "Before updates" << std::endl;
+                    std::cout << "u(i+0.5,j) = " << m_velocityU[i][j] << std::endl;
+                    std::cout << "w(i,j+0.5) = " << m_velocityW[i][j] << std::endl;
+                    std::cout << "sigma(i,j) = " << m_sigmaField[i][j] << std::endl;
+                    std::cout << "gamma(i,j) = " << m_gammaField[i][j] << std::endl;
+                    std::cout << "phi(i,j) = " << m_phiField[i][j] << std::endl;
+                    std::cout << "psi(i,j) = " << m_psiField[i][j] << std::endl;
+                }*/
+
+                // Equation 11
+                // u(i+0.5,j) += -0.5 * (sigma(i+1,j) + sigma(i,j)) * u(i+0.5,j) * delta_t
+                m_velocityU[i][j] += -0.5 * (m_sigmaField[i + 1][j] + m_sigmaField[i][j]) * m_velocityU[i][j] * m_dt;
+
+                // Equation 22
+                // w(i,j+0.5) += -0.5 * (gamma(i,j+1) + gamma(i,j)) * w(i,j+0.5) * delta_t
+                m_velocityW[i][j] += -0.5 * (m_gammaField[i][j + 1] + m_gammaField[i][j]) * m_velocityW[i][j] * m_dt;
+
+                // Equation 12
+                // phi(i,j) += -LAMBDA_UPDATE * sigma(i,j) * ((w(i,j+0.5) - w(i,j-0.5)) / delta_x) * delta_t
+                m_phiField[i][j] += -LAMBDA_UPDATE * m_sigmaField[i][j] * (m_velocityW[i][j] - m_velocityW[i][j - 1]) *
+                        m_dxInv * m_dt;
+
+                // Equation 13
+                // phi(i,j) *= LAMBDA_DECAY
+                m_phiField[i][j] *= LAMBDA_DECAY;
+
+                // Equation 23
+                // psi(i,j) += -LAMBDA_UPDATE * psi(i,j) * ((u(i+0.5,j) - u(i-0.5,j)) / delta_x) * delta_t
+                m_psiField[i][j] += -LAMBDA_UPDATE * m_gammaField[i][j] * (m_velocityU[i][j] - m_velocityU[i - 1][j]) *
+                        m_dxInv * m_dt;
+
+                // Equation 24
+                // psi(i,j) *= LAMBDA_DECAY
+                m_psiField[i][j] *= LAMBDA_DECAY;
+
+                /*if(debug){
+                    std::cout << "After updates" << std::endl;
+                    std::cout << "u(i+0.5,j) = " << m_velocityU[i][j] << std::endl;
+                    std::cout << "w(i,j+0.5) = " << m_velocityW[i][j] << std::endl;
+                    std::cout << "sigma(i,j) = " << m_sigmaField[i][j] << std::endl;
+                    std::cout << "gamma(i,j) = " << m_gammaField[i][j] << std::endl;
+                    std::cout << "phi(i,j) = " << m_phiField[i][j] << std::endl;
+                    std::cout << "psi(i,j) = " << m_psiField[i][j] << std::endl;
+                }*/
+            }
+        }
+    }
+
+    std::cout << "dampenWaves() complete" << std::endl;
+}
+
+/**
+ * @brief computes the resting height of the fluid
+ * the resting height is computed as the average across the depth field
+ * the result of this function is used in dampenWaves()
+ * @return h_rest
+ */
+float Fluid::computeHRest(){
+    float hRest = 0;
+
+    for(int i = 0; i < m_gridSize; i++){
+        for(int j = 0; j < m_gridSize; j++){
+            hRest += m_depthField[i][j];
+        }
+    }
+
+    return (hRest / (float)(m_gridSize * m_gridSize));
 }
