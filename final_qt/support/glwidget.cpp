@@ -69,7 +69,7 @@ void GLWidget::init()
 #ifdef USE_HEIGHTMAP
     m_terrain = new HeightmapTerrain(); //added by hcreynol
 #else
-    m_terrain = new Terrain();
+    m_terrain = new RandomTerrain();
 #endif
     m_fluid =  new Fluid(m_terrain);
     // Start a timer that will try to get 60 frames per second (the actual

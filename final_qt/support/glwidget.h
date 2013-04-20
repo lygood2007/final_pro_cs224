@@ -25,7 +25,7 @@
 #define DRAW_TERRAIN
 
 //added by hcreynol
-#define USE_HEIGHTMAP
+//#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
 

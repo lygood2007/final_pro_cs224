@@ -22,6 +22,7 @@
 #include <string.h>
 #include <iostream>
 #include <sstream>
+#include "utils.h"
 #include "CS123Common.h"
 #include "debug_marco.h"
 
