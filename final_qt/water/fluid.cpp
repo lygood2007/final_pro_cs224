@@ -713,6 +713,7 @@ void Fluid::drawNormal() const
     {
         glColor3f(1,1,1);
 
+        const float halfDomain = m_domainSize/2;
         const int magn = 5;
         for (int row = 0; row < m_gridSize; row++)
         {
@@ -720,7 +721,7 @@ void Fluid::drawNormal() const
             {
                 glBegin(GL_LINES);
 
-                Vector3 curVert = Vector3(-TERRAIN_BOUND + column, m_depthField[row][column], -TERRAIN_BOUND +row);
+                Vector3 curVert = Vector3(-halfDomain+ column*m_dx, m_terrainHeightField[row][column]+ m_depthField[row][column], -halfDomain +row*m_dx);
                 Vector3 curNorm = m_normalField[row][column];
 
                 glNormal3f(curNorm.x,curNorm.y,curNorm.z);
