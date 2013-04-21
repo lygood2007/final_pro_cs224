@@ -166,6 +166,8 @@ void Fluid::update(const float dt)
     applyBoundary();
     checkBoundary();
 
+    clampFields();
+
 #ifdef DAMPEN_WAVES
     dampenWaves();
 #endif
@@ -912,4 +914,20 @@ float Fluid::computeHRest(){
     }
 
     return (hRest / (float)(m_gridSize * m_gridSize));
+}
+
+void Fluid::clampFields(){
+    // clamp h(i,j) >= 0
+    // clamp u(i,j) < alpha * (delta_x / delta_t)
+    // clamp w(i,j) < alpha * (delta_x / delta_t)
+
+    float velocityClamp = CLAMP_ALPHA * (m_dx / m_dt);
+
+    for(int i = 0; i < m_gridSize; i++){
+        for(int j = 0; j < m_gridSize; j++){
+            m_depthField[i][j] = max(0.0f, m_depthField[i][j]);
+            m_velocityU[i][j] = min(velocityClamp, m_velocityU[i][j]);
+            m_velocityW[i][j] = min(velocityClamp, m_velocityW[i][j]);
+        }
+    }
 }

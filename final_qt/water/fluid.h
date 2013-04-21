@@ -31,6 +31,8 @@
 #define INIT_SIGMA_GAMMA 0.0f
 #define INIT_PHI_PSI 0.0f
 
+#define CLAMP_ALPHA 0.5f
+
 //extern float bilinearInterp( QVector<QVector<float > > &vec, const float x, const float z );
 //extern float randomFloatGenerator( float min = 0.f, float max = 1.f);
 
@@ -191,6 +193,11 @@ public:
      * @return h_rest
      */
     float computeHRest();
+
+    /**
+     * @brief applies stability enhancements on h, u, w, as described in 2.1.5
+     */
+    void clampFields();
 
 private:
 // Variables
