@@ -384,12 +384,13 @@ void Fluid::init(const int gridSize, const float domainSize)
                 if(i < DAMPENING_REGION){
                     iDistance = DAMPENING_REGION - i;
                 } else if(i >= m_gridSize - DAMPENING_REGION){
-                    iDistance = i - DAMPENING_REGION;
+                    iDistance = i - (m_gridSize - DAMPENING_REGION - 1);
                 }
+
                 if(j < DAMPENING_REGION){
                     jDistance = DAMPENING_REGION - j;
                 } else if(j >= m_gridSize - DAMPENING_REGION){
-                    jDistance = j - DAMPENING_REGION;
+                    jDistance = j - (m_gridSize - DAMPENING_REGION - 1);
                 }
 
                 iDistance /= (float)DAMPENING_REGION;
@@ -883,6 +884,7 @@ void Fluid::dampenWaves(){
 
                 // Equation 23
                 // psi(i,j) += -LAMBDA_UPDATE * psi(i,j) * ((u(i+0.5,j) - u(i-0.5,j)) / delta_x) * delta_t
+                // CORRECTION: psi(i,j) should be gamma(i,j) on the right-hand side
                 m_psiField[i][j] += -LAMBDA_UPDATE * m_gammaField[i][j] * (m_velocityU[i][j] - m_velocityU[i - 1][j]) *
                         m_dxInv * m_dt;
 
@@ -892,8 +894,6 @@ void Fluid::dampenWaves(){
             }
         }
     }
-
-    std::cout << "dampenWaves() complete" << std::endl;
 }
 
 /**

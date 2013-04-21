@@ -25,7 +25,7 @@
 #define LAMBDA_DECAY 0.9
 #define LAMBDA_UPDATE 0.1
 #define DAMPENING_REGION 10
-#define QUADRATIC_A 0.5f
+#define QUADRATIC_A 10.0f
 #define QUADRATIC_B 0.0f
 #define QUADRATIC_C 0.0f
 #define INIT_SIGMA_GAMMA 0.0f
