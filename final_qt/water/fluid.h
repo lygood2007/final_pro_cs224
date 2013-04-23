@@ -24,7 +24,7 @@
 //#define DAMPEN_WAVES
 #define LAMBDA_DECAY 0.9
 #define LAMBDA_UPDATE 0.1
-#define DAMPENING_REGION 10
+#define DAMPENING_REGION 5
 #define QUADRATIC_A 10.0f
 #define QUADRATIC_B 0.0f
 #define QUADRATIC_C 0.0f
