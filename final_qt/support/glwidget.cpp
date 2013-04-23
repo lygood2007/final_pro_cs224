@@ -171,11 +171,6 @@ void GLWidget::paintGL()
     m_camera.applyPerspectiveCamera(width,height);
     m_framebufferObjects["fbo_0"]->bind();
      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-     renderSkybox();//@NOTE - This must go first!!
-#ifdef DRAW_TERRAIN
-    m_terrain->draw();
-#endif
-
     renderScene();
    m_framebufferObjects["fbo_0"]->release();
 
@@ -195,36 +190,43 @@ void GLWidget::paintGL()
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_LIGHTING);
+
+
     // use the brightpass shader to render bright area only to fbo_2 for bloom effects
-//    m_framebufferObjects["fbo_2"]->bind();
-//    m_shaderPrograms["brightpass"]->bind();
-//    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
-//    renderTexturedQuad(width, height);
-//    m_shaderPrograms["brightpass"]->release();
-//    glBindTexture(GL_TEXTURE_2D, 0);
-//    m_framebufferObjects["fbo_2"]->release();
+    m_framebufferObjects["fbo_2"]->bind();
+    m_shaderPrograms["brightpass"]->bind();
+    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+    renderTexturedQuad(width, height);
+    m_shaderPrograms["brightpass"]->release();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    m_framebufferObjects["fbo_2"]->release();
 
-////      running a blurring effect over the bright areas
-//    float scales[] = {4.f,8.f};
-//    for (int i = 0; i < 2; ++i)
-//    {
-//        // Render the blurred brightpass filter result to fbo 1
-//       renderBlur(width / scales[i], height / scales[i]);
+//      running a blurring effect over the bright areas
+    float scales[] = {4.f,8.f};
+    for (int i = 0; i < 2; ++i)
+    {
+        // Render the blurred brightpass filter result to fbo 1
+       renderBlur(width / scales[i], height / scales[i]);
 
-//       // Bind the image from fbo to a texture
-//        glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
-//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+       // Bind the image from fbo to a texture
+        glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-//        // Enable alpha blending and render the texture to the screen
-//        glEnable(GL_BLEND);
-//        glBlendFunc(GL_ONE, GL_ONE);
-////        renderTexturedQuad(width * scales[i], height * scales[i]);
-//        glDisable(GL_BLEND);
-//        glBindTexture(GL_TEXTURE_2D, 0);
-//    }
+        // Enable alpha blending and render the texture to the screen
+        glEnable(GL_BLEND);
+        glDisable(GL_LIGHTING);
+        glEnable(GL_TEXTURE_2D);
+        glViewport(0,0,width,height);
+        glBlendFunc(GL_ONE, GL_ONE);
+        renderTexturedQuad(width * scales[i], height * scales[i]);
+        glDisable(GL_BLEND);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_LIGHTING);
+    }
 
-    //paintText();
+    paintText();
 }
 
 /**
@@ -263,23 +265,6 @@ void GLWidget::renderSkybox()
 **/
 void GLWidget::renderGeometry()
 {
-//    GLfloat no_mat[] = { 0.0, 0.0, 0.0, 1.0 };
-//    GLfloat mat_ambient[] = { 0.7, 0.7, 0.7, 1.0 };
-//    GLfloat mat_ambient_color[] = { 0.8, 0.8, 0.2, 1.0 };
-//    GLfloat mat_diffuse[] = { 0.1, 0.5, 0.8, 1.0 };
-//    GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-//    GLfloat no_shininess[] = { 0.0 };
-//    GLfloat low_shininess[] = { 5.0 };
-//    GLfloat high_shininess[] = { 100.0 };
-//    GLfloat mat_emission[] = {0.3, 0.2, 0.2, 0.0};
-
-//    glPushMatrix();
-
-//    glMaterialfv(GL_FRONT, GL_AMBIENT, no_mat);
-//    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-//    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-//    glMaterialfv(GL_FRONT, GL_SHININESS, high_shininess);
-//    glMaterialfv(GL_FRONT, GL_EMISSION, no_mat);
 
 #ifdef RENDER_FLUID
     // Fluid part
@@ -287,7 +272,6 @@ void GLWidget::renderGeometry()
     m_fluid->draw();
 #endif
 
-//    glPopMatrix();
 
 }
 
@@ -297,6 +281,13 @@ void GLWidget::renderGeometry()
 **/
 void GLWidget::renderScene()
 {
+
+    renderSkybox();//@NOTE - This must go first!!
+
+#ifdef DRAW_TERRAIN
+   m_terrain->draw();
+#endif
+
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     // Enable depth testing
