@@ -87,7 +87,7 @@ void Terrain::draw() const
     glPopMatrix();
     // Force OpenGL to perform all pending operations -- usually a good idea to call this
     // We need that?
-    glFlush();
+   // glFlush();
     // We need that?
     // Swap the buffers to show what we have just drawn onto the screen
     //swapBuffers();
