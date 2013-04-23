@@ -74,11 +74,18 @@ public:
     /** The render function, will be called every frame */
     void paintGL();
 
+    /** Putting all our resource init's in one place*/
+    void initializeResources();
+
+    /** Copied from CS123 Bloom lab - these really aren't the best and could be improved*/
     void applyOrthogonalCamera(float width, float height);
     void applyPerspectiveCamera(float width, float height);
     void renderScene();
     void renderTexturedQuad(int width, int height);
     void renderSkybox();
+
+    /** Placeing all visible geometry rendering in one method*/
+    void renderGeometry();
 
     /** Updates the current OpenGL state to avoid object distortion when the window is resized. */
     void resizeGL(int w, int h);

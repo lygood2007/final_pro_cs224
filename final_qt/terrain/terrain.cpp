@@ -81,7 +81,7 @@ void Terrain::draw() const
     glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
     glEnd();
     glDisable(GL_BLEND);*/
-    drawBoundary();
+//    drawBoundary();
     drawNormals();
 
     glPopMatrix();

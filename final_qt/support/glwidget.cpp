@@ -89,6 +89,7 @@ void GLWidget::init()
 
     setFixedSize( WIN_W, WIN_H );
     m_camera.setRatio(WIN_W/WIN_H);
+    m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
     updateCamera();
 
     /** ONLY A TEST FOR USING CUDA*/
@@ -131,18 +132,34 @@ void GLWidget::initializeGL()
     glLightfv(GL_LIGHT0, GL_SPECULAR, specularColor);
     glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     glEnable(GL_LIGHT0);
-    m_terrain->generate();
-    m_fluid->backupHeight(m_terrain);
-    m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
 
+    initializeResources();
+}
+
+/** Putting all of our other inits in one place*/
+void GLWidget::initializeResources()
+{
+    cout << "--- Loading Resources ---" << endl;
+
+    m_terrain->generate();
+    cout << "Generated Terrain ---" << endl;
+
+    m_fluid->backupHeight(m_terrain);
+    cout << "Calculated Fluid Height ---" << endl;
 
     m_skybox = ResourceLoader::loadSkybox();
     loadCubeMap();
+    cout << "Loaded Skymap ---" << endl;
 
     createShaderPrograms();
-    createFramebufferObjects(width(), height());
+    cout << "Loaded Shaders ---" << endl;
 
+    createFramebufferObjects(width(), height());
+    cout << "Loaded FBO's---" << endl;
+
+    cout << " --- Finish Loading Resources ---" << endl;
 }
+
 
 void GLWidget::paintGL()
 {
@@ -151,66 +168,57 @@ void GLWidget::paintGL()
 
     renderSkybox(); //@NOTE - This must go first!!
 
-#ifdef DRAW_TERRAIN
-    m_terrain->draw();
-#endif
-
-#ifdef RENDER_FLUID
-    // Fluid part
-    m_fluid->update( 0.02 );
-    m_fluid->draw();
-#endif
+    renderScene(); //@NOTE: - comment this out when working on the shaders
 
     //The lighting stuff - SH
     int width = this->width();
     int height = this->height();
 
-//     Render the scene to a framebuffer
-    m_framebufferObjects["fbo_0"]->bind();
-    applyPerspectiveCamera(width, height);
-    renderScene();
-    m_framebufferObjects["fbo_0"]->release();
+//     Render the scene to a framebuffer with reflect/refract shaders
+//    m_framebufferObjects["fbo_0"]->bind();
+//    applyPerspectiveCamera(width, height);
+//    renderScene();
+//    m_framebufferObjects["fbo_0"]->release();
 
-    // Copy the rendered scene into framebuffer 1
-    m_framebufferObjects["fbo_0"]->blitFramebuffer(m_framebufferObjects["fbo_1"],
-                                                   QRect(0, 0, width, height), m_framebufferObjects["fbo_0"],
-                                                   QRect(0, 0, width, height), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+//    // Copy the rendered scene into framebuffer 1
+//    m_framebufferObjects["fbo_0"]->blitFramebuffer(m_framebufferObjects["fbo_1"],
+//                                                   QRect(0, 0, width, height), m_framebufferObjects["fbo_0"],
+//                                                   QRect(0, 0, width, height), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-    // TODO: Step 0 - draw the scene to the screen as a textured quad
+//    //draw the scene to the screen as a textured quad
 //    applyOrthogonalCamera(width, height);
 //    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
 //    renderTexturedQuad(width, height);
 //    glBindTexture(GL_TEXTURE_2D, 0);
 
-    // TODO: Step 1 - use the brightpass shader to render bright areas
-    // only to fbo_2
-    m_framebufferObjects["fbo_2"]->bind();
-    m_shaderPrograms["brightpass"]->bind();
-    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
-    renderTexturedQuad(width, height);
-    m_shaderPrograms["brightpass"]->release();
-    glBindTexture(GL_TEXTURE_2D, 0);
-    m_framebufferObjects["fbo_2"]->release();
+    // use the brightpass shader to render bright area only to fbo_2 for bloom effects
+//    m_framebufferObjects["fbo_2"]->bind();
+//    m_shaderPrograms["brightpass"]->bind();
+//    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+//    renderTexturedQuad(width, height);
+//    m_shaderPrograms["brightpass"]->release();
+//    glBindTexture(GL_TEXTURE_2D, 0);
+//    m_framebufferObjects["fbo_2"]->release();
 
-    // TODO: Uncomment this section in step 2 of the lab
-    float scales[] = {4.f,8.f};
-    for (int i = 0; i < 2; ++i)
-    {
-        // Render the blurred brightpass filter result to fbo 1
-       renderBlur(width / scales[i], height / scales[i]);
+////      running a blurring effect over the bright areas
+//    float scales[] = {4.f,8.f};
+//    for (int i = 0; i < 2; ++i)
+//    {
+//        // Render the blurred brightpass filter result to fbo 1
+//       renderBlur(width / scales[i], height / scales[i]);
 
-       // Bind the image from fbo to a texture
-        glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//       // Bind the image from fbo to a texture
+//        glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-        // Enable alpha blending and render the texture to the screen
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE, GL_ONE);
-//        renderTexturedQuad(width * scales[i], height * scales[i]);
-        glDisable(GL_BLEND);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
+//        // Enable alpha blending and render the texture to the screen
+//        glEnable(GL_BLEND);
+//        glBlendFunc(GL_ONE, GL_ONE);
+////        renderTexturedQuad(width * scales[i], height * scales[i]);
+//        glDisable(GL_BLEND);
+//        glBindTexture(GL_TEXTURE_2D, 0);
+//    }
 
     paintText();
 }
@@ -244,6 +252,26 @@ void GLWidget::renderSkybox()
 
 }
 
+/**
+  Renders the visible geometry, terrain and fluid only at this point
+**/
+void GLWidget::renderGeometry()
+{
+
+#ifdef DRAW_TERRAIN
+    m_terrain->draw();
+#endif
+
+#ifdef RENDER_FLUID
+    // Fluid part
+    m_fluid->update( 0.02 );
+    m_fluid->draw();
+#endif
+
+}
+
+
+
 
 /**
   Renders the scene.  May be called multiple times by paintGL() if necessary.
@@ -257,24 +285,26 @@ void GLWidget::renderScene()
     // Enable culling (back) faces for rendering the fluid
     glEnable(GL_CULL_FACE);
 
-    // Render the fluid with the refraction shader bound
-    glActiveTexture(GL_TEXTURE0);
-    m_shaderPrograms["refract"]->bind();
-    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
-    glPushMatrix();
-    glTranslatef(-1.25f, 0.f, 0.f);
-//    glCallList(m_dragon.idx);
-    glPopMatrix();
-    m_shaderPrograms["refract"]->release();
+    renderGeometry();
 
-    // Render the fluid with the reflection shader bound
-    m_shaderPrograms["reflect"]->bind();
-    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
-    glPushMatrix();
-    glTranslatef(1.25f,0.f,0.f);
-//    glCallList(m_dragon.idx);
-    glPopMatrix();
-    m_shaderPrograms["reflect"]->release();
+    // Render the fluid with the refraction shader bound
+//    glActiveTexture(GL_TEXTURE0);
+//    m_shaderPrograms["refract"]->bind();
+//    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
+//    glPushMatrix();
+//    glTranslatef(-1.25f, 0.f, 0.f);
+//    renderGeometry(); //@TODO - Gotta find a faster way to do this
+//    glPopMatrix();
+//    m_shaderPrograms["refract"]->release();
+
+//    // Render the fluid with the reflection shader bound
+//    m_shaderPrograms["reflect"]->bind();
+//    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
+//    glPushMatrix();
+//    glTranslatef(1.25f,0.f,0.f);
+//    renderGeometry();
+//    glPopMatrix();
+//    m_shaderPrograms["reflect"]->release();
 //     Disable culling, depth testing and cube maps
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
