@@ -352,7 +352,7 @@ void Fluid::init(const int gridSize, const float domainSize)
     m_updateCount = 0;
     m_timeElapsed = 0.f;
     // Default color
-    m_color = Colorf(0.f,0.2f,0.8f,0.5f);
+    m_color = Colorf(0.1f,0.4f,0.8f,1.0f);
     m_renderNormals = false;
 
     // initializing wave dampening fields

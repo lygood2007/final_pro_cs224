@@ -1,5 +1,6 @@
 varying vec3 normal, lightDir, r;
 const vec3 L = vec3(0.,0.,1.);
+uniform vec4 CurrColor;
 void main()
 {	
 	gl_Position = ftransform();		

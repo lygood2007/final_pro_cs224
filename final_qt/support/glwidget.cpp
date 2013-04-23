@@ -113,7 +113,7 @@ void GLWidget::initializeGL()
     glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
 
     // Bind the ambient and diffuse color of each vertex to the current glColor() value
-   glEnable(GL_COLOR_MATERIAL);
+    glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
 
     // Cull triangles that are facing away from the camera
@@ -142,20 +142,20 @@ void GLWidget::initializeResources()
     cout << "--- Loading Resources ---" << endl;
 
     m_terrain->generate();
-    cout << "Generated Terrain ---" << endl;
+    cout << "  Generated Terrain ->" << endl;
 
     m_fluid->backupHeight(m_terrain);
-    cout << "Calculated Fluid Height ---" << endl;
+    cout << "  Calculated Fluid Height ->" << endl;
 
     m_skybox = ResourceLoader::loadSkybox();
     loadCubeMap();
-    cout << "Loaded Skymap ---" << endl;
+    cout << "  Loaded Skymap ->" << endl;
 
     createShaderPrograms();
-    cout << "Loaded Shaders ---" << endl;
+    cout << "  Loaded Shaders ->" << endl;
 
     createFramebufferObjects(width(), height());
-    cout << "Loaded FBO's---" << endl;
+    cout << "  Loaded FBO's->" << endl;
 
     cout << " --- Finish Loading Resources ---" << endl;
 }
@@ -166,11 +166,17 @@ void GLWidget::paintGL()
     timeUpdate();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    renderSkybox(); //@NOTE - This must go first!!
+     renderSkybox();//@NOTE - This must go first!!
+
+#ifdef DRAW_TERRAIN
+    m_terrain->draw();
+#endif
 
     renderScene(); //@NOTE: - comment this out when working on the shaders
 
-    //The lighting stuff - SH
+
+
+
     int width = this->width();
     int height = this->height();
 
@@ -231,7 +237,8 @@ void GLWidget::renderSkybox()
 
     glDisable(GL_LIGHTING); //so the map will be uniformly bright
 
-//    //I should just be able to ask the camera it's position but that doesn't seem to work, so this
+    //I should just be able to ask the camera it's position but that doesn't seem to work, so this
+//    Vector4 temp = m_camera.getEyePos(); Vector3 eye = Vector3(temp.x, temp.y, temp.z);
     Vector3 dir(-Vector3::fromAngles(m_camera.m_theta, m_camera.m_phi));
     Vector3 eye(m_camera.m_center - dir * m_camera.m_zoom);
 
@@ -257,10 +264,23 @@ void GLWidget::renderSkybox()
 **/
 void GLWidget::renderGeometry()
 {
+//    GLfloat no_mat[] = { 0.0, 0.0, 0.0, 1.0 };
+//    GLfloat mat_ambient[] = { 0.7, 0.7, 0.7, 1.0 };
+//    GLfloat mat_ambient_color[] = { 0.8, 0.8, 0.2, 1.0 };
+//    GLfloat mat_diffuse[] = { 0.1, 0.5, 0.8, 1.0 };
+//    GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+//    GLfloat no_shininess[] = { 0.0 };
+//    GLfloat low_shininess[] = { 5.0 };
+//    GLfloat high_shininess[] = { 100.0 };
+//    GLfloat mat_emission[] = {0.3, 0.2, 0.2, 0.0};
 
-#ifdef DRAW_TERRAIN
-    m_terrain->draw();
-#endif
+//    glPushMatrix();
+
+//    glMaterialfv(GL_FRONT, GL_AMBIENT, no_mat);
+//    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+//    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+//    glMaterialfv(GL_FRONT, GL_SHININESS, high_shininess);
+//    glMaterialfv(GL_FRONT, GL_EMISSION, no_mat);
 
 #ifdef RENDER_FLUID
     // Fluid part
@@ -268,9 +288,9 @@ void GLWidget::renderGeometry()
     m_fluid->draw();
 #endif
 
+//    glPopMatrix();
+
 }
-
-
 
 
 /**
@@ -278,16 +298,17 @@ void GLWidget::renderGeometry()
 **/
 void GLWidget::renderScene()
 {
+
+
     // Enable depth testing
     glEnable(GL_DEPTH_TEST);
-//    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-    // Enable culling (back) faces for rendering the fluid
+    // Enable culling (back) faces for rendering the fluid and terrain
     glEnable(GL_CULL_FACE);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
 
-    renderGeometry();
+//    renderGeometry();
 
-    // Render the fluid with the refraction shader bound
+//     Render the fluid with the refraction shader bound
 //    glActiveTexture(GL_TEXTURE0);
 //    m_shaderPrograms["refract"]->bind();
 //    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
@@ -297,15 +318,17 @@ void GLWidget::renderScene()
 //    glPopMatrix();
 //    m_shaderPrograms["refract"]->release();
 
-//    // Render the fluid with the reflection shader bound
-//    m_shaderPrograms["reflect"]->bind();
-//    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
-//    glPushMatrix();
-//    glTranslatef(1.25f,0.f,0.f);
-//    renderGeometry();
-//    glPopMatrix();
-//    m_shaderPrograms["reflect"]->release();
+    // Render the fluid with the reflection shader bound
+    m_shaderPrograms["reflect"]->bind();
+    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
+    m_shaderPrograms["reflect"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,1.0f);
+    glPushMatrix();
+    glTranslatef(1.25f,0.f,0.f);
+    renderGeometry();
+    glPopMatrix();
+    m_shaderPrograms["reflect"]->release();
 //     Disable culling, depth testing and cube maps
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
 
@@ -491,6 +514,10 @@ void GLWidget::applyOrthogonalCamera(float width, float height)
 void GLWidget::applyPerspectiveCamera(float width, float height)
 {
     float ratio = ((float) width) / height;
+
+//    Vector4 temp = m_camera.getEyePos();
+//    Vector3 eye = Vector3(temp.x, temp.y, temp.z);
+
     Vector3 dir(-Vector3::fromAngles(m_camera.m_theta, m_camera.m_phi));
     Vector3 eye(m_camera.m_center - dir * m_camera.m_zoom);
 
