@@ -724,20 +724,20 @@ void Fluid::computeNormal()
     for( int i = 0; i < m_gridSize; i++ )
     {
         for( int j = 0; j < m_gridSize; j++ )
-        {
+        {   
             int numNeighbors = 0;
             Vector3 offsets[8];
             // Search fir eight neightbors
             Vector2 coords[8];
             QList<Vector2 > neighbors;
-            coords[0] = Vector2(j,     i - 1);
-            coords[1] = Vector2(j + 1,i - 1);
-            coords[2] = Vector2(j + 1, i);
-            coords[3] = Vector2(j + 1, i + 1);
-            coords[4] = Vector2(j,     i + 1);
-            coords[5] = Vector2(j - 1,i + 1);
-            coords[6] = Vector2(j - 1, i);
-            coords[7] = Vector2(j - 1, i - 1);
+            coords[0] = Vector2(i,     j - 1);
+            coords[1] = Vector2(i + 1, j - 1);
+            coords[2] = Vector2(i + 1, j);
+            coords[3] = Vector2(i + 1, j + 1);
+            coords[4] = Vector2(i,     j + 1);
+            coords[5] = Vector2(i - 1, j + 1);
+            coords[6] = Vector2(i - 1, j);
+            coords[7] = Vector2(i - 1, j - 1);
             for( int m = 0; m < 8; m++ )
             {
                 if( coords[m].x < 0 || coords[m].y < 0 || coords[m].x > m_gridSize - 1 || coords[m].y > m_gridSize - 1 )
@@ -747,7 +747,9 @@ void Fluid::computeNormal()
 
             for( int m = 0; m < neighbors.size(); m++ )
             {
-                offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y],neighbors[m].y) - Vector3(i,m_depthField[i][j],i);
+                //offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y],neighbors[m].y) - Vector3(i,m_depthField[i][j],i);
+                offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y] + m_terrainHeightField[neighbors[m].x][neighbors[m].y],neighbors[m].y) -
+                        Vector3(i,m_depthField[i][j] + m_terrainHeightField[i][j],j);
             }
 
             Vector3 sum = Vector3::zero();
@@ -761,6 +763,7 @@ void Fluid::computeNormal()
 
                 sum += tmp;
             }
+
             m_normalField[i][j] = -sum.getNormalized();
         }
     }
