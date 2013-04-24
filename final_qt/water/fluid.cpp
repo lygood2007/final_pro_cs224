@@ -357,27 +357,31 @@ void Fluid::init(const int gridSize, const float domainSize)
 
     // initializing wave dampening fields
     m_sigmaField.resize(m_gridSize);
-    m_gammaField.resize(m_gridSize);
+    m_gammaField.resize(m_gridSize + 1);
     m_phiField.resize(m_gridSize);
-    m_psiField.resize(m_gridSize);
+    m_psiField.resize(m_gridSize + 1);
 
     for(int i = 0; i < m_gridSize; i++){
-        m_sigmaField[i].resize(m_gridSize);
+        m_sigmaField[i].resize(m_gridSize + 1);
         m_sigmaField[i].fill(INIT_SIGMA_GAMMA);
 
         m_gammaField[i].resize(m_gridSize);
         m_gammaField[i].fill(INIT_SIGMA_GAMMA);
 
-        m_phiField[i].resize(m_gridSize);
+        m_phiField[i].resize(m_gridSize + 1);
         m_phiField[i].fill(INIT_PHI_PSI);
 
         m_psiField[i].resize(m_gridSize);
         m_psiField[i].fill(INIT_PHI_PSI);
     }
+    m_gammaField[m_gridSize].resize(m_gridSize);
+    m_gammaField[m_gridSize].fill(INIT_SIGMA_GAMMA);
+    m_psiField[m_gridSize].resize(m_gridSize);
+    m_psiField[m_gridSize].fill(INIT_PHI_PSI);
 
     //initialize sigma and gamma inside the dampening region
-    for(int i = 0; i < m_gridSize; i++){
-        for(int j= 0; j < m_gridSize; j++){
+    for(int i = 0; i <= m_gridSize; i++){
+        for(int j = 0; j <= m_gridSize; j++){
             if(i < DAMPENING_REGION || i >= m_gridSize - DAMPENING_REGION ||
                     j < DAMPENING_REGION || j >= m_gridSize - DAMPENING_REGION){
                 //horizontal and vertical distances
@@ -404,8 +408,12 @@ void Fluid::init(const int gridSize, const float domainSize)
                 //quadratic function
                 float value = (QUADRATIC_A * distance * distance) + (QUADRATIC_B * distance) + QUADRATIC_C;
 
-                m_sigmaField[i][j] = value;
-                m_gammaField[i][j] = value;
+                if(i < m_gridSize){
+                    m_sigmaField[i][j] = value;
+                }
+                if(j < m_gridSize){
+                    m_gammaField[i][j] = value;
+                }
             }
         }
     }
@@ -858,7 +866,7 @@ void Fluid::dampenWaves(){
 
     //iterate through the dampening region
     for(int i = 1; i < m_gridSize - 1; i++){
-        for(int j= 1; j < m_gridSize - 1; j++){
+        for(int j = 1; j < m_gridSize - 1; j++){
             if(i < DAMPENING_REGION || i >= m_gridSize - DAMPENING_REGION ||
                     j < DAMPENING_REGION || j >= m_gridSize - DAMPENING_REGION){
                 // Equation 10
@@ -932,5 +940,8 @@ void Fluid::clampFields(){
             m_velocityU[i][j] = min(velocityClamp, m_velocityU[i][j]);
             m_velocityW[i][j] = min(velocityClamp, m_velocityW[i][j]);
         }
+
+        m_velocityU[i][m_gridSize] = min(velocityClamp, m_velocityU[i][m_gridSize]);
+        m_velocityW[m_gridSize][i] = min(velocityClamp, m_velocityW[m_gridSize][i]);
     }
 }
