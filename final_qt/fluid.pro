@@ -25,7 +25,6 @@ DEPENDPATH += common \
 
 SOURCES += \
     camera/camera.cpp \
-    water/fluid.cpp \
     terrain/terrain.cpp \
     support/glwidget.cpp \
     support/main.cpp \
@@ -39,11 +38,12 @@ SOURCES += \
     common/CS123Vector.inl \
     terrain/random_terrain.cpp \
     terrain/heightmap_terrain.cpp \
-    common/utils.cpp
+    common/utils.cpp \
+    water/fluidCPU.cpp \
+    water/fluidGPU.cpp
 
 HEADERS  += \
     camera/camera.h \
-    water/fluid.h \
     terrain/terrain.h \
     support/glwidget.h \
     support/mainwindow.h \
@@ -60,7 +60,10 @@ HEADERS  += \
     terrain/heightmap_terrain.h \
     common/debug_marco.h \
     common/utils.h \
-    common/grid.h
+    common/grid.h \
+    water/fluidCPU.h \
+    water/fluid_global.h \
+    water/fluidGPU.h
 
 OTHER_FILES += cuda/test.cu \
     shaders/refract.vert \

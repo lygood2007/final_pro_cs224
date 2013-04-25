@@ -60,6 +60,46 @@
  }
 
  /**
+   * @brief bilinearInterp 2D dimension bilinear interpolation for 1D array
+   * @param vec The 2D array
+   * @param x The x coordinate
+   * @param z The z coordiante
+   * @return The result
+   */
+  float bilinearInterp( float* vec, float x, float z, int width, int height )
+  {
+      if( x < 0 )
+          x = 0.f;
+      if( z < 0 )
+          z = 0.f;
+      if( x > width - 1 )
+          x = width - 1;
+      if( z > height - 1 )
+          z = height -1;
+
+      const int X = (int)x;
+      const int Y = (int)z;
+      const float s1 = x - X;
+      const float s0 = 1.f - s1;
+      const float t1 = z - Y;
+      const float t0 = 1.f-t1;
+      float e1, e2, e3,e4;
+      e1 = e2 = e3 = e4 = 0;
+      e1 = vec[Y*width+X];
+      if( Y+1 <= height- 1 )
+          e2 = vec[(Y+1)*width + X];
+      if( X +1 <= width -1 )
+          e3 = vec[Y*width + X+1];
+      if( Y+1 <= height - 1 && X + 1 <= width - 1)
+          e4 = vec[(Y+1)*width + X+1];
+
+      float result = s0*(t0*e1 + t1*e2 )+
+              s1*(t0*e3  + t1*e4 );
+
+      return  result;
+  }
+
+ /**
   * @brief randomFloatGenerator Generate a float number between min and max
   * @param min The lower bound
   * @param max The upper bound

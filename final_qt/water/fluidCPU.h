@@ -5,15 +5,21 @@
  ** Member: Scott, Hobarts, Yan Li
  **/
 
-#ifndef FLUID_H
-#define FLUID_H
+#ifndef FLUIDCPU_H
+#define FLUIDCPU_H
 
 #include <QVector>
 #include "types.h"
 #include "terrain.h"
 #include "glwidget.h"
+
+/**
+ *  The default parameter for fluids are now define here
+ **/
+#include "fluid_global.h"
 //#define FLUID_DEBUG
 
+/*
 #define GRID_SIZE TERRAIN_BOUND*2
 #define DOMAIN_SIZE TERRAIN_BOUND
 #define GRAVITY -10
@@ -31,36 +37,21 @@
 #define INIT_SIGMA_GAMMA 0.0f
 #define INIT_PHI_PSI 0.0f
 
-#define CLAMP_ALPHA 0.5f
+#define CLAMP_ALPHA 0.5f*/
 
 //extern float bilinearInterp( QVector<QVector<float > > &vec, const float x, const float z );
 //extern float randomFloatGenerator( float min = 0.f, float max = 1.f);
 
-
-class Fluid
+class FluidCPU
 {
 
 public:
 
-    enum FieldType
-    {
-        HEIGHT = 0,
-        VELOCITY_U,
-        VELOCITY_W,
-        VELOCITY
-    };
-
-    enum DrawMethod
-    {
-        DRAW_POINTS = 0,
-        DRAW_MESH
-    };
-
-    Fluid();
-    Fluid(const int gridSize, const float domainSize );
+    FluidCPU();
+    FluidCPU(const int gridSize, const float domainSize );
     // Initialize from terrain, we should use this
-    Fluid( Terrain* t );
-    ~Fluid();
+    FluidCPU( Terrain* t );
+    ~FluidCPU();
     void draw() const; //the name says it all - draw some fluid
 
     /**
@@ -208,14 +199,6 @@ private:
     float m_dx;
     float m_dt;
     float m_dxInv;
-
-    QVector<QVector<float> > m_depthField; // Stores the height
-    QVector<QVector<Vector3> > m_normalField; // Stroes the normal, a better way is to declare this as a 2D array,
-                                                  // To make it compatible with terrain, I declare as pointer
-    QVector<QVector<float> > m_velocityU;
-    QVector<QVector<float> > m_velocityW;
-    QVector<QVector<float> > m_terrainHeightField;
-    QVector<Tri> m_triangles;
     float m_timeElapsed; // For debug
     int m_updateCount; // For debug
 
@@ -224,10 +207,21 @@ private:
 
     float** m_tempBuffer;
 
+    /**
+     * Design for cpu fluid. 2D vector is not suitable for cuda
+     **/
+
+    QVector<QVector<float> > m_depthField; // Stores the height
+    QVector<QVector<Vector3> > m_normalField; // Stroes the normal, a better way is to declare this as a 2D array,
+
+    QVector<QVector<float> > m_velocityU;
+    QVector<QVector<float> > m_velocityW;
+    QVector<QVector<float> > m_terrainHeightField;
+    QVector<Tri> m_triangles;
     QVector<QVector<float> > m_sigmaField; // stores sigma values for wave dampening
     QVector<QVector<float> > m_gammaField; // stores gamma values for wave dampening
     QVector<QVector<float> > m_phiField; // stores phi values for wave dampening
     QVector<QVector<float> > m_psiField; // stores psi values for wave dampening
 };
 
-#endif // FLUID_H
+#endif // FLUIDCPU_H

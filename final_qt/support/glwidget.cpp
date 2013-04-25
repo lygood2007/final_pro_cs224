@@ -9,7 +9,8 @@
 #include "glwidget.h"
 #include "CS123Algebra.h"
 #include "types.h"
-#include "fluid.h"
+#include "fluidCPU.h"
+#include "fluidGPU.h"
 #include "utils.h"
 #include "terrain.h"
 #include "random_terrain.h"
@@ -24,6 +25,7 @@
 extern "C"
 {
     void testVector();
+    bool findSupportDevice();
     extern void glActiveTexture(GLenum);
 }
 
@@ -71,7 +73,12 @@ void GLWidget::init()
 #else
     m_terrain = new RandomTerrain();
 #endif
-    m_fluid =  new Fluid(m_terrain);
+
+#ifdef USE_GPU_FLUID
+    m_fluid = new FluidGPU(m_terrain);
+#else
+    m_fluid =  new FluidCPU(m_terrain);
+ #endif
     // Start a timer that will try to get 60 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
     m_timer.start(1000 / 60);
@@ -92,8 +99,10 @@ void GLWidget::init()
     m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
     updateCamera();
 
-    /** ONLY A TEST FOR USING CUDA*/
-    testVector();
+#ifdef USE_GPU_FLUID
+    bool support = findSupportDevice();
+        testVector();
+#endif
 }
 
 void GLWidget::initializeGL()
@@ -167,11 +176,16 @@ void GLWidget::paintGL()
     int height = this->height();
     timeUpdate();
 
+#ifdef USE_FBO
     updateCamera();
     m_camera.applyPerspectiveCamera(width,height);
     m_framebufferObjects["fbo_0"]->bind();
+
+#endif
      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    renderScene();
+     renderScene();
+
+#ifdef USE_FBO
    m_framebufferObjects["fbo_0"]->release();
 
     // Copy the rendered scene into framebuffer 1
@@ -225,7 +239,7 @@ void GLWidget::paintGL()
         glDisable(GL_TEXTURE_2D);
         glEnable(GL_LIGHTING);
     }
-
+#endif
     paintText();
 }
 
@@ -281,9 +295,9 @@ void GLWidget::renderGeometry()
 **/
 void GLWidget::renderScene()
 {
-
+#ifdef USE_SKYBOX
     renderSkybox();//@NOTE - This must go first!!
-
+#endif
 #ifdef DRAW_TERRAIN
    m_terrain->draw();
 #endif
@@ -295,6 +309,8 @@ void GLWidget::renderScene()
     //glEnable(GL_DEPTH_TEST);
     // Enable culling (back) faces for rendering the fluid and terrain
  //   glEnable(GL_CULL_FACE);
+
+#ifdef USE_SKYBOX
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
 
 //     Render the fluid with the refraction shader bound
@@ -313,12 +329,17 @@ void GLWidget::renderScene()
     m_shaderPrograms["reflect"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,1.0f);
     glPushMatrix();
     glTranslatef(1.25f,0.f,0.f);
+#endif
+
     renderGeometry();
+
+#ifdef USE_SKYBOX
     glPopMatrix();
     m_shaderPrograms["reflect"]->release();
 //     Disable culling, depth testing and cube maps
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     glDisable(GL_TEXTURE_CUBE_MAP);
+#endif
     //glDisable(GL_CULL_FACE);
    // glDisable(GL_DEPTH_TEST);
 }
@@ -533,7 +554,6 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     {
 #ifdef RENDER_FLUID
          intersectFluid( event->x(), event->y() );
-    //m_fluid->addRandomDrop();
 #endif
         m_mouseLeftDown = true;
     }
@@ -685,8 +705,14 @@ void GLWidget::intersectFluid( const int x, const int y)
     float dx = m_fluid->m_dx;
 
     const QVector<Tri>& temp = m_fluid->m_triangles;
+
+#ifdef USE_GPU_FLUID
+    const float* tempHeight = m_fluid->m_heightField;
+    const float* tempDepth = m_fluid->m_depthField;
+#else
     const QVector<QVector<float> >& tempHeight = m_fluid->m_terrainHeightField;
     const QVector<QVector<float> >& tempDepth = m_fluid->m_depthField;
+#endif
     int indexRow = -1;
     int indexCol = -1;
     const int gridSize = m_fluid->m_gridSize;
@@ -702,20 +728,33 @@ void GLWidget::intersectFluid( const int x, const int y)
         r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
         for( int m = 0; m < 3; m++ )
         {
+#ifdef USE_GPU_FLUID
+            if( tempDepth[m_fluid->getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
+                count++;
+#else
             if( m_fluid->m_depthField[r[m]][c[m]] > EPSILON )
                 count++;
+#endif
         }
         if( count == 0 )
             continue;
         else
         {
+#ifdef USE_GPU_FLUID
+            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
+                                      ,- halfDomain + r[0]*dx );
+            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[m_fluid->getIndex1D(r[1],c[1],HEIGHT)]
+                                       ,- halfDomain + r[1]*dx );
+            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[m_fluid->getIndex1D(r[2],c[2],HEIGHT)]
+                                      ,- halfDomain + r[2]*dx );
+#else
             const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[r[0]][c[0]] + tempDepth[r[0]][c[0]],
                                       - halfDomain + r[0]*dx );
             const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[r[1]][c[1]] + tempDepth[r[1]][c[1]],
                                       - halfDomain + r[1]*dx );
             const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[r[2]][c[2]] + tempDepth[r[2]][c[2]],
                                       - halfDomain + r[2]*dx );
-
+#endif
              if( doIntersectTriangles( eye3, dir3, p0, p1, p2 ) )
              {
                  indexRow =  gridSize - c[0];
