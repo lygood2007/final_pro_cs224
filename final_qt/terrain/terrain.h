@@ -20,7 +20,7 @@
 #define TERRAIN_MIN_HEIGHT 0
 #define TERRAIN_MAX_HEIGHT 50
 
-#define TEXTURE_DIR "./resource/terrain.jpg"
+#define TEXTURE_DIR "./resource/sandy_sea_floor.jpg"
 
 typedef Vector2 GridIndex;
 

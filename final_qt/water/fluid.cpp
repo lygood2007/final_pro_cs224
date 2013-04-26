@@ -748,8 +748,8 @@ void Fluid::computeNormal()
             for( int m = 0; m < neighbors.size(); m++ )
             {
                 //offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y],neighbors[m].y) - Vector3(i,m_depthField[i][j],i);
-                offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y] + m_terrainHeightField[neighbors[m].x][neighbors[m].y],neighbors[m].y) -
-                        Vector3(i,m_depthField[i][j] + m_terrainHeightField[i][j],j);
+                offsets[m] = Vector3(neighbors[m].y,m_depthField[neighbors[m].x][neighbors[m].y] + m_terrainHeightField[neighbors[m].x][neighbors[m].y],neighbors[m].x) -
+                        Vector3(j,m_depthField[i][j] + m_terrainHeightField[i][j],i);
             }
 
             Vector3 sum = Vector3::zero();

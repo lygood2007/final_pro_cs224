@@ -170,9 +170,9 @@ void GLWidget::paintGL()
     updateCamera();
     m_camera.applyPerspectiveCamera(width,height);
     m_framebufferObjects["fbo_0"]->bind();
-     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     renderScene();
-   m_framebufferObjects["fbo_0"]->release();
+    m_framebufferObjects["fbo_0"]->release();
 
     // Copy the rendered scene into framebuffer 1
     m_framebufferObjects["fbo_0"]->blitFramebuffer(m_framebufferObjects["fbo_1"],
@@ -211,7 +211,7 @@ void GLWidget::paintGL()
        // Bind the image from fbo to a texture
         glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
         // Enable alpha blending and render the texture to the screen
         glEnable(GL_BLEND);
@@ -263,7 +263,7 @@ void GLWidget::renderSkybox()
 /**
   Renders the visible geometry, terrain and fluid only at this point
 **/
-void GLWidget::renderGeometry()
+void GLWidget::renderFluid()
 {
 
 #ifdef RENDER_FLUID
@@ -288,6 +288,23 @@ void GLWidget::renderScene()
    m_terrain->draw();
 #endif
 
+   if(false) // make true to draw some axis'
+   {
+       static GLUquadric * quad = gluNewQuadric();
+       glColor3f(0, 0, 1);
+       gluCylinder(quad, 1, 1, 10, 10, 10); // Z
+       glPushMatrix();
+       glRotatef(90, 0, 1, 0);
+       glColor3f(1, 0, 0);
+       gluCylinder(quad, 1, 1, 10, 10, 10); // X
+       glPopMatrix();
+       glPushMatrix();
+       glRotatef(-90, 1, 0, 0);
+       glColor3f(0, 1, 0);
+       gluCylinder(quad, 1, 1, 10, 10, 10); // Y
+       glPopMatrix();
+    }
+
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     // Enable depth testing
@@ -303,19 +320,36 @@ void GLWidget::renderScene()
 //    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
 //    glPushMatrix();
 //    glTranslatef(-1.25f, 0.f, 0.f);
-//    renderGeometry(); //@TODO - Gotta find a faster way to do this
+//    renderFluid();
 //    glPopMatrix();
 //    m_shaderPrograms["refract"]->release();
 
-    // Render the fluid with the reflection shader bound
-    m_shaderPrograms["reflect"]->bind();
-    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
-    m_shaderPrograms["reflect"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,1.0f);
-    glPushMatrix();
-    glTranslatef(1.25f,0.f,0.f);
-    renderGeometry();
-    glPopMatrix();
-    m_shaderPrograms["reflect"]->release();
+    if(false) //true for perfect reflection, false for fresnel
+    {
+        // Render the fluid with the reflection shader bound
+        m_shaderPrograms["reflect"]->bind();
+        m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["reflect"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,0.5f);
+        glPushMatrix();
+        glTranslatef(1.25f,0.f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["reflect"]->release();
+    }
+    else
+    {
+        // Render the fluid with the fresnel shader bound for reflection and refraction
+        m_shaderPrograms["fresnel"]->bind();
+        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,1.0f);
+        glPushMatrix();
+        glTranslatef(1.25f,0.f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["fresnel"]->release();
+    }
+
+
 //     Disable culling, depth testing and cube maps
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     glDisable(GL_TEXTURE_CUBE_MAP);
@@ -340,12 +374,26 @@ void GLWidget::resizeGL(int w, int h)
 void GLWidget::loadCubeMap()
 {
     QList<QFile *> fileList;
-    fileList.append(new QFile("resource/posx.jpg"));
-    fileList.append(new QFile("resource/negx.jpg"));
-    fileList.append(new QFile("resource/posy.jpg"));
-    fileList.append(new QFile("resource/negy.jpg"));
-    fileList.append(new QFile("resource/posz.jpg"));
-    fileList.append(new QFile("resource/negz.jpg"));   
+
+    if(true) //true for real, false for testing color reflections
+    {
+        fileList.append(new QFile("resource/posx.jpg"));
+        fileList.append(new QFile("resource/negx.jpg"));
+        fileList.append(new QFile("resource/posy.jpg"));
+        fileList.append(new QFile("resource/sandy_sea_floor.jpg"));
+        fileList.append(new QFile("resource/posz.jpg"));
+        fileList.append(new QFile("resource/negz.jpg"));
+    }
+    else
+    {
+        fileList.append(new QFile("resource/red.jpg"));
+        fileList.append(new QFile("resource/orange.jpg"));
+        fileList.append(new QFile("resource/green.jpg"));
+        fileList.append(new QFile("resource/sandy_sea_floor.jpg"));
+        fileList.append(new QFile("resource/purple.jpg"));
+        fileList.append(new QFile("resource/yellow.jpg"));
+
+    }
     m_cubeMap = ResourceLoader::loadCubeMap(fileList);
 }
 
@@ -357,6 +405,7 @@ void GLWidget::createShaderPrograms()
     const QGLContext *ctx = context();
     m_shaderPrograms["reflect"] = ResourceLoader::newShaderProgram(ctx, "shaders/reflect.vert", "shaders/reflect.frag");
     m_shaderPrograms["refract"] = ResourceLoader::newShaderProgram(ctx, "shaders/refract.vert", "shaders/refract.frag");
+    m_shaderPrograms["fresnel"] = ResourceLoader::newShaderProgram(ctx, "shaders/fresnel.vert", "shaders/fresnel.frag");
     m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
     m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
 }

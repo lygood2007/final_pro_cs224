@@ -1,5 +1,5 @@
-uniform samplerCube CubeMap;
-uniform vec4 CurrColor;
+uniform samplerCube CubeMap; //the skymap
+uniform vec4 CurrColor; //the current color of the water
 varying vec3 normal, lightDir, r;
 
 void main (void)
@@ -16,5 +16,5 @@ void main (void)
 //            final_color = vec4(1.0, 1.0, 1.0, 1.0);
         }
 //                gl_FragColor = CurrColor;
-        gl_FragColor = CurrColor *(0.6) +  final_color * (0.4);
+        gl_FragColor = CurrColor *(0.3) +  final_color * (0.7);
 }

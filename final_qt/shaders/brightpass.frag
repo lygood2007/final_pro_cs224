@@ -4,11 +4,12 @@ void main(void) {
     vec4 sample = texture2D(tex, gl_TexCoord[0].st);
     float luminance = max(0.0, dot(avgVector, sample.rgb));
 
-    // TODO: Step 1 - update the shader so that we set the
-    // fragment color to black if the luminance is less than 1
-    if(luminance < 1.0) {
+    // set fragment color to black if the luminance is less than some number
+    //adjust these values until you like the effect you are getting
+    if(luminance < 2.0) {
 	sample.rgb = vec3(0.0, 0.0, 0.0);
     } else {
+        luminance = luminance/(luminance + 1.0 );
 	sample.rgb = vec3(luminance, luminance, luminance);
     }
     gl_FragColor = sample;
