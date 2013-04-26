@@ -9,6 +9,8 @@
 
 #include <QVector>
 #include "vector.h"
+#include "debug_marco.h"
+
 /**
   * @brief bilinearInterp 2D dimension bilinear interpolation
   * @param vec The 2D array
@@ -36,5 +38,39 @@
   * @return True if the ray intersects
   */
  bool doIntersectTriangles( const Vector3& eyePos, const Vector3& d, const Vector3& v0, const Vector3& v1, const Vector3& v2 );
+
+ /**
+  * Safely delete an 1-D array
+  */
+ template<class T>
+ inline void safeFreeArray1D( T* array )
+ {
+     if( array != NULL )
+     {
+         free( array );
+     }
+     array = NULL;
+ }
+
+ /**
+  * Safely delete an 2-D array
+  */
+template <class T>
+ inline void safeFreeArray2D( T** array, int rows )
+ {
+     if( array != NULL )
+     {
+         for( int i = 0; i < rows; i++ )
+         {
+             if( array[i] != NULL )
+             {
+                 free(array[i]);
+                 array[i] = NULL;
+             }
+         }
+         free( array );
+         array = NULL;
+     }
+ }
 
 #endif // UTILS_H

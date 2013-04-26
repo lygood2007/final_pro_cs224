@@ -5,8 +5,8 @@
  ** Member: Scott, Hobarts, Yan Li
  **/
 
-#ifndef FLUID_H
-#define FLUID_H
+#ifndef FLUIDGPU_H
+#define FLUIDGPU_H
 
 #include <QVector>
 #include "types.h"
@@ -36,31 +36,22 @@
 //extern float bilinearInterp( QVector<QVector<float > > &vec, const float x, const float z );
 //extern float randomFloatGenerator( float min = 0.f, float max = 1.f);
 
+/**
+ *  The default parameter for fluids are now define here
+ **/
+#include "fluid_global.h"
+//#define FLUID_DEBUG
 
-class Fluid
+class FluidGPU
 {
 
 public:
 
-    enum FieldType
-    {
-        HEIGHT = 0,
-        VELOCITY_U,
-        VELOCITY_W,
-        VELOCITY
-    };
-
-    enum DrawMethod
-    {
-        DRAW_POINTS = 0,
-        DRAW_MESH
-    };
-
-    Fluid();
-    Fluid(const int gridSize, const float domainSize );
+    FluidGPU();
+    FluidGPU(const int gridSize, const float domainSize );
     // Initialize from terrain, we should use this
-    Fluid( Terrain* t );
-    ~Fluid();
+    FluidGPU( Terrain* t );
+    ~FluidGPU();
     void draw() const; //the name says it all - draw some fluid
 
     /**
@@ -114,6 +105,19 @@ public:
      */
     void backupHeight( Terrain* t );
 
+    /**
+     * @brief getGridSize Return the gird size
+     * @return The grid size
+     */
+    inline int getGridSize() const {return m_gridSize;}
+
+    /**
+     * @brief getFieldArray Get the pointer to the array with specified type
+     * @param buffLength The buffer length returned
+     * @return The buffer
+     */
+    float* getFieldArray( FieldType type, int& buffLength ) const;
+
  private:
 
      friend void GLWidget::intersectFluid(const int x, const int y);
@@ -126,12 +130,17 @@ public:
     /**
      * @brief Advect the array
      */
-    void advect(  FieldType type, QVector<QVector<float> >& vec );
+    void advect(  FieldType type, float* vec );
 
     /**
      * @brief updateVelocities Update the velocities
      */
     void updateVelocities();
+
+    /**
+     * @brief updateDepth Update the depth field
+     */
+    void updateDepth();
 
     /**
      * @brief updateHeight Update the height field
@@ -149,7 +158,7 @@ public:
     void checkBoundary();
 
     /**
-     * @brief Write the height field or velocity to image
+     * @brief Write the depth field or velocity to image
      */
     void saveToImage( FieldType type );
 
@@ -167,7 +176,6 @@ public:
      * @brief Draw the normals of the fluid points
      */
     void drawNormal() const;
-
 
     /**
      * @brief initDepthField Initialize the depth field
@@ -199,35 +207,47 @@ public:
      */
     void clampFields();
 
+    /**
+     * @brief getIndex1D Return the corresponding 1D index based on which type
+     * @param i The row number
+     * @param j The col number
+     * @param type The type of the field
+     * @return The 1D index
+     */
+    inline int getIndex1D( int i, int j, FieldType type) const;
+
 private:
+
 // Variables
     int m_gridSize;
+    int m_uWidth; // width for velocityU (m_gridSize+1)
 
     float m_domainSize;
-
     float m_dx;
     float m_dt;
     float m_dxInv;
-
-    QVector<QVector<float> > m_depthField; // Stores the height
-    QVector<QVector<Vector3> > m_normalField; // Stroes the normal, a better way is to declare this as a 2D array,
-                                                  // To make it compatible with terrain, I declare as pointer
-    QVector<QVector<float> > m_velocityU;
-    QVector<QVector<float> > m_velocityW;
-    QVector<QVector<float> > m_terrainHeightField;
-    QVector<Tri> m_triangles;
     float m_timeElapsed; // For debug
     int m_updateCount; // For debug
 
     bool m_renderNormals; // For debug
     Colorf m_color; // The color of the water
 
-    float** m_tempBuffer;
+    /**
+     * Design for gpu fluid. 2D vector is not suitable for cuda
+     **/
+    Vector3* m_normalField;
+    float* m_tempBuffer;
+    float* m_depthField;
+    float* m_velocityU;
+    float* m_velocityW;
+    float* m_terrainHeightField;
+    float* m_heightField;
+    float* m_sigmaField;
+    float* m_gammaField;
+    float* m_phiField;
+    float* m_psiField;
 
-    QVector<QVector<float> > m_sigmaField; // stores sigma values for wave dampening
-    QVector<QVector<float> > m_gammaField; // stores gamma values for wave dampening
-    QVector<QVector<float> > m_phiField; // stores phi values for wave dampening
-    QVector<QVector<float> > m_psiField; // stores psi values for wave dampening
+     QVector<Tri> m_triangles;
 };
 
-#endif // FLUID_H
+#endif // FLUIDGPU_H

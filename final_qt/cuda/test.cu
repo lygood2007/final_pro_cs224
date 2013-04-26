@@ -7,8 +7,9 @@
 #include <assert.h>
 
 extern "C"
-void testVector();
-
+{
+    void testVector();
+}
 __global__ void VecAdd(float* A, float* B, float* C, int N)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -67,5 +68,6 @@ void testVector() {
         cudaFree(d_B);
         cudaFree(d_C);
 }
+
 
 #endif

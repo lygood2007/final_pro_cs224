@@ -25,14 +25,23 @@
 #define DRAW_TERRAIN
 
 //added by hcreynol
-//#define USE_HEIGHTMAP
+#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
+//#define USE_FBO
+#define USE_SKYBOX
+
+/**
+    Uncomment this if you don't want to use CUDA to compute
+**/
+#define USE_GPU_FLUID
+
 
 class QGLShaderProgram;
 class QGLFramebufferObject;
 class Terrain;
-class Fluid;
+class FluidCPU;
+class FluidGPU;
 
 class GLWidget : public QGLWidget
 {
@@ -48,7 +57,12 @@ private:
     QTimer m_timer; // The timer variable
     OrbitCamera m_camera; // Camera
     Terrain* m_terrain;
-    Fluid* m_fluid;
+
+#ifdef USE_GPU_FLUID
+    FluidGPU* m_fluid;
+#else
+    FluidCPU* m_fluid;
+#endif
 
     QHash<QString, QGLShaderProgram *> m_shaderPrograms; // hash map of all shader programs
     QHash<QString, QGLFramebufferObject *> m_framebufferObjects; // hash map of all framebuffer objects
@@ -65,6 +79,8 @@ private:
     int m_prevTime;
     float m_prevFps, m_fps;
     float m_delta;
+
+
 public:
     // Private functions
     /** Initliaze the variables in the class*/
@@ -134,7 +150,6 @@ public:
     void createBlurKernel(int radius, int width, int height, GLfloat* kernel, GLfloat* offsets);
 
     void renderBlur(int width, int height);
-
 
 private slots:
     /** Callback function, will be called whenever the timer ticks*/

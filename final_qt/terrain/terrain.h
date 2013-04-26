@@ -11,6 +11,7 @@
 #include <QList>
 #include <qgl.h>
 #include "vector.h"
+#include "fluid_global.h"
 //debugging
 #include <iostream>
 #include <assert.h>

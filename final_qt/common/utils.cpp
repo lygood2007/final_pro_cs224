@@ -58,7 +58,6 @@
 
      return  result;
  }
-
  /**
   * @brief randomFloatGenerator Generate a float number between min and max
   * @param min The lower bound
