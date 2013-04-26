@@ -40,7 +40,7 @@ SOURCES += \
     terrain/heightmap_terrain.cpp \
     common/utils.cpp \
     water/fluidCPU.cpp \
-    water/fluidGPU.cpp
+    water/fluidGPU.cpp \
 
 HEADERS  += \
     camera/camera.h \
@@ -65,7 +65,8 @@ HEADERS  += \
     water/fluid_global.h \
     water/fluidGPU.h
 
-OTHER_FILES += cuda/test.cu \
+OTHER_FILES += cuda/fluid_compute.cu \
+    cuda/test.cu \
     shaders/refract.vert \
     shaders/refract.frag \
     shaders/reflect.vert \
@@ -73,7 +74,7 @@ OTHER_FILES += cuda/test.cu \
     shaders/brightpass.frag \
     shaders/blur.frag
 
-CUDA_SOURCES += cuda/test.cu
+CUDA_SOURCES += cuda/test.cu cuda/fluid_compute.cu
 
 # you shouldn't have to change anything under this line
 

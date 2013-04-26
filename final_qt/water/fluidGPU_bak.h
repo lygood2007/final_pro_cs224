@@ -37,6 +37,15 @@ public:
     void update(const float dt);
 
     /**
+     * @brief Increment the height of the rectangular region around (posX, posZ) by incHeight
+     * @param posX The x position
+     * @param posZ The z position
+     * @param radius The radius
+     * @param incHeight The amount of height added
+     */
+    void incrementH(const int posX, const int posZ, const int radius, const float incHeight );
+
+    /**
      * @brief addDrop Add the drop to specified region
      * @param posX The x position
      * @param posZ The z position
@@ -96,6 +105,31 @@ public:
     void init(const int gridSize = GRID_SIZE, const float domainSize = DOMAIN_SIZE);
 
     /**
+     * @brief Advect the array
+     */
+    void advect(  FieldType type, float* vec );
+
+    /**
+     * @brief updateVelocities Update the velocities
+     */
+    void updateVelocities();
+
+    /**
+     * @brief updateDepth Update the depth field
+     */
+    void updateDepth();
+
+    /**
+     * @brief updateHeight Update the height field
+     */
+    void updateHeight();
+
+    /**
+     * @brief Apply boundary condition
+     */
+    void applyBoundary();
+
+    /**
      * @brief Check boundary
      */
     void checkBoundary();
@@ -110,11 +144,20 @@ public:
      * @param method The method for drawing, could be DRAW_POINTS or DRAW_MESH
      */
     void drawFluid( DrawMethod method ) const;
+    /**
+     * @brief Computet the normal of each points
+     */
+    void computeNormal();
 
     /**
      * @brief Draw the normals of the fluid points
      */
     void drawNormal() const;
+
+    /**
+     * @brief initDepthField Initialize the depth field
+     */
+    void initDepthField( );
 
     /**
      * @brief build the triangle List
@@ -169,12 +212,13 @@ private:
     /**
      * Design for gpu fluid. 2D vector is not suitable for cuda
      **/
-    Vector3* m_normalField; // Essential
-    float* m_depthField; // Essential
-    float* m_velocityU; // I preserve this for future use
-    float* m_velocityW; // I preserve this for future use
-    float* m_terrainHeightField; // Essential
-    float* m_heightField; // Essential
+    Vector3* m_normalField;
+    float* m_tempBuffer;
+    float* m_depthField;
+    float* m_velocityU;
+    float* m_velocityW;
+    float* m_terrainHeightField;
+    float* m_heightField;
     float* m_sigmaField;
     float* m_gammaField;
     float* m_phiField;

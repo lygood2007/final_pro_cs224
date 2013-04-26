@@ -9,7 +9,6 @@
 extern "C"
 {
     void testVector();
-    bool findSupportDevice();
 }
 __global__ void VecAdd(float* A, float* B, float* C, int N)
 {
@@ -70,31 +69,5 @@ void testVector() {
         cudaFree(d_C);
 }
 
-/**
- * @brief findSupportGPU Find supported CUDA device counts
- * @return True if device count is not zero
- */
-bool findSupportDevice()
-{
-       int deviceCount = 0;
-
-       cudaError_t error_id = cudaGetDeviceCount(&deviceCount);
-
-       if (error_id != cudaSuccess)
-       {
-           printf("cudaGetDeviceCount returned error code: %d\n-> %s\n", (int)error_id, cudaGetErrorString(error_id));
-           printf("> FAILED %s sample finished, exiting...\n" );
-           exit(EXIT_FAILURE);
-       }
-       if (deviceCount == 0)
-       {
-           printf("> There are no device(s) supporting CUDA\n");
-           return false;
-       }
-       else
-       {
-           printf("> Found %d CUDA Capable Device(s)\n", deviceCount);
-       }
-}
 
 #endif

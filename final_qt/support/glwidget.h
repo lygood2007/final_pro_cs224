@@ -25,7 +25,7 @@
 #define DRAW_TERRAIN
 
 //added by hcreynol
-//#define USE_HEIGHTMAP
+#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
 //#define USE_FBO
@@ -63,8 +63,6 @@ private:
 #else
     FluidCPU* m_fluid;
 #endif
-
-
 
     QHash<QString, QGLShaderProgram *> m_shaderPrograms; // hash map of all shader programs
     QHash<QString, QGLFramebufferObject *> m_framebufferObjects; // hash map of all framebuffer objects

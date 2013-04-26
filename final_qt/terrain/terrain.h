@@ -11,14 +11,10 @@
 #include <QList>
 #include <qgl.h>
 #include "vector.h"
+#include "fluid_global.h"
 //debugging
 #include <iostream>
 #include <assert.h>
-
-#define DEFAULT_DEPTH 6
-#define TERRAIN_BOUND 50
-#define TERRAIN_MIN_HEIGHT 0
-#define TERRAIN_MAX_HEIGHT 50
 
 #define TEXTURE_DIR "./resource/terrain.jpg"
 

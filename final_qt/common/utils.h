@@ -9,6 +9,8 @@
 
 #include <QVector>
 #include "vector.h"
+#include "debug_marco.h"
+
 /**
   * @brief bilinearInterp 2D dimension bilinear interpolation
   * @param vec The 2D array
@@ -17,15 +19,6 @@
   * @return The result
   */
  float bilinearInterp( QVector<QVector<float > > &vec, float x, float z );
-
- /**
-   * @brief bilinearInterp 2D dimension bilinear interpolation for 1D array
-   * @param vec The 2D array
-   * @param x The x coordinate
-   * @param z The z coordiante
-   * @return The result
-   */
-  float bilinearInterp( float* vec, float x, float z, const int width, const int height );
 
  /**
   * @brief randomFloatGenerator Generate a float number between min and max

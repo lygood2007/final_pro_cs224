@@ -8,7 +8,7 @@
 
 Terrain::Terrain()
 {
-    m_depth =  DEFAULT_DEPTH;
+    m_depth =  DEFAULT_TERRAIN_DEPTH;
     m_gridLength = (1<<m_depth)+1;
     int terrain_array_size = m_gridLength*m_gridLength;
     m_vertices = new Vector3[terrain_array_size];

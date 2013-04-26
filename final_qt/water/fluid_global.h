@@ -9,6 +9,11 @@
 #ifndef FLUID_GLOBAL_H
 #define FLUID_GLOBAL_H
 
+#define TERRAIN_BOUND 50
+#define TERRAIN_MIN_HEIGHT 0
+#define TERRAIN_MAX_HEIGHT 50
+#define DEFAULT_TERRAIN_DEPTH 7
+
 #define GRID_SIZE TERRAIN_BOUND*2
 #define DOMAIN_SIZE TERRAIN_BOUND
 #define GRAVITY -10
@@ -39,7 +44,7 @@ enum FieldType
     VEL_W,
     VEL,
     TMP,
-    T_HEIGHT,
+    TERRAINH,
     SIGMA,
     GAMMA,
     PHI,

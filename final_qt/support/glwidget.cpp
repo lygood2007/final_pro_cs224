@@ -74,11 +74,6 @@ void GLWidget::init()
     m_terrain = new RandomTerrain();
 #endif
 
-#ifdef USE_GPU_FLUID
-    m_fluid = new FluidGPU(m_terrain);
-#else
-    m_fluid =  new FluidCPU(m_terrain);
- #endif
     // Start a timer that will try to get 60 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
     m_timer.start(1000 / 60);
@@ -100,8 +95,9 @@ void GLWidget::init()
     updateCamera();
 
 #ifdef USE_GPU_FLUID
-    bool support = findSupportDevice();
-        testVector();
+        m_fluid = new FluidGPU(m_terrain);
+#else
+     m_fluid =  new FluidCPU(m_terrain);
 #endif
 }
 

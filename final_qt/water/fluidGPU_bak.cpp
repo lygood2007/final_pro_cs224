@@ -31,13 +31,17 @@ using std::endl;
 
 extern "C"
 {
+/*
+    void initGridGPU( int hostGridSize, float hostdx, const float* hostTerrainMap );
+    void copybackGPU(FieldType type, float* hostHeightMap );
+    void destroyGPUmem();
+    void addDropGPU(const int posX, const int posZ, const int radius, const float h );*/
 void initGridGPU( const int hostGridSize, const float hostdx, const float* hostTerrainMap );
 void copybackGPU(FieldType type, float* hostMap  );
 void destroyGPUmem();
 void addDropGPU(const int posX, const int posZ, const int radius, const float h );
 void advectGPU(const float dt);
 void updateFluidGPU( const float dt );
-bool findSupportDevice();
 }
 
 FluidGPU::FluidGPU()
@@ -59,6 +63,7 @@ FluidGPU::FluidGPU( Terrain *t )
 FluidGPU::~FluidGPU()
 {
     // Release the heap
+    safeFreeArray1D( m_tempBuffer );
     safeFreeArray1D( m_velocityU );
     safeFreeArray1D( m_velocityW );
     safeFreeArray1D( m_terrainHeightField );
@@ -145,6 +150,12 @@ void FluidGPU::draw() const
 **/
 void FluidGPU::update(const float dt)
 {
+    // Test
+
+    //updateFluid();
+    //copyback(DEPTH,m_depthField);
+    //copyback(HEIGHT,m_heightField);
+  //  return;
     if( dt > 0.05 )
     {
         // We assume this is not stable
@@ -153,11 +164,22 @@ void FluidGPU::update(const float dt)
     }
 
    m_dt = dt;
+ /*
+    advect( DEPTH, m_depthField );
+    advect( VEL_U, m_velocityU );
+    advect( VEL_W, m_velocityW );
+
+    updateDepth();
+    updateHeight();
+    updateVelocities();
+
+    applyBoundary();
+    checkBoundary();
+*/
 
     updateFluidGPU( dt );
     copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
-     copybackGPU(NORMAL,(float*)m_normalField);
     //clampFields();
 
 #ifdef DAMPEN_WAVES
@@ -175,6 +197,34 @@ void FluidGPU::update(const float dt)
         saveToImage( VELOCITY );
 #endif
 
+}
+
+/**
+ * @brief Increment the height of the rectangular region around (posX, posZ) by incHeight
+ * @param posX The x position
+ * @param posZ The z position
+ * @param radius The radius
+ * @param incHeight The amount of height added
+ */
+void FluidGPU::incrementH(const int posX, const int posZ, const int radius, const float incHeight )
+{
+    for( int i = posZ - radius; i < posZ + radius + 1; i++ )
+    {
+        for( int j = posX - radius; j < posX + radius + 1; j++ )
+        {
+            if( i < 0 || i >= m_gridSize  || j < 0 || j >= m_gridSize )
+            {
+                continue;
+            }
+            else
+            {
+                const int index = getIndex1D( i,j,DEPTH );
+                m_depthField[index] += incHeight;
+                if( m_depthField[index] > maxHeight )
+                    m_depthField[index] = maxHeight;
+            }
+        }
+    }
 }
 
 void FluidGPU::addDrop(const int posX, const int posZ)
@@ -240,8 +290,7 @@ void FluidGPU::backupHeight( Terrain* t )
    }
    initGridGPU( m_gridSize, m_dx, m_terrainHeightField );
    copybackGPU(DEPTH,m_depthField);
-   copybackGPU(HEIGHT,m_heightField);
-   copybackGPU(NORMAL, (float*)m_normalField );
+   copybackGPU(HEIGHT,m_heightField);;
    std::cout<<"Finshed backup"<<std::endl;
 }
 
@@ -293,28 +342,34 @@ void FluidGPU::init(const int gridSize, const float domainSize)
         m_velocityU[i] = 0.f;
         m_velocityW[i] = 0.f;
     }
+
+    size = (m_gridSize+1)*(m_gridSize+1)*sizeof(float);
+    m_tempBuffer = (float*)malloc(size);
+    for( int i = 0; i < (m_gridSize+1)*(m_gridSize+1); i++ )
+    {
+        m_tempBuffer[i] = 0.f;
+    }
     size = m_gridSize*m_gridSize*sizeof(Vector3);
     m_normalField = (Vector3*)malloc(size);
     for( int i = 0; i < m_gridSize*m_gridSize; i++ )
     {
         // Initial value for normals
-        m_normalField[i] = Vector3(1,1,0);
+        m_normalField[i] = Vector3(0,1,0);
     }
+
+
     buildTriangleList();
     // Set the random seed
     srand((unsigned)time(0));
+
     m_updateCount = 0;
     m_timeElapsed = 0.f;
-
     // Default color
     m_color = Colorf(0.1f,0.4f,0.8f,1.0f);
     m_renderNormals = false;
 
-    // Find if cuda is supported
-    if( !findSupportDevice() )
-    {
-        printf("GPU does not support CUDA!\n");
-    }
+    // Initialize cuda
+
 
     // initializing wave dampening fields
     /*
@@ -413,8 +468,186 @@ void FluidGPU::init(const int gridSize, const float domainSize)
     }
     assert(0);
 #endif
-
 }
+
+/**
+ * @brief Advect the fluid
+ */
+void FluidGPU::advect( FieldType type, float* vec  )
+{
+    int width;
+    int height;
+    switch( type )
+    {
+    case DEPTH:
+        {
+            width = m_gridSize;
+            height = m_gridSize;
+            break;
+        }
+     case VEL_U:
+    {
+        width = m_uWidth;
+        height = m_gridSize;
+        break;
+    }
+    case VEL_W:
+    {
+        width = m_gridSize;
+        height = m_gridSize+1;
+        break;
+    }
+    default:
+        assert(0);
+        break;
+    }
+
+    for( int i = 1; i < height - 1; i++ )
+    {
+        for( int j = 1; j < width - 1; j++ )
+        {
+            float u,w;
+            switch( type )
+            {
+            case DEPTH:
+            {
+                u = 0.5*( m_velocityU[getIndex1D(i,j,VEL_U)]+m_velocityU[getIndex1D(i,j+1,VEL_U)] );
+                w = 0.5*( m_velocityW[getIndex1D(i,j,VEL_W)]+m_velocityW[getIndex1D(i+1,j,VEL_W)] );
+                break;
+            }
+            case VEL_U:
+            {
+                u = m_velocityU[getIndex1D(i,j,VEL_U)];
+                w = 0.25*( m_velocityW[getIndex1D(i,j,VEL_W)]+m_velocityW[getIndex1D(i,j-1,VEL_W)]
+                           +m_velocityW[getIndex1D(i+1,j-1,VEL_W)]+m_velocityW[getIndex1D(i+1,j,VEL_W)] );
+                break;
+            }
+            case VEL_W:
+            {
+                u = 0.25*( m_velocityU[getIndex1D(i-1,j,VEL_U)]+m_velocityU[getIndex1D(i-1,j+1,VEL_U)]
+                           +m_velocityU[getIndex1D(i,j,VEL_U)]+m_velocityU[getIndex1D(i,j+1,VEL_U)] );
+                w = m_velocityW[getIndex1D(i,j,VEL_W)];
+                break;
+            }
+            default:
+            {
+                assert(0);
+                break;
+            }
+            }
+            float curPosX = (float)j;
+            float curPosY = (float)i;
+            float prev_x = curPosX - u*m_dt*m_dxInv;
+            float prev_z = curPosY - w*m_dt*m_dxInv;
+           m_tempBuffer[getIndex1D(i,j,TMP)] = bilinearInterp( vec, prev_x, prev_z, width, height );
+        }
+    }
+
+    // Copy back
+    for( int i = 1; i < height - 1; i++ )
+    {
+        for( int j = 1; j < width - 1; j++ )
+        {
+            switch( type )
+            {
+            case DEPTH:
+            {
+                vec[getIndex1D(i,j,DEPTH)] = m_tempBuffer[getIndex1D(i,j,TMP)];
+                break;
+            }
+            case VEL_W:
+            {
+                vec[getIndex1D(i,j,VEL_W)] = m_tempBuffer[getIndex1D(i,j,TMP)];
+                break;
+            }
+            case VEL_U:
+            {
+                vec[getIndex1D(i,j,VEL_U)] = m_tempBuffer[getIndex1D(i,j,TMP)];
+                break;
+            }
+            default:
+                assert(0);
+            }
+        }
+    }
+}
+
+/**
+ * @brief updateVelocities Update the velocities
+ */
+void FluidGPU::updateVelocities()
+{
+    float h1,h2;
+    for (int i=1;i<m_gridSize-1;i++)
+    {
+        for (int j=2;j<m_gridSize-1;j++)
+        {
+            h1 = m_heightField[getIndex1D(i,j,HEIGHT)];
+            h2 = m_heightField[getIndex1D(i,j-1,HEIGHT)];
+            m_velocityU[getIndex1D(i,j,VEL_U)] += GRAVITY * m_dt * m_dxInv * ( (h1-h2) );
+        }
+    }
+    for (int i=2;i<m_gridSize-1;i++)
+    {
+        for (int j=1;j<m_gridSize-1;j++)
+        {
+            h1 = m_heightField[getIndex1D(i,j,HEIGHT)];
+            h2 = m_heightField[getIndex1D(i-1,j,HEIGHT)];
+            m_velocityW[getIndex1D(i,j,VEL_W)] += GRAVITY* m_dt * m_dxInv * ((h1-h2));
+        }
+    }
+}
+
+/**
+ * @brief updateDepth Update the depth field
+ */
+void FluidGPU::updateDepth()
+{
+    const float decay = 1.f;
+
+    for( int i = 1; i < m_gridSize - 1; i++ )
+    {
+        for( int j = 1; j < m_gridSize - 1; j++ )
+        {
+            float dh = -decay*m_depthField[getIndex1D(i,j,DEPTH)]*m_dxInv*((m_velocityU[getIndex1D(i,j+1,VEL_U)] - m_velocityU[getIndex1D(i,j,VEL_U)])
+                                                           +(m_velocityW[getIndex1D(i+1,j,VEL_W)] - m_velocityW[getIndex1D(i,j,VEL_W)]));
+            m_depthField[getIndex1D(i,j,DEPTH)] += dh*m_dt;
+        }
+    }
+}
+
+/**
+ * @brief updateHeight Update the height field
+ */
+void FluidGPU::updateHeight()
+{
+    for( int i = 0; i < m_gridSize*m_gridSize; i++ )
+    {
+        m_heightField[i] = max(0.f, m_depthField[i] + m_terrainHeightField[i]);
+    }
+}
+
+/**
+ * @brief Apply boundary condition
+ */
+void FluidGPU::applyBoundary()
+{
+    for( int i = 0; i < m_gridSize; i++ )
+    {
+        m_depthField[getIndex1D(0,i,DEPTH)] = max(0.f, m_heightField[getIndex1D(1,i,HEIGHT)]
+                                                   - m_terrainHeightField[getIndex1D(0,i,TERRAINH)]);
+        m_depthField[getIndex1D(m_gridSize-1,i,DEPTH)] = max( 0.f, m_heightField[getIndex1D(m_gridSize - 2,i,HEIGHT)]
+                                                              - m_terrainHeightField[getIndex1D(m_gridSize-1,i,TERRAINH)]);
+    }
+
+    for( int j = 0; j < m_gridSize; j++ )
+    {
+        m_depthField[getIndex1D(j,0,DEPTH)] = max(0.f, m_heightField[getIndex1D(j,1,HEIGHT)] - m_terrainHeightField[getIndex1D(j,0,TERRAINH)]);
+        m_depthField[getIndex1D(j,m_gridSize-1,DEPTH)] = max(0.f, m_heightField[getIndex1D(j,m_gridSize-2,HEIGHT)]
+                                                            - m_terrainHeightField[getIndex1D(j,m_gridSize-1,TERRAINH)]);
+    }
+}
+
 /**
  * @brief Check boundary
  */
@@ -509,7 +742,6 @@ void FluidGPU::drawFluid( DrawMethod method ) const
     }
     else if ( method == DRAW_MESH )
     {
-        // This mode doesn't deal with the invisible triangles
         glPushMatrix();
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE,GL_ONE);
@@ -557,15 +789,9 @@ void FluidGPU::drawFluid( DrawMethod method ) const
                 }
                 if( count == 0 )
                     continue;
-
                 float tx, ty, tz;
                 for( int m = 0; m < 3; m++ )
                 {
-                    //if( m_depthField[getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
-                      glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-                   /*else
-                        glColor4f(0.f,0.f,0.f, m_color.a );
-                    */
                     int index = r[m]*m_gridSize + c[m];
                     tx = -halfDomain + c[m]*m_dx;
                     ty = m_heightField[index];
@@ -586,6 +812,60 @@ void FluidGPU::drawFluid( DrawMethod method ) const
 }
 
 /**
+ * @brief Computet the normal of each points
+ */
+void FluidGPU::computeNormal()
+{
+    for( int i = 0; i < m_gridSize; i++ )
+    {
+        for( int j = 0; j < m_gridSize; j++ )
+        {   
+            int numNeighbors = 0;
+            Vector3 offsets[8];
+            // Search fir eight neightbors
+            Vector2 coords[8];
+            QList<Vector2 > neighbors;
+            coords[0] = Vector2(i,     j - 1);
+            coords[1] = Vector2(i + 1, j - 1);
+            coords[2] = Vector2(i + 1, j);
+            coords[3] = Vector2(i + 1, j + 1);
+            coords[4] = Vector2(i,     j + 1);
+            coords[5] = Vector2(i - 1, j + 1);
+            coords[6] = Vector2(i - 1, j);
+            coords[7] = Vector2(i - 1, j - 1);
+            for( int m = 0; m < 8; m++ )
+            {
+                if( coords[m].x < 0 || coords[m].y < 0 || coords[m].x > m_gridSize - 1 || coords[m].y > m_gridSize - 1 )
+                    continue;
+                neighbors.push_back( coords[m]);
+            }
+
+            for( int m = 0; m < neighbors.size(); m++ )
+            {
+                //offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y],neighbors[m].y) - Vector3(i,m_depthField[i][j],i);
+                offsets[m] = Vector3(neighbors[m].x,m_heightField[getIndex1D(neighbors[m].x,neighbors[m].y,HEIGHT)],neighbors[m].y) -
+                        Vector3(i,m_heightField[getIndex1D(i,j,HEIGHT)]
+                                ,j);
+            }
+
+            Vector3 sum = Vector3::zero();
+            for (int m = 0; m < neighbors.size(); ++m)
+            {
+                Vector3 tmp = Vector3::zero();
+                if( m+1 == numNeighbors )
+                    tmp = offsets[m].cross(offsets[0]);
+                else
+                    tmp = offsets[m].cross(offsets[m+1]);
+
+                sum += tmp;
+            }
+
+            m_normalField[getIndex1D(i,j,NORMAL)] = -sum.getNormalized();
+        }
+    }
+}
+
+/**
  * @brief Draw the normals of the fluid points
  */
 void FluidGPU::drawNormal() const
@@ -595,7 +875,7 @@ void FluidGPU::drawNormal() const
         glColor3f(1,1,1);
 
         const float halfDomain = m_domainSize/2;
-        const int magn = 2;
+        const int magn = 5;
         for (int row = 0; row < m_gridSize; row++)
         {
             for (int column = 0; column < m_gridSize; column++)
@@ -620,10 +900,29 @@ void FluidGPU::drawNormal() const
 }
 
 /**
+ * @brief initDepthField Initialize the depth field
+ */
+void FluidGPU::initDepthField()
+{
+    for( int i = 0; i < m_gridSize; i++ )
+    {
+        for( int j =0; j < m_gridSize; j++ )
+        {
+            m_depthField[getIndex1D(i,j,DEPTH)] = max(0.f, defaultHeight - m_terrainHeightField[getIndex1D(i,j,TERRAINH)] );
+        }
+    }
+}
+
+/**
  * @brief build the triangle List
  */
 void FluidGPU::buildTriangleList()
 {
+    /*
+    assert( m_depthField.size() == m_gridSize );
+    assert( m_depthField[0].size() == m_gridSize );
+    */
+
     cout<<"Build the triangle list..."<<endl;
     for( int i = 0; i < m_gridSize-1; i++ )
     {
