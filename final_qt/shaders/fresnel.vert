@@ -7,7 +7,7 @@ void main()
 {
     vertex = (gl_ModelViewMatrix * gl_Vertex).xyz;
     normal = normalize(gl_NormalMatrix * gl_Normal);
-    eye = gl_ProjectionMatrixInverse*vec4(0,0,-1,0);
+    eye = vec3(gl_ProjectionMatrixInverse*vec4(0,0,-1,0)).xyz;
 
     gl_Position = ftransform();
 }

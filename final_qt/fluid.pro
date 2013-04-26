@@ -72,7 +72,10 @@ OTHER_FILES += cuda/fluid_compute.cu \
     shaders/reflect.vert \
     shaders/reflect.frag \
     shaders/brightpass.frag \
-    shaders/blur.frag
+    shaders/blur.frag \
+    shaders/fresnel.vert \
+    shaders/fresnel.vars \
+    shaders/fresnel.frag
 
 CUDA_SOURCES += cuda/test.cu cuda/fluid_compute.cu
 

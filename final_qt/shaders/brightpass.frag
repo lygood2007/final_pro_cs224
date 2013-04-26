@@ -6,7 +6,7 @@ void main(void) {
 
     // set fragment color to black if the luminance is less than some number
     //adjust these values until you like the effect you are getting
-    if(luminance < 2.0) {
+    if(luminance < 2.5) {
 	sample.rgb = vec3(0.0, 0.0, 0.0);
     } else {
         luminance = luminance/(luminance + 1.0 );

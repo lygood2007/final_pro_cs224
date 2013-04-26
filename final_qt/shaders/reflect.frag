@@ -16,5 +16,5 @@ void main (void)
 //            final_color = vec4(1.0, 1.0, 1.0, 1.0);
         }
 //                gl_FragColor = CurrColor;
-        gl_FragColor = CurrColor *(0.3) +  final_color * (0.7);
+        gl_FragColor = CurrColor *(0.5) +  final_color * (0.5);
 }

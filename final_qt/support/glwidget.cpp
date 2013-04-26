@@ -336,12 +336,33 @@ void GLWidget::renderScene()
 //    glPopMatrix();
 //    m_shaderPrograms["refract"]->release();
 
-    // Render the fluid with the reflection shader bound
-    m_shaderPrograms["reflect"]->bind();
-    m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
-    m_shaderPrograms["reflect"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,1.0f);
-    glPushMatrix();
-    glTranslatef(1.25f,0.f,0.f);
+    if(true) //true for perfect reflection, false for fresnel
+    {
+        // Render the fluid with the reflection shader bound
+        m_shaderPrograms["reflect"]->bind();
+        m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["reflect"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,0.5f);
+        glPushMatrix();
+        glTranslatef(1.25f,0.f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["reflect"]->release();
+    }
+    else
+    {
+        // Render the fluid with the fresnel shader bound for reflection and refraction
+        m_shaderPrograms["fresnel"]->bind();
+        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,0.5f);
+        m_shaderPrograms["fresnel"]->setUniformValue("rS", 0.143f);
+        m_shaderPrograms["fresnel"]->setUniformValue("eta", 0.77f,0.78f,0.8f);
+        glPushMatrix();
+        glTranslatef(1.25f,0.f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["fresnel"]->release();
+    }
+
 #endif
 
 
