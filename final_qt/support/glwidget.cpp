@@ -353,7 +353,7 @@ void GLWidget::renderScene()
         // Render the fluid with the fresnel shader bound for reflection and refraction
         m_shaderPrograms["fresnel"]->bind();
         m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,0.5f);
+        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,1.0f);
         m_shaderPrograms["fresnel"]->setUniformValue("rS", 0.143f);
         m_shaderPrograms["fresnel"]->setUniformValue("eta", 0.77f,0.78f,0.8f);
         glPushMatrix();
@@ -425,7 +425,7 @@ void GLWidget::createShaderPrograms()
     const QGLContext *ctx = context();
     m_shaderPrograms["reflect"] = ResourceLoader::newShaderProgram(ctx, "shaders/reflect.vert", "shaders/reflect.frag");
     m_shaderPrograms["refract"] = ResourceLoader::newShaderProgram(ctx, "shaders/refract.vert", "shaders/refract.frag");
-    m_shaderPrograms["fresnel"] = ResourceLoader::newShaderProgram(ctx, "shaders/fresnel.vert", "shaders/fresnel.frag");
+    m_shaderPrograms["fresnel"] = ResourceLoader::newShaderProgram(ctx, "shaders/f2.vert", "shaders/f2.frag");
     m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
     m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
 }

@@ -75,7 +75,9 @@ OTHER_FILES += cuda/fluid_compute.cu \
     shaders/blur.frag \
     shaders/fresnel.vert \
     shaders/fresnel.vars \
-    shaders/fresnel.frag
+    shaders/fresnel.frag \
+    shaders/f2.frag \
+    shaders/f2.vert
 
 CUDA_SOURCES += cuda/test.cu cuda/fluid_compute.cu
 
