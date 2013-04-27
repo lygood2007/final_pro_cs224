@@ -32,7 +32,7 @@
 #define INIT_PHI_PSI 0.0f
 #define CLAMP_ALPHA 0.5f
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT- 5;
+const float defaultHeight = TERRAIN_MAX_HEIGHT- 25;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;

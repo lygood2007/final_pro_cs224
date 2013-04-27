@@ -13,6 +13,6 @@
 
 
 #define dout_var(var) dout << #var" = " << var << endl;
-#define dout std::cout << __FILE__ << "@" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "):
+#define dout std::cout << __FILE__ << "@" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "):";
 
 #endif // DEBUG_MARCO_H

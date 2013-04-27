@@ -447,11 +447,11 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
      int j = blockDim.x*blockIdx.x + threadIdx.x;
     float value;
     // Fix the boundary
-    if( i == 0 || i == height-1|| j == 0 ||  j == width-1 )
+    /*if( i == 0 || i == height-1|| j == 0 ||  j == width-1 )
     {
         map2Dwrite( depthMap, i,j, 0, width );
-    }
-     /*if( j == 0 && i !=  0 && i != height-1)
+    }*/
+     if( j == 0 && i !=  0 && i != height-1)
      {
          value = max(0.f, map2Dread( heightMap, i,1,width) - map2Dread( terrainMap, i,j,width ) );
          map2Dwrite( depthMap, i,j, value, width );
@@ -501,7 +501,7 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
          value = max(0.f, map2Dread( heightMap, height - 2, width-2, width ) - map2Dread(terrainMap, i,j,width ));
          map2Dwrite( depthMap, i,j, value, width );
          return;
-     }*/
+     }
  }
 
  // Review passed
@@ -588,6 +588,65 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
             vec3 result = normalize( sum );
            const int index = i*width+j;
            normalMap[index].x = result.x; normalMap[index].y = result.y; normalMap[index].z = result.z;
+     }
+ }
+
+ /**
+  * Reduce the overshooting phenomenon when the wave enters a shallow region
+  */
+ __global__ void overshootingReduction( const float* depthMap, float* nextDepthMap, const float* heightMap,
+                                        const float dx, const int width, const int height )
+ {
+     int i = blockDim.y*blockIdx.y + threadIdx.y;
+     int j = blockDim.x*blockIdx.x + threadIdx.x;
+     if( i >= 0 && i < height && j >= 0 && j < width )
+     {
+         float hij = map2Dread( depthMap, i,j,width );
+         // Exclude the border
+         if( i >= 1 && i < height-1 && j >= 1 && j < width-1 )
+         {
+             // 2.2 section
+             const float alpha = 0.3;
+             // n(i,j)
+             float n = map2Dread( heightMap, i,j,width );
+             // n(i-1,j)
+             float n2 = map2Dread( heightMap, i-1,j,width );
+             // n(i+1,j)
+             float n3 = map2Dread( heightMap, i+1,j,width );
+             // n(i,j-1)
+             float n4 = map2Dread( heightMap, i, j-1, width );
+             // n(i,j+1)
+             float n5 = map2Dread( heightMap, i, j+1, width );
+             float value;
+             float nextD = hij;
+             float lamda = 2*dx;
+             if( n - n2 >lamda && n > n3  )
+             {
+                 value = alpha*( cudaMax( 0.f, 0.5*( hij + map2Dread(depthMap,i+1,j,width) ) ) - hij );
+                 nextD += value;
+             }
+             if( n - n3 > lamda && n > n2 )
+             {
+                 value = alpha*( cudaMax( 0.f, 0.5*( hij + map2Dread(depthMap,i-1,j,width) ) ) - hij );
+                 nextD += value;
+             }
+             if( n - n4 > lamda && n > n5 )
+             {
+                 value = alpha*( cudaMax( 0.f, 0.5*( hij + map2Dread(depthMap, i,j+1,width ) ) ) - hij );
+                 nextD += value;
+             }
+             if( n - n5 > lamda && n > n4 )
+             {
+                 value = alpha*( cudaMax( 0.f, 0.5*( hij + map2Dread(depthMap, i, j- 1, width) ) ) - hij );
+                 nextD += value;
+             }
+             map2Dwrite( nextDepthMap, i,j, nextD,width );
+         }
+         else
+         {
+             // Just copy
+             map2Dwrite( nextDepthMap, i,j, hij,width );
+         }
      }
  }
 
@@ -784,7 +843,8 @@ void updateFluidGPU( const float dt )
     /**
      * Update the height
      */
-    updateHeightCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap, gridSize, gridSize );
+    updateHeightCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceHeightMap,
+                                                         deviceDepthMap, deviceTerrainMap, gridSize, gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
@@ -814,6 +874,22 @@ void updateFluidGPU( const float dt )
     blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
     blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
     blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    applyBoundaryCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap, deviceHeightMap, deviceTerrainMap, gridSize,gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    overshootingReduction<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
+                                                              deviceNextDepthMap, deviceHeightMap, mapdx, gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+    /**
+     * Copy back the buffer into deviceDepthMap
+     */
+    cudaMemcpy( deviceDepthMap, deviceNextDepthMap, gridSize*gridSize*sizeof(float),cudaMemcpyDeviceToDevice );
+
+    /**
+     * Apply boundary again
+     **/
     applyBoundaryCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap, deviceHeightMap, deviceTerrainMap, gridSize,gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
@@ -869,6 +945,7 @@ void addDropGPU(const int posX, const int posZ, const int radius, const float h 
  */
 void destroyGPUmem()
 {
+    cudaFree( deviceNormalMap );
     cudaFree( deviceTerrainMap );
     cudaFree( deviceHeightMap );
     cudaFree( deviceDepthMap );
