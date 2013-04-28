@@ -74,6 +74,13 @@ FluidCPU::~FluidCPU()
         delete []m_tempBuffer[i];
     }
     delete []m_tempBuffer;
+
+    // release the particles
+    for(int i = 0; i < m_particles.size(); i++){
+        Particle *currParticle = m_particles[i];
+        m_particles[i] = NULL;
+        delete currParticle;
+    }
 }
 
 //where the magic happens
@@ -87,6 +94,8 @@ void FluidCPU::draw() const
         //and the velocity components on faces
     //glPolygonMode(GL_FRONT, GL_LINE);
     drawFluid( DRAW_MESH );
+    drawParticles();
+
   if( m_renderNormals )
         drawNormal();
 //  glPolygonMode(GL_FRONT,GL_FILL);
@@ -175,6 +184,8 @@ void FluidCPU::update(const float dt)
 #endif
 
     computeNormal();
+
+    updateParticles();
 
     m_timeElapsed += dt;
     m_updateCount++;
@@ -756,8 +767,7 @@ void FluidCPU::computeNormal()
 
             for( int m = 0; m < neighbors.size(); m++ )
             {
-                //offsets[m] = Vector3(neighbors[m].x,m_depthField[neighbors[m].x][neighbors[m].y],neighbors[m].y) - Vector3(i,m_depthField[i][j],i);
-                offsets[m] = Vector3(neighbors[m].y,m_depthField[neighbors[m].x][neighbors[m].y] + m_terrainHeightField[neighbors[m].x][neighbors[m].y], neighbors[m].x) -
+                offsets[m] = Vector3(neighbors[m].y, m_depthField[neighbors[m].x][neighbors[m].y] + m_terrainHeightField[neighbors[m].x][neighbors[m].y], neighbors[m].x) -
                         Vector3(j,m_depthField[i][j] + m_terrainHeightField[i][j],i);
             }
 
@@ -942,4 +952,198 @@ void FluidCPU::clampFields(){
             m_velocityW[i][j] = min(velocityClamp, m_velocityW[i][j]);
         }
     }
+}
+
+void FluidCPU::updateParticles(){
+    for(int i = 0; i < m_particles.size(); i++){
+        Particle *currParticle = m_particles[i];
+        currParticle->updateParticle(m_dt);
+    }
+
+    removeParticles();
+}
+
+void FluidCPU::removeParticles(){
+    double halfDomain = m_domainSize / 2.0;
+
+    int index = 0;
+    while(index < m_particles.size()){
+        //get current particle
+        Particle *currParticle = m_particles[index];
+        Vector3 position = currParticle->getPosition();
+
+        //check bounds
+        //check return to fluid
+        if(position.x < -halfDomain || position.x > halfDomain ||
+                position.z < -halfDomain || position.z > halfDomain ||
+                position.y < 0){
+            m_particles.remove(index);
+        } else if(fluidParticleInteraction(currParticle)){
+            m_particles.remove(index);
+        } else {
+            index++;
+        }
+    }
+}
+
+bool FluidCPU::fluidParticleInteraction(Particle *particle){
+    Vector3 position = particle->getPosition();
+
+    //get positions
+    double halfDomain = m_domainSize / 2.0;
+    double lenX = position.x + halfDomain;
+    double lenZ = position.z + halfDomain;
+
+    int i = (int) min(m_gridSize, max(0.0, round(lenX / m_dx)));
+    int j = (int) min(m_gridSize, max(0.0, round(lenZ / m_dx)));
+
+    if(position.y <= m_terrainHeightField[i][j] + m_depthField[i][j]){
+        double Veff = particle->getVolume();
+
+        m_depthField[i][j] += Veff / (m_dx * m_dx);
+
+        double denominator = (m_depthField[i][j] * m_dx * m_dx) + Veff;
+
+        m_velocityU[i][j] = ((m_velocityU[i][j] * m_depthField[i][j] * m_dx * m_dx) + (particle->getVelocity().x * Veff)) / denominator;
+        m_velocityW[i][j] = ((m_velocityW[i][j] * m_depthField[i][j] * m_dx * m_dx) + (particle->getVelocity().z * Veff)) / denominator;
+
+        return true;
+    }
+    return false;
+}
+
+void FluidCPU::drawParticles() const{
+    for(int i = 0; i < m_particles.size(); i++){
+        Particle *drawParticle = m_particles[i];
+        drawParticle->drawParticle();
+    }
+}
+
+void FluidCPU::generateSplashParticles(int i, int j, int numParticles){
+    //get position
+    double halfDomain = m_domainSize / 2.0;
+    double posX = -halfDomain + (i * m_dx);
+    double posZ = -halfDomain + (j * m_dx);
+    Vector3 position = Vector3(posX, m_terrainHeightField[i][j] + m_depthField[i][j], posZ);
+
+    double halfDx = m_dx / 2.0;
+
+    for(int i = 0; i < numParticles; i++){
+        //jitter particle positions
+        double randX = ((rand() / RAND_MAX) * m_dx) - halfDx;
+        double randZ = ((rand() / RAND_MAX) * m_dx) - halfDx;
+        Vector3 newPosition = Vector3(position.x + randX, position.y, position.z + randZ);
+
+        generateSplashParticle(i, j, newPosition);
+    }
+}
+
+void FluidCPU::generateSplashParticle(int i, int j, Vector3 position){
+    //check amount of fluid
+    if(m_depthField[i][j] <= 0){
+        return;
+    }
+
+    //compute volume
+    double Veff = C_DEPOSIT * (4 / 3) * M_PI *
+            SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+    double heightChange = Veff / (m_dx * m_dx);
+
+    //check height change
+    if(m_depthField[i][j] < heightChange){
+        heightChange = m_depthField[i][j];
+        Veff = heightChange * (m_dx * m_dx);
+    }
+
+    //reduce height field
+    m_depthField[i][j] -= heightChange;
+
+    //get velocity
+    Vector3 velocity = Vector3(m_velocityU[i][j], 0, m_velocityW[i][j]);
+
+    //get acceleration
+    Vector3 acceleration = Vector3(0, GRAVITY, 0);
+
+    //make new particle
+    Particle *newParticle = new Particle(SPLASH_PARTICLE_RADIUS, Veff, position, velocity, acceleration);
+
+    //append new particle
+    m_particles.append(newParticle);
+}
+
+void FluidCPU::checkForBreakingWaves(){
+    double condition1Compare = ALPHA_MIN_SPLASH * GRAVITY * m_dt * m_dxInv;
+
+    //iterate over grid
+    for(int i = 1; i < m_gridSize - 1; i++){
+        for(int j = 1; j < m_gridSize - 1; j++){
+            //check conditions for breaking waves
+            //condition 1: steepness
+            double condition1 = computeBreakingWaveCondition1(i, j);
+            if(condition1 <= condition1Compare){
+                continue;
+            }
+
+            //condition 2: rising front
+            if(computeBreakingWaveCondition2(i, j) <= V_MIN_SPLASH){
+                continue;
+            }
+
+            //condition 3: top of wave
+            if(computeBreakingWaveCondition3(i, j) >= L_MIN_SPLASH){
+                continue;
+            }
+
+            //generate splash particles
+            int numParticles = (int) round(condition1 * BREAKING_WAVE_NUM_SPLASH_PARTICLES);
+            generateSplashParticles(i, j, numParticles);
+        }
+    }
+}
+
+double FluidCPU::computeBreakingWaveCondition1(int i, int j){
+    //compute eta values
+    double eta = m_terrainHeightField[i][j] + m_depthField[i][j];
+    double etaMinHorz = m_terrainHeightField[i - 1][j] + m_depthField[i - 1][j];
+    double etaMaxHorz = m_terrainHeightField[i + 1][j] + m_depthField[i + 1][j];
+    double etaMinVert = m_terrainHeightField[i][j - 1] + m_depthField[i][j - 1];
+    double etaMaxVert = m_terrainHeightField[i][j + 1] + m_depthField[i][j + 1];
+
+    double firstTerm = etaMaxHorz - eta;
+    double secondTerm = etaMinHorz - eta;
+    double thirdTerm = etaMaxVert - eta;
+    double fourthTerm = etaMinVert - eta;
+
+    //compute gradient vector
+    Vector2 etaGradient = Vector2(firstTerm, thirdTerm);
+    if(fabs(secondTerm) > fabs(firstTerm)){
+        etaGradient.x = secondTerm;
+    }
+    if(fabs(fourthTerm) > fabs(thirdTerm)){
+        etaGradient.y = fourthTerm;
+    }
+    etaGradient = etaGradient * m_dxInv;
+
+    //return magnitude
+    return etaGradient.length();
+}
+
+double FluidCPU::computeBreakingWaveCondition2(int i, int j){
+    //TODO
+    return 0;
+}
+
+double FluidCPU::computeBreakingWaveCondition3(int i, int j){
+    //compute eta values
+    double eta = m_terrainHeightField[i][j] + m_depthField[i][j];
+    double etaMinHorz = m_terrainHeightField[i - 1][j] + m_depthField[i - 1][j];
+    double etaMaxHorz = m_terrainHeightField[i + 1][j] + m_depthField[i + 1][j];
+    double etaMinVert = m_terrainHeightField[i][j - 1] + m_depthField[i][j - 1];
+    double etaMaxVert = m_terrainHeightField[i][j + 1] + m_depthField[i][j + 1];
+
+    //compute numerator
+    double numerator = etaMaxHorz + etaMinHorz + etaMaxVert + etaMinVert - (4 * eta);
+
+    //return term
+    return (numerator * m_dxInv * m_dxInv);
 }

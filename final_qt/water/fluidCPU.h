@@ -12,6 +12,7 @@
 #include "types.h"
 #include "terrain.h"
 #include "glwidget.h"
+#include "particle.h"
 
 /**
  *  The default parameter for fluids are now define here
@@ -38,6 +39,14 @@
 #define INIT_PHI_PSI 0.0f
 
 #define CLAMP_ALPHA 0.5f*/
+
+#define C_DEPOSIT 1
+#define SPLASH_PARTICLE_RADIUS 0.1
+
+#define ALPHA_MIN_SPLASH 0.45
+#define V_MIN_SPLASH 4
+#define L_MIN_SPLASH -4
+#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 50
 
 //extern float bilinearInterp( QVector<QVector<float > > &vec, const float x, const float z );
 //extern float randomFloatGenerator( float min = 0.f, float max = 1.f);
@@ -190,6 +199,48 @@ public:
      */
     void clampFields();
 
+    /**
+     * @brief updates the positions and velocities of the current particles
+     */
+    void updateParticles();
+
+    /**
+     * @brief checks to see which particles should be removed from the list
+     */
+    void removeParticles();
+
+    /**
+     * @brief checks if this particle has hit the fluid, if so, returns height to fluid
+     */
+    bool fluidParticleInteraction(Particle *particle);
+
+    /**
+     * @brief renders the particles
+     */
+    void drawParticles() const;
+
+    /**
+     * @brief generate multiple splash particles here
+     */
+    void generateSplashParticles(int i, int j, int numParticles);
+
+    /**
+     * @brief generate a splash particle at (i, j) on the grid
+     */
+    void generateSplashParticle(int i, int j, Vector3 position);
+
+    /**
+     * @brief check grid for breaking waves, generate splash particles if so
+     */
+    void checkForBreakingWaves();
+
+    /**
+     * @brief computes the values of the three conditions for breaking waves
+     */
+    double computeBreakingWaveCondition1(int i, int j);
+    double computeBreakingWaveCondition2(int i, int j);
+    double computeBreakingWaveCondition3(int i, int j);
+
 private:
 // Variables
     int m_gridSize;
@@ -222,6 +273,9 @@ private:
     QVector<QVector<float> > m_gammaField; // stores gamma values for wave dampening
     QVector<QVector<float> > m_phiField; // stores phi values for wave dampening
     QVector<QVector<float> > m_psiField; // stores psi values for wave dampening
+
+    QVector<Particle*> m_particles; // stores the particles
+    QVector<QVector<float> > m_depthFieldPrev; // stores the previous values of the heights
 };
 
 #endif // FLUIDCPU_H
