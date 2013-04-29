@@ -40,13 +40,14 @@
 
 #define CLAMP_ALPHA 0.5f*/
 
+//#define USE_PARTICLES
 #define C_DEPOSIT 1
 #define SPLASH_PARTICLE_RADIUS 0.1
-
 #define ALPHA_MIN_SPLASH 0.45
 #define V_MIN_SPLASH 4
 #define L_MIN_SPLASH -4
 #define BREAKING_WAVE_NUM_SPLASH_PARTICLES 50
+#define LAMBDA_Y 0.1
 
 //extern float bilinearInterp( QVector<QVector<float > > &vec, const float x, const float z );
 //extern float randomFloatGenerator( float min = 0.f, float max = 1.f);
@@ -240,6 +241,11 @@ public:
     double computeBreakingWaveCondition1(int i, int j);
     double computeBreakingWaveCondition2(int i, int j);
     double computeBreakingWaveCondition3(int i, int j);
+
+    /**
+     * @brief use the current m_depthField to update m_depthFieldPrev
+     */
+    void updatePrevField();
 
 private:
 // Variables

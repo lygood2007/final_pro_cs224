@@ -167,6 +167,8 @@ void FluidCPU::update(const float dt)
 
     m_dt = dt;
 
+    updatePrevField();
+
     advect( DEPTH, m_depthField );
     advect( VEL_U, m_velocityU );
     advect( VEL_W, m_velocityW );
@@ -185,7 +187,9 @@ void FluidCPU::update(const float dt)
 
     computeNormal();
 
+#ifdef USE_PARTICLES
     updateParticles();
+#endif
 
     m_timeElapsed += dt;
     m_updateCount++;
@@ -333,6 +337,8 @@ void FluidCPU::init(const int gridSize, const float domainSize)
     m_velocityU.resize(m_gridSize);
     m_velocityW.resize(m_gridSize+1);
 
+    m_depthFieldPrev.resize(m_gridSize);
+
     for( int i = 0; i < m_gridSize; i++ )
     {
         m_depthField[i].resize(m_gridSize);
@@ -347,6 +353,8 @@ void FluidCPU::init(const int gridSize, const float domainSize)
 
         m_velocityW[i].resize(m_gridSize);
         m_velocityW[i].fill(defaultW);
+
+        m_depthFieldPrev[i].resize(m_gridSize);
     }
     m_velocityW[m_gridSize].resize(m_gridSize);
     m_velocityW[m_gridSize].fill(defaultW);
@@ -955,12 +963,17 @@ void FluidCPU::clampFields(){
 }
 
 void FluidCPU::updateParticles(){
+    //advance current particles
     for(int i = 0; i < m_particles.size(); i++){
         Particle *currParticle = m_particles[i];
         currParticle->updateParticle(m_dt);
     }
 
+    //remove particles
     removeParticles();
+
+    //add any new particles
+    checkForBreakingWaves();
 }
 
 void FluidCPU::removeParticles(){
@@ -1028,7 +1041,7 @@ void FluidCPU::generateSplashParticles(int i, int j, int numParticles){
 
     double halfDx = m_dx / 2.0;
 
-    for(int i = 0; i < numParticles; i++){
+    for(int a = 0; a < numParticles; a++){
         //jitter particle positions
         double randX = ((rand() / RAND_MAX) * m_dx) - halfDx;
         double randZ = ((rand() / RAND_MAX) * m_dx) - halfDx;
@@ -1059,7 +1072,7 @@ void FluidCPU::generateSplashParticle(int i, int j, Vector3 position){
     m_depthField[i][j] -= heightChange;
 
     //get velocity
-    Vector3 velocity = Vector3(m_velocityU[i][j], 0, m_velocityW[i][j]);
+    Vector3 velocity = Vector3(m_velocityU[i][j], LAMBDA_Y * computeBreakingWaveCondition2(i, j), m_velocityW[i][j]);
 
     //get acceleration
     Vector3 acceleration = Vector3(0, GRAVITY, 0);
@@ -1129,8 +1142,7 @@ double FluidCPU::computeBreakingWaveCondition1(int i, int j){
 }
 
 double FluidCPU::computeBreakingWaveCondition2(int i, int j){
-    //TODO
-    return 0;
+    return ((m_depthField[i][j] - m_depthFieldPrev[i][j]) / m_dt);
 }
 
 double FluidCPU::computeBreakingWaveCondition3(int i, int j){
@@ -1146,4 +1158,12 @@ double FluidCPU::computeBreakingWaveCondition3(int i, int j){
 
     //return term
     return (numerator * m_dxInv * m_dxInv);
+}
+
+void FluidCPU::updatePrevField(){
+    for(int i = 0; i < m_gridSize; i++){
+        for(int j = 0; j < m_gridSize; j++){
+            m_depthFieldPrev[i][j] = m_depthField[i][j];
+        }
+    }
 }
