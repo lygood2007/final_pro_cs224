@@ -70,7 +70,14 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_heightField );
     safeFreeArray1D( m_depthField );
 
-     destroyGPUmem();
+    destroyGPUmem();
+
+    // release the particles
+    for(int i = 0; i < m_particles.size(); i++){
+        Particle *currParticle = m_particles[i];
+        m_particles[i] = NULL;
+        delete currParticle;
+    }
 }
 
 //where the magic happens
@@ -84,6 +91,9 @@ void FluidGPU::draw() const
         //and the velocity components on faces
     //glPolygonMode(GL_FRONT, GL_LINE);
     drawFluid( DRAW_MESH );
+#ifdef USE_PARTICLES
+    drawParticles();
+#endif
   if( m_renderNormals )
         drawNormal();
 //  glPolygonMode(GL_FRONT,GL_FILL);
@@ -157,8 +167,12 @@ void FluidGPU::update(const float dt)
     updateFluidGPU( dt );
     copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
-     copybackGPU(NORMAL,(float*)m_normalField);
+    copybackGPU(NORMAL,(float*)m_normalField);
     //clampFields();
+
+#ifdef USE_PARTICLES
+    updateParticles();
+#endif
 
 #ifdef DAMPEN_WAVES
     //dampenWaves();
@@ -806,5 +820,179 @@ float* FluidGPU::getFieldArray( FieldType type, int& buffLength ) const
     default:
         printf("Invalid type\n");
         return 0;
+    }
+}
+
+void FluidGPU::updateParticles(){
+    //advance current particles
+    for(int i = 0; i < m_particles.size(); i++){
+        Particle *currParticle = m_particles[i];
+        currParticle->updateParticle(m_dt);
+    }
+
+    //remove particles
+    removeParticles();
+
+    //add any new particles
+    //checkForBreakingWaves();
+
+    //copy back changes
+    copybackGPU(DEPTH,m_depthField);
+    copybackGPU(HEIGHT,m_heightField);
+}
+
+void FluidGPU::removeParticles(){
+    double halfDomain = m_domainSize / 2.0;
+
+    QVector<Vector3> values;
+
+    int index = 0;
+    while(index < m_particles.size()){
+        //get current particle
+        Particle *currParticle = m_particles[index];
+        Vector3 position = currParticle->getPosition();
+
+        //check bounds
+        //check return to fluid
+        if(position.x < -halfDomain || position.x > halfDomain ||
+                position.z < -halfDomain || position.z > halfDomain ||
+                position.y < 0){
+            m_particles.remove(index);
+            delete currParticle;
+        } else {
+            Vector3 currValues = fluidParticleInteractionCheck(currParticle);
+
+            if(currValues.x >= 0){
+                bool added = false;
+                for(int i = 0; i < values.size(); i++){
+                    if(currValues.x == values[i].x && currValues.z == values[i].z){
+                        values[i].y += currValues.y;
+                        added = true;
+                        break;
+                    }
+                }
+                if(!added){
+                    values.append(currValues);
+                }
+
+                m_particles.remove(index);
+                delete currParticle;
+            } else {
+                index++;
+            }
+        }
+    }
+
+    if(values.size() > 0){
+        fluidParticleUpdate(values);
+    }
+}
+
+bool FluidGPU::fluidParticleInteraction(Particle *particle){
+    Vector3 position = particle->getPosition();
+
+    //get positions
+    float halfDomain = m_domainSize / 2.0;
+    float lenX = position.x + halfDomain;
+    float lenZ = position.z + halfDomain;
+
+    int j = (int) min(m_gridSize, max(0.0, round(lenX / m_dx)));
+    int i = (int) min(m_gridSize, max(0.0, round(lenZ / m_dx)));
+
+    int depthIndex = getIndex1D(i, j, DEPTH);
+    int heightIndex = getIndex1D(i, j, HEIGHT);
+    int velocityUIndex = getIndex1D(i, j, VEL_U);
+    int velocityWIndex = getIndex1D(i, j, VEL_W);
+
+    if(position.y <= m_heightField[heightIndex]){
+        float Veff = particle->getVolume();
+        float heightChange = Veff / (m_dx * m_dx);
+
+        //add to height
+        addDropGPU( j, i, 2, heightChange );
+
+        float denominator = (m_depthField[depthIndex] * m_dx * m_dx) + Veff;
+
+        //TODO: make this do something
+        m_velocityU[velocityUIndex] = ((m_velocityU[depthIndex] * m_depthField[depthIndex] * m_dx * m_dx) + (particle->getVelocity().x * Veff)) / denominator;
+        m_velocityW[velocityWIndex] = ((m_velocityW[depthIndex] * m_depthField[depthIndex] * m_dx * m_dx) + (particle->getVelocity().z * Veff)) / denominator;
+
+        return true;
+    }
+    return false;
+}
+
+Vector3 FluidGPU::fluidParticleInteractionCheck(Particle *particle){
+    Vector3 position = particle->getPosition();
+
+    //get positions
+    float halfDomain = m_domainSize / 2.0;
+    float lenX = (position.x + halfDomain) * m_dxInv;
+    float lenZ = (position.z + halfDomain) * m_dxInv;
+
+    int j = (int) min(m_gridSize, max(0.0, round(lenX)));
+    int i = (int) min(m_gridSize, max(0.0, round(lenZ)));
+
+    int heightIndex = getIndex1D(i, j, HEIGHT);
+
+    if(position.y <= m_heightField[heightIndex]){
+        float heightChange = particle->getVolume() / (m_dx * m_dx);
+        return Vector3((float)j, heightChange, (float)i);
+    }
+    return Vector3(-1, 0, -1);
+}
+
+void FluidGPU::fluidParticleUpdate(QVector<Vector3> values){
+    for(int p = 0; p < values.size(); p++){
+        int j = (int)values[p].x;
+        int i = (int)values[p].z;
+        float heightChange = values[p].y;
+        addDropGPU( j, i, 2, heightChange );
+    }
+}
+
+void FluidGPU::drawParticles() const{
+    //begin
+    //glBegin(GL_QUADS);
+    glBegin(GL_POINTS);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE,GL_ONE);
+
+    //iterate through and draw particles as points
+    for(int i = 0; i < m_particles.size(); i++){
+        Particle *drawParticle = m_particles[i];
+        drawParticle->drawParticle();
+    }
+
+    //end
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+    glEnd();
+}
+
+void FluidGPU::addDroppingParticles(const int posX, const int posZ){
+    //support values
+    float radius = m_dx * PARTICLE_DROPPING_RADIUS;
+    float Veff = C_DEPOSIT * (4 / 3) * M_PI *
+            SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+    float halfDomain = m_domainSize / 2.0;
+
+    float coordX = -halfDomain + (posX * m_dx);
+    float coordY = -halfDomain + (posZ * m_dx);
+
+    for(int i = 0; i < NUM_DROPPING_PARTICLES; i++){
+        //jitter particle positions
+        float randX = randomFloatGenerator(-radius, radius);
+        float randY = randomFloatGenerator(0, PARTICLE_DROP_RANGE);
+        float randZ = randomFloatGenerator(-radius, radius);
+
+        Vector3 position = Vector3(coordX + randX, PARTICLE_DROP_HEIGHT + randY, coordY + randZ);
+        Vector3 velocity = Vector3::zero();
+        Vector3 acceleration = Vector3(0, GRAVITY, 0);
+
+        //make new particle
+        Particle *newParticle = new Particle(SPLASH_PARTICLE_RADIUS, Veff, position, velocity, acceleration);
+        m_particles.append(newParticle);
     }
 }

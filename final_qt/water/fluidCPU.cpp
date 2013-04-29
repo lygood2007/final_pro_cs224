@@ -991,8 +991,10 @@ void FluidCPU::removeParticles(){
                 position.z < -halfDomain || position.z > halfDomain ||
                 position.y < 0){
             m_particles.remove(index);
+            delete currParticle;
         } else if(fluidParticleInteraction(currParticle)){
             m_particles.remove(index);
+            delete currParticle;
         } else {
             index++;
         }

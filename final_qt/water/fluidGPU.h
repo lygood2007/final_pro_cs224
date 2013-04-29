@@ -12,6 +12,7 @@
 #include "types.h"
 #include "terrain.h"
 #include "glwidget.h"
+#include "particle.h"
 
 /**
  *  The default parameter for fluids are now define here
@@ -42,6 +43,14 @@ public:
      * @param posZ The z position
      */
     void addDrop( const int posX, const int posZ );
+
+    /**
+     * @brief drop particles on a small area
+     * @param posX The x position
+     * @param posZ The z position
+     */
+    void addDroppingParticles( const int posX, const int posZ );
+
     /**
      * @brief Add drop to random positions
      *
@@ -88,7 +97,7 @@ public:
 
  private:
 
-     friend void GLWidget::intersectFluid(const int x, const int y);
+     friend void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event);
     /**
      * @brief init Initialize the variables
      * @param gridSize The length of the grid
@@ -150,6 +159,33 @@ public:
      */
     inline int getIndex1D( int i, int j, FieldType type) const;
 
+    /**
+     * @brief updates the positions and velocities of the current particles
+     */
+    void updateParticles();
+
+    /**
+     * @brief checks to see which particles should be removed from the list
+     */
+    void removeParticles();
+
+    /**
+     * @brief checks if this particle has hit the fluid, if so, returns height to fluid
+     * DEPRACATED, USE FUNCTIONS BELOW
+     */
+    bool fluidParticleInteraction(Particle *particle);
+
+    /**
+     * @brief better particle/fluid interaction
+     */
+    Vector3 fluidParticleInteractionCheck(Particle *particle);
+    void fluidParticleUpdate(QVector<Vector3> values);
+
+    /**
+     * @brief renders the particles
+     */
+    void drawParticles() const;
+
 private:
 
 // Variables
@@ -180,7 +216,9 @@ private:
     float* m_phiField;
     float* m_psiField;
 
-     QVector<Tri> m_triangles;
+    QVector<Tri> m_triangles;
+
+    QVector<Particle*> m_particles; // stores the particles
 };
 
 #endif // FLUIDGPU_H

@@ -61,20 +61,15 @@ void Particle::updateParticle(double dt){
 }
 
 void Particle::drawParticle(){
-    //start
-    glPushMatrix();
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE,GL_ONE);
     glColor4f(m_color.r, m_color.g, m_color.b, m_color.a);
+    glVertex3f(m_position.x, m_position.y, m_position.z);
 
-    //translate to particle position
-    glTranslatef(m_position.x, m_position.y, m_position.z);
-
-    //draw sphere
-    gluQuadricDrawStyle(m_quadric, GLU_FILL);
-    gluSphere(m_quadric, m_radius, DEFAULT_PARTICLE_SLICES, DEFAULT_PARTICLE_SLICES);
-
-    //end
-    glDisable(GL_BLEND);
-    glPopMatrix();
+//    glVertex3f(m_position.x + 1, m_position.y, m_position.z + 1);
+//    glNormal3f(0, 1, 0);
+//    glVertex3f(m_position.x + 1, m_position.y, m_position.z);
+//    glNormal3f(0, 1, 0);
+//    glVertex3f(m_position.x, m_position.y, m_position.z + 1);
+//    glNormal3f(0, 1, 0);
+//    glVertex3f(m_position.x, m_position.y, m_position.z);
+//    glNormal3f(0, 1, 0);
 }
