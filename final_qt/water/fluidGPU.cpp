@@ -511,8 +511,8 @@ void FluidGPU::drawFluid( DrawMethod method ) const
     {
         // This mode doesn't deal with the invisible triangles
         glPushMatrix();
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE,GL_ONE);
+//        glEnable(GL_BLEND);
+//        glBlendFunc(GL_ONE,GL_ONE);
         float halfDomain = m_domainSize/2;
 
         const bool drawStrip = false;
@@ -576,7 +576,7 @@ void FluidGPU::drawFluid( DrawMethod method ) const
             }
             glEnd();
         }
-        glDisable(GL_BLEND);
+//        glDisable(GL_BLEND);
         glPopMatrix();
     }
     else

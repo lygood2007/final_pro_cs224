@@ -1,3 +1,7 @@
+// IoR of Air is   1.0002926
+// IoR of Water is 1.33335  (at 20 deg C)
+// (n1-n2)/(n1+n2) = -0.1427199692
+
 const float Eta = 0.143;         // Ratio of indices of refraction
 const float FresnelPower = 5.0;
 

@@ -12,7 +12,7 @@
 //added by hcreynol
 #include <QFile>
 
-#define HEIGHTMAP_FILENAME "./resource/h_map_3.jpg"
+#define HEIGHTMAP_FILENAME "./resource/h_map_2.jpg"
 //added by hcreynol
 
 class HeightmapTerrain : public Terrain

@@ -12,5 +12,7 @@ void main()
 
     vec3 color   = mix(refractColor, reflectColor, Ratio);
 
-    gl_FragColor = mix(CurrColor, vec4(color, 1.0), .5);
+    gl_FragColor = mix(CurrColor, vec4(color, 1.0), .2);
+//    gl_FragColor = vec4(color, 1.0);
+//    gl_FragColor = CurrColor;
 }
