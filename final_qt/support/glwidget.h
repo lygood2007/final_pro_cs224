@@ -24,7 +24,6 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
-//added by hcreynol
 //#define USE_HEIGHTMAP
 
 #define RENDER_FLUID

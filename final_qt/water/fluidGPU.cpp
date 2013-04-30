@@ -78,6 +78,12 @@ FluidGPU::~FluidGPU()
         m_particles[i] = NULL;
         delete currParticle;
     }
+    // release the particle sources
+    for(int i = 0; i < m_particle_sources.size(); i++){
+        ParticleSource *currParticleSource = m_particle_sources[i];
+        m_particle_sources[i] = NULL;
+        delete currParticleSource;
+    }
 }
 
 //where the magic happens
@@ -172,6 +178,7 @@ void FluidGPU::update(const float dt)
 
 #ifdef USE_PARTICLES
     updateParticles();
+    updateParticleSources();
 #endif
 
 #ifdef DAMPEN_WAVES
@@ -329,6 +336,10 @@ void FluidGPU::init(const int gridSize, const float domainSize)
     {
         printf("GPU does not support CUDA!\n");
     }
+
+#ifdef USE_PARTICLES
+    initParticleSources();
+#endif
 
     // initializing wave dampening fields
     /*
@@ -955,6 +966,8 @@ void FluidGPU::drawParticles() const{
     //begin
     //glBegin(GL_QUADS);
     glBegin(GL_POINTS);
+    //glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+    //glPointSize(20);
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE,GL_ONE);
@@ -968,6 +981,7 @@ void FluidGPU::drawParticles() const{
     //end
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
+    //glDisable(GL_PROGRAM_POINT_SIZE_EXT);
     glEnd();
 }
 
@@ -994,5 +1008,33 @@ void FluidGPU::addDroppingParticles(const int posX, const int posZ){
         //make new particle
         Particle *newParticle = new Particle(SPLASH_PARTICLE_RADIUS, Veff, position, velocity, acceleration);
         m_particles.append(newParticle);
+    }
+}
+
+void FluidGPU::initParticleSources(){
+    float halfDomain = m_domainSize / 2.0;
+
+//    //make a big, low flow source
+//    Vector3 startingCorner = Vector3(-halfDomain, 60, -halfDomain);
+//    Vector3 endingCorner = Vector3(halfDomain, 65, halfDomain);
+//    ParticleSource *particleSource = new ParticleSource(startingCorner, endingCorner, 50);
+//    m_particle_sources.append(particleSource);
+
+//    //make a small, high flow source
+//    Vector3 startingCorner2 = Vector3(-m_dx, 100, -m_dx);
+//    Vector3 endingCorner2 = Vector3(m_dx, 110, m_dx);
+//    Vector3 startingCorner2 = Vector3(-halfDomain, 100, -5);
+//    Vector3 endingCorner2 = Vector3(halfDomain, 120, 5);
+//    ParticleSource *particleSource2 = new ParticleSource(startingCorner2, endingCorner2, 100);
+//    m_particle_sources.append(particleSource2);
+}
+
+void FluidGPU::updateParticleSources(){
+    for(int i = 0; i < m_particle_sources.size(); i++){
+        QVector<Particle*> newParticles = m_particle_sources[i]->generateParticles();
+
+        for(int j = 0; j < newParticles.size(); j++){
+            m_particles.append(newParticles[j]);
+        }
     }
 }

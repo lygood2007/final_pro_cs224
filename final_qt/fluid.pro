@@ -41,7 +41,8 @@ SOURCES += \
     common/utils.cpp \
     water/fluidCPU.cpp \
     water/fluidGPU.cpp \
-    water/particle.cpp
+    water/particle.cpp \
+    water/particlesource.cpp
 
 HEADERS  += \
     camera/camera.h \
@@ -65,7 +66,8 @@ HEADERS  += \
     water/fluidCPU.h \
     water/fluid_global.h \
     water/fluidGPU.h \
-    water/particle.h
+    water/particle.h \
+    water/particlesource.h
 
 OTHER_FILES += cuda/fluid_compute.cu \
     cuda/test.cu \

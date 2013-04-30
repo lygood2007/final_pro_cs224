@@ -13,6 +13,7 @@
 #include "terrain.h"
 #include "glwidget.h"
 #include "particle.h"
+#include "particlesource.h"
 
 /**
  *  The default parameter for fluids are now define here
@@ -186,6 +187,16 @@ public:
      */
     void drawParticles() const;
 
+    /**
+     * @brief create particle sources
+     */
+    void initParticleSources();
+
+    /**
+     * @brief generate new particles for this timestep from the sources
+     */
+    void updateParticleSources();
+
 private:
 
 // Variables
@@ -219,6 +230,7 @@ private:
     QVector<Tri> m_triangles;
 
     QVector<Particle*> m_particles; // stores the particles
+    QVector<ParticleSource*> m_particle_sources; // stores sources of particles (faucets)
 };
 
 #endif // FLUIDGPU_H

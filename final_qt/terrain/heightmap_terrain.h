@@ -8,12 +8,9 @@
 #define HEIGHTMAPTERRAIN_H
 
 #include "terrain.h"
-
-//added by hcreynol
 #include <QFile>
 
-#define HEIGHTMAP_FILENAME "./resource/h_map_1.jpg"
-//added by hcreynol
+#define HEIGHTMAP_FILENAME "./resource/h_map_2.jpg"
 
 class HeightmapTerrain : public Terrain
 {
@@ -26,9 +23,8 @@ private:
 
 protected:
     virtual void populateTerrain();
-    double determinePosition(double gridPosition); //added by hcreynol
-    double interpolateHeight(QImage heightMap, double x, double y); //added by hcreynol
-    // added by hcreynol
+    double determinePosition(double gridPosition);
+    double interpolateHeight(QImage heightMap, double x, double y);
 
 protected:
     QString m_filename; // filename of the heightmap file
