@@ -16,10 +16,10 @@
 #include <iostream>
 #include <assert.h>
 
-#define DEFAULT_DEPTH 6
-#define TERRAIN_BOUND 50
-#define TERRAIN_MIN_HEIGHT 0
-#define TERRAIN_MAX_HEIGHT 25
+//#define DEFAULT_DEPTH 6
+//#define TERRAIN_BOUND 50
+//#define TERRAIN_MIN_HEIGHT 0
+//#define TERRAIN_MAX_HEIGHT 25
 
 #define TEXTURE_DIR "./resource/sandy_sea_floor.jpg"
 
