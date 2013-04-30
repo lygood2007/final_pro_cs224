@@ -24,7 +24,6 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
-//added by hcreynol
 //#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
@@ -144,7 +143,7 @@ public:
      * @param y, The y position in screen space
      * @return Return if it is intersected
      */
-    void intersectFluid( const int x, const int y);
+    void intersectFluid( const int x, const int y, QMouseEvent *event);
 
     //copied from CS123 lab 09 - SH
     void loadCubeMap();

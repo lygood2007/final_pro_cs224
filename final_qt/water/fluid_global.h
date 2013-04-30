@@ -32,7 +32,21 @@
 #define INIT_PHI_PSI 0.0f
 #define CLAMP_ALPHA 0.5f
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT- 25;
+#define USE_PARTICLES
+#define C_DEPOSIT 1
+#define SPLASH_PARTICLE_RADIUS 0.25
+#define ALPHA_MIN_SPLASH 0.45
+#define V_MIN_SPLASH 4
+#define L_MIN_SPLASH -4
+#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 50
+#define LAMBDA_Y 0.1
+
+#define NUM_DROPPING_PARTICLES 10000
+#define PARTICLE_DROPPING_RADIUS 2.0
+#define PARTICLE_DROP_HEIGHT 60
+#define PARTICLE_DROP_RANGE 20
+
+const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;

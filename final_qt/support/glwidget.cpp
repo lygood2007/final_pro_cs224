@@ -609,7 +609,7 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     else
     {
 #ifdef RENDER_FLUID
-         intersectFluid( event->x(), event->y() );
+         intersectFluid( event->x(), event->y(), event);
 #endif
         m_mouseLeftDown = true;
     }
@@ -744,7 +744,7 @@ void GLWidget::timeUpdate()
  * @param y, The y position in screen space
  * @return Return if it is intersected
  */
-void GLWidget::intersectFluid( const int x, const int y)
+void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
 {
     Vector4 eyePos = m_camera.getEyePos();
     Vector4 pFilmCam;
@@ -822,7 +822,11 @@ void GLWidget::intersectFluid( const int x, const int y)
 
     if( indexRow != -1 && indexCol != -1 )
     {
-        m_fluid->addDrop( indexCol, indexRow );
+        if(event->button() == Qt::LeftButton){
+            m_fluid->addDrop( indexCol, indexRow );
+        } else if(event->button() == Qt::MiddleButton){
+            m_fluid->addDroppingParticles(indexCol, indexRow);
+        }
     }
 }
 
