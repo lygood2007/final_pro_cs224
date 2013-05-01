@@ -31,7 +31,7 @@ using std::endl;
 
 extern "C"
 {
-void initGridGPU( const int hostGridSize, const float hostdx, const float* hostTerrainMap );
+void initGridGPU( const int hostGridSize, const float hostdx, const float halfdm, const float* hostTerrainMap );
 void copybackGPU(FieldType type, float* hostMap  );
 void destroyGPUmem();
 void addDropGPU(const int posX, const int posZ, const int radius, const float h );
@@ -42,6 +42,12 @@ bool findSupportDevice();
 void initParticlesGPU(const int numParticles);
 void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
 void inputParticlesGPU( const float *particlePositions, const float *particleVelocities );
+
+void glBindBuffer (GLenum target, GLuint buffer);
+void  glGenBuffers (GLsizei n, GLuint *buffers);
+void *glMapBuffer(	GLenum target,GLenum access);
+void  glBufferData (GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage);
+GLboolean glUnmapBuffer(	GLenum target);
 }
 
 FluidGPU::FluidGPU()
@@ -63,6 +69,8 @@ FluidGPU::FluidGPU( Terrain *t )
 FluidGPU::~FluidGPU()
 {
     // Release the heap
+    safeFreeArray1D( m_paintField );
+    safeFreeArray1D( m_indices );
     safeFreeArray1D( m_velocityU );
     safeFreeArray1D( m_velocityW );
     safeFreeArray1D( m_terrainHeightField );
@@ -98,75 +106,16 @@ FluidGPU::~FluidGPU()
 //where the magic happens
 void FluidGPU::draw() const
 {
-
-//Main algo loop - once per time step
-
-    //Height field fluid simulation - Sec 2.1
-        //discretize the simulation domain where the heights are stored at the cell centers
-        //and the velocity components on faces
-    //glPolygonMode(GL_FRONT, GL_LINE);
-    drawFluid( DRAW_MESH );
+    drawFluid( DRAW_MESH_VBO );
 #ifdef USE_PARTICLES
-    drawParticles();
+    //  drawParticles();
 #endif
 
 #ifdef USE_PARTICLES_2
     drawParticles2();
 #endif
-  if( m_renderNormals )
+    if( m_renderNormals )
         drawNormal();
-//  glPolygonMode(GL_FRONT,GL_FILL);
-        //employing time splitting by first solving for self advection of the velocity field
-            //advection is the unconditionally stable modified MacCormack method
-            //but we fall back onto the semi-Lagrangian method if the first equation result is out of bounds
-
-        //then integrating the height field and velocity field forward in time
-            //explicity intergrate the height of the field using equation (7) to guarentee mass preservation
-            //@TODO - modify this step to take waterfall discontinuties into account for Sec 2.4.3
-
-            //update face velocities taking the gradient of the water height into account
-            //@TODO - this also needs to be modified to account for waterfalls, Sec 2.4.3
-
-        //boundary conditions
-            //dealing with reflective and static surfaces by setting face velocity to zero
-            //the entire "wet" cell needs to be higher than the terrain level in order to flow, if not treat as stopped
-
-            //for open water scenes implement Perfectly Matched Layers to dampen out the waves when the get near the edge
-            //the width of the dampening region is 10 cells
-
-            //@NOTE: for stability, be sure to clamp h_i,j to always be >= zero
-
-            //@NOTE:  for violent wave stabilty clamp u_i +1/2, j and v_i, j+1/2 to alpha dx/dt = 0.5
-
-            //@NOTE: limit the water depth used for the height intergration, beta = 2
-
-        //Overshooting reduction - Sec 2.2
-        //to prevent triangle overlap when moving to shallow regions from deeper water
-        //to detect edges of the waves and reduce the magnitude - need to fix in x and z planes
-
-    //Solids simulation
-    //we currently have the terrain right in glwidget - will either need to move that here to pass a pointer
-    //for the next step of the algo
-    //Two-way coupling of height field and solids - Sec 2.3
-
-        //recursively divide each triangle in fluid and solids into sub triangles smaller than kdx^2 where k = 1
-        //let p = the position at this time step and v = the velocity at this time step of the centroid of the sub triangle
-        //A is the area of the subtriangle with  p and v obtained by baycentric interpolation from the original triangle
-        //with normal of n from the vector triangle
-
-        //calculate the buoyancy of the triangle
-        //calculate the lift of the triangle
-        //calculate the drag of the triangle
-
-        //add these forces to the solid the subtriangle belongs to, for a fluid weight the forces to the three vertices of the original tri
-
-
-        //modify the height and velocity of the fluid due to solids using algo 2
-
-
-    //Particles generation and simulation - Sec 2.4
-
-    //spray/splash and rform
 }
 
 /**
@@ -181,17 +130,21 @@ void FluidGPU::update(const float dt)
         return;
     }
 
-   m_dt = dt;
+    m_dt = dt;
 
     updateFluidGPU( dt );
+    /*
     copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
+    */
+     copybackGPU(HEIGHT,m_heightField);
+    copybackGPU( PAINT, (float*) m_paintField );
     copybackGPU(NORMAL,(float*)m_normalField);
     //clampFields();
 
 #ifdef USE_PARTICLES
-    updateParticles();
-    updateParticleSources();
+    //updateParticles();
+    //  updateParticleSources();
 #endif
 
 #ifdef USE_PARTICLES_2
@@ -203,8 +156,6 @@ void FluidGPU::update(const float dt)
 #ifdef DAMPEN_WAVES
     //dampenWaves();
 #endif
-
-//    computeNormal();
 
     m_timeElapsed += dt;
     m_updateCount++;
@@ -220,14 +171,15 @@ void FluidGPU::update(const float dt)
 void FluidGPU::addDrop(const int posX, const int posZ)
 {
     // Fixed size
-    int radius = m_gridSize/20;
+    int radius = m_gridSize/18;
     if( radius < 1 )
         radius = 1;
-    float h = 4;
+    float h = m_domainSize/30;
 
     addDropGPU( posX, posZ, radius, h );
-    copybackGPU(DEPTH,m_depthField);
+    //copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
+    copybackGPU( PAINT, (float*)m_paintField );
 }
 
 /**
@@ -241,13 +193,13 @@ void FluidGPU::addRandomDrop( const float freq )
     **/
     // freq is not useful right now
     //float rnd = randomFloatGenerator();
-        //int posX = rand()%m_gridSize;
-        //int posY = rand()%m_gridSize;
-       // int radius = rand()%(m_gridSize/15);
-        /**
+    //int posX = rand()%m_gridSize;
+    //int posY = rand()%m_gridSize;
+    // int radius = rand()%(m_gridSize/15);
+    /**
          * @brief not applicable right now
          */
-     /**   int posX = 0.5*m_gridSize;
+    /**   int posX = 0.5*m_gridSize;
         int posZ = 0.5*m_gridSize;
         int radius = rand()%(m_gridSize/15);
     float rndHeight = randomFloatGenerator( 5, 15 );
@@ -268,27 +220,30 @@ void FluidGPU::backupHeight( Terrain* t )
 {
     std::cout<<"Back up terrain heights into fluid..."<<std::endl;
     assert( t->getGridLength() == m_gridSize );
-   // assert( t->getBound() == m_domainSize/2 );
-   const Vector3* terrainVertices = t->getVerts();
-   for( int i = 0; i < m_gridSize; i++ )
-   {
-       for( int j = 0; j < m_gridSize; j++ )
-       {
-           const int index = getIndex1D( i,j, TERRAINH);
-           m_terrainHeightField[index] = terrainVertices[index].y;
-       }
-   }
-   initGridGPU( m_gridSize, m_dx, m_terrainHeightField );
-   copybackGPU(DEPTH,m_depthField);
-   copybackGPU(HEIGHT,m_heightField);
-   copybackGPU(NORMAL, (float*)m_normalField );
-   std::cout<<"Finshed backup"<<std::endl;
+    // assert( t->getBound() == m_domainSize/2 );
+    const Vector3* terrainVertices = t->getVerts();
+    for( int i = 0; i < m_gridSize; i++ )
+    {
+        for( int j = 0; j < m_gridSize; j++ )
+        {
+            const int index = getIndex1D( i,j, TERRAINH);
+            m_terrainHeightField[index] = terrainVertices[index].y;
+        }
+    }
+    initBuffer();
+    float halfDomain = m_domainSize/2.f;
+    initGridGPU( m_gridSize, m_dx, halfDomain, m_terrainHeightField );
+    copybackGPU(PAINT,(float*)m_paintField);
+  //  copybackGPU(DEPTH,m_depthField);
+    copybackGPU(HEIGHT,m_heightField);
+    copybackGPU(NORMAL, (float*)m_normalField );
+    std::cout<<"Finshed backup"<<std::endl;
 
-   //initialize particles
-   initParticlesGPU(TOTAL_NUM_PARTICLES);
+    //initialize particles
+    initParticlesGPU(TOTAL_NUM_PARTICLES);
 #ifdef USE_PARTICLES_2
-   copybackGPU(PARTICLE_POSITIONS, (float*)m_particle_positions );
-   copybackGPU(PARTICLE_VELOCITIES, (float*)m_particle_velocities );
+    copybackGPU(PARTICLE_POSITIONS, (float*)m_particle_positions );
+    copybackGPU(PARTICLE_VELOCITIES, (float*)m_particle_velocities );
 #endif
 }
 
@@ -321,6 +276,7 @@ void FluidGPU::init(const int gridSize, const float domainSize)
     m_phiField = (float*)malloc(size);
     m_psiField = (float*)malloc(size);
     m_heightField = (float*)malloc(size);
+    m_paintField = (Vector3* )malloc(size);
     for( int i = 0; i < m_gridSize*m_gridSize; i++ )
     {
         m_depthField[i] = 0.f;
@@ -347,6 +303,10 @@ void FluidGPU::init(const int gridSize, const float domainSize)
         // Initial value for normals
         m_normalField[i] = Vector3(1,1,0);
     }
+
+    int sizeIndex = (m_gridSize+1)*(m_gridSize-1)*2;
+    m_indices = (GLuint*)malloc(sizeIndex*sizeof(sizeIndex));
+    initIndices();
     buildTriangleList();
     // Set the random seed
     srand((unsigned)time(0));
@@ -362,7 +322,6 @@ void FluidGPU::init(const int gridSize, const float domainSize)
     {
         printf("GPU does not support CUDA!\n");
     }
-
 #ifdef USE_PARTICLES
     initParticleSources();
 #endif
@@ -377,112 +336,59 @@ void FluidGPU::init(const int gridSize, const float domainSize)
     }
     m_particle_acceleration = Vector3(0, GRAVITY, 0);
 #endif
-
-    // initializing wave dampening fields
-    /*
-    m_sigmaField.resize(m_gridSize);
-    m_gammaField.resize(m_gridSize + 1);
-    m_phiField.resize(m_gridSize);
-    m_psiField.resize(m_gridSize + 1);
-
-    for(int i = 0; i < m_gridSize; i++){
-        m_sigmaField[i].resize(m_gridSize + 1);
-        m_sigmaField[i].fill(INIT_SIGMA_GAMMA);
-
-        m_gammaField[i].resize(m_gridSize);
-        m_gammaField[i].fill(INIT_SIGMA_GAMMA);
-
-        m_phiField[i].resize(m_gridSize + 1);
-        m_phiField[i].fill(INIT_PHI_PSI);
-
-        m_psiField[i].resize(m_gridSize);
-        m_psiField[i].fill(INIT_PHI_PSI);
-    }
-<<<<<<< HEAD:final_qt/water/fluidGPU.cpp
-*/
-    //initialize sigma and gamma inside the dampening region
-/*    for(int i = 0; i < m_gridSize; i++){
-        for(int j= 0; j < m_gridSize; j++){
-=======
-    m_gammaField[m_gridSize].resize(m_gridSize);
-    m_gammaField[m_gridSize].fill(INIT_SIGMA_GAMMA);
-    m_psiField[m_gridSize].resize(m_gridSize);
-    m_psiField[m_gridSize].fill(INIT_PHI_PSI);
-
-    //initialize sigma and gamma inside the dampening region
-    for(int i = 0; i <= m_gridSize; i++){
-        for(int j = 0; j <= m_gridSize; j++){
->>>>>>> 45d010989ed255ec99ace55830acd9541d0b8402:final_qt/water/fluid.cpp
-            if(i < DAMPENING_REGION || i >= m_gridSize - DAMPENING_REGION ||
-                    j < DAMPENING_REGION || j >= m_gridSize - DAMPENING_REGION){
-                //horizontal and vertical distances
-                float iDistance = 0;
-                float jDistance = 0;
-                if(i < DAMPENING_REGION){
-                    iDistance = DAMPENING_REGION - i;
-                } else if(i >= m_gridSize - DAMPENING_REGION){
-                    iDistance = i - (m_gridSize - DAMPENING_REGION - 1);
-                }
-
-                if(j < DAMPENING_REGION){
-                    jDistance = DAMPENING_REGION - j;
-                } else if(j >= m_gridSize - DAMPENING_REGION){
-                    jDistance = j - (m_gridSize - DAMPENING_REGION - 1);
-                }
-
-                iDistance /= (float)DAMPENING_REGION;
-                jDistance /= (float)DAMPENING_REGION;
-
-                //distance
-                float distance = sqrt((iDistance * iDistance) + (jDistance * jDistance));
-
-                //quadratic function
-                float value = (QUADRATIC_A * distance * distance) + (QUADRATIC_B * distance) + QUADRATIC_C;
-
-<<<<<<< HEAD:final_qt/water/fluidGPU.cpp
-                const int index = i*m_gridSize + j;
-                m_sigmaField[index] = value;
-                m_gammaField[index] = value;
-=======
-                if(i < m_gridSize){
-                    m_sigmaField[i][j] = value;
-                }
-                if(j < m_gridSize){
-                    m_gammaField[i][j] = value;
-                }
->>>>>>> 45d010989ed255ec99ace55830acd9541d0b8402:final_qt/water/fluid.cpp
-            }
-        }
-    }
-*/
-#ifdef Fluid_DEBUG
-   // m_gridSize = 20;
-    const float END_TIME = 1;
-    m_dt = 0.2;
-    m_dx = 0.5;
-    m_dxInv = 1/0.5;
-    int count = 0;
-    float timeCount = 0.f;
-    while( timeCount < END_TIME )
-    {
-        update(m_dt);
-        if( m_updateCount %20 == 0 )
-            writeToImage(VELOCITY);
-        count++;
-        printf("Count:%d\n", count);
-       printMat( m_depthField );
-        timeCount+= m_dt;
-    }
-    assert(0);
-#endif
-
 }
+
+/**
+ * @brief initBuffer Initialize the buffer
+ */
+void FluidGPU::initBuffer()
+{
+    assert( m_paintField != NULL );
+    int terrainSize = m_gridSize*m_gridSize;
+    glGenBuffers(1,&m_vertexBuffer );
+    glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_paintField, GL_STATIC_DRAW );
+
+    glGenBuffers( 1, &m_normalBuffer );
+    glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_normalField, GL_STATIC_DRAW );
+
+    int indexSize = (m_gridSize+1)*(m_gridSize-1)*2;
+    glGenBuffers(1,&m_indexBuffer );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
+    glBufferData( GL_ELEMENT_ARRAY_BUFFER, indexSize*sizeof(GLuint), m_indices, GL_STATIC_DRAW );
+}
+
+/**
+ * @brief init index array
+ */
+void FluidGPU::initIndices()
+{
+    assert(m_indices != NULL );
+    int index = 0;
+    for( int z = 0; z < m_gridSize-1; z++ )
+    {
+        int x;
+        for( x =  0; x < m_gridSize; x++ )
+        {
+
+            m_indices[index] = x + z*m_gridSize;
+            index++;
+            m_indices[index] = x + (z+1)*m_gridSize;
+            index++;
+        }
+        m_indices[index] = x-1 + (z+1)*m_gridSize;
+        index++;
+        m_indices[index] = 0 + (z+1)*m_gridSize;
+        index++;
+    }
+}
+
 /**
  * @brief Check boundary
  */
 void FluidGPU::checkBoundary()
 {
-
 }
 
 /**
@@ -569,48 +475,54 @@ void FluidGPU::drawFluid( DrawMethod method ) const
         glPopMatrix();
         glEnd();
     }
-    else if ( method == DRAW_MESH )
+    else if ( method == DRAW_MESH_STRIP )
     {
         // This mode doesn't deal with the invisible triangles
-        glPushMatrix();
-//        glEnable(GL_BLEND);
-//        glBlendFunc(GL_ONE,GL_ONE);
+        //        glEnable(GL_BLEND);
+        //        glBlendFunc(GL_ONE,GL_ONE);
         float halfDomain = m_domainSize/2;
 
-        const bool drawStrip = false;
-        if( drawStrip == true )
-        {
-            for( int i = 0; i < m_gridSize-1; i++ )
-            {
 
-                glBegin( GL_TRIANGLE_STRIP );
-                glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-                for( int j = 0; j < m_gridSize; j++ )
-                {
-                    int index = i*m_gridSize + j;
-                    glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
-                    glVertex3f(  -halfDomain+j*m_dx, m_heightField[index], -halfDomain+i*m_dx );
-                    index = (i+1)*m_gridSize + j;
-                    glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
-                    glVertex3f(  -halfDomain +j*m_dx, m_heightField[index] , -halfDomain +(i+1)*m_dx );
-                }
-                glEnd();
-            }
-        }
-        else
+        for( int i = 0; i < m_gridSize-1; i++ )
         {
-             // Else we use triangles mode to draw(This will hide the invisible triangles)
-            glBegin( GL_TRIANGLES );
+
+            glBegin( GL_TRIANGLE_STRIP );
             glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-            for( int i = 0;  i < m_triangles.size(); i++ )
+            for( int j = 0; j < m_gridSize; j++ )
             {
-                Tri curTri  = m_triangles[i];
-                int r[3]; int c[3];
-                r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
-                r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
-                r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-                // Firstly check if the triangle is visible
-                int count = 0;
+                int index = i*m_gridSize + j;
+                glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
+                float d1 = m_depthField[index];
+                if( d1 < 0.01 )
+                    glVertex3f(  -halfDomain+j*m_dx, m_heightField[index]-0.01, -halfDomain+i*m_dx );
+                else
+                    glVertex3f(  -halfDomain+j*m_dx, m_heightField[index], -halfDomain+i*m_dx );
+                index = (i+1)*m_gridSize + j;
+                glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
+                float d2 = m_depthField[index];
+                if( d2 < 0.01 )
+                    glVertex3f(  -halfDomain +j*m_dx, m_heightField[index] -0.01, -halfDomain +(i+1)*m_dx );
+                else
+                    glVertex3f(  -halfDomain +j*m_dx, m_heightField[index] , -halfDomain +(i+1)*m_dx );
+            }
+            glEnd();
+        }
+    }
+    else if( method == DRAW_MESH )
+    {
+        float halfDomain = m_domainSize/2;
+        // Else we use triangles mode to draw(This will hide the invisible triangles)
+        glBegin( GL_TRIANGLES );
+        glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+        for( int i = 0;  i < m_triangles.size(); i++ )
+        {
+            Tri curTri  = m_triangles[i];
+            int r[3]; int c[3];
+            r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
+            r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
+            r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
+            // Firstly check if the triangle is visible
+            /*              int count = 0;
 
                 for( int m = 0; m < 3; m++ )
                 {
@@ -619,27 +531,66 @@ void FluidGPU::drawFluid( DrawMethod method ) const
                 }
                 if( count == 0 )
                     continue;
-
-                float tx, ty, tz;
-                for( int m = 0; m < 3; m++ )
-                {
-                    //if( m_depthField[getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
-                      glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-                   /*else
+*/
+            float tx, ty, tz;
+            for( int m = 0; m < 3; m++ )
+            {
+                //if( m_depthField[getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
+                glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+                /*else
                         glColor4f(0.f,0.f,0.f, m_color.a );
                     */
-                    int index = r[m]*m_gridSize + c[m];
-                    tx = -halfDomain + c[m]*m_dx;
-                    ty = m_heightField[index];
-                    tz = - halfDomain + r[m]*m_dx;
-                    glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
-                    glVertex3f( tx, ty, tz );
-                }
+                int index = r[m]*m_gridSize + c[m];
+                tx = -halfDomain + c[m]*m_dx;
+                ty = m_heightField[index];
+                if( m_depthField[index] < 0.5 )
+                    ty = ty - 0.5;
+                tz = - halfDomain + r[m]*m_dx;
+                glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
+                glVertex3f( tx, ty, tz );
             }
-            glEnd();
         }
-//        glDisable(GL_BLEND);
-        glPopMatrix();
+        glEnd();
+    }
+    else if( method = DRAW_MESH_VBO )
+    {
+        glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
+        Vector3* vertBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
+        /*if(!glUnmapBuffer(GL_ARRAY_BUFFER))
+        {
+            assert(0);
+        }*/
+        memcpy( vertBuffer, m_paintField, sizeof(Vector3)*m_gridSize*m_gridSize);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+
+         glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
+        glVertexPointer(3,GL_FLOAT,0,(char*)NULL);
+        glEnableClientState( GL_VERTEX_ARRAY );
+
+        glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
+        Vector3* normBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
+        /*if( !glUnmapBuffer(GL_ARRAY_BUFFER) )
+        {
+            assert(0);
+        }*/
+        memcpy( normBuffer, m_normalField, sizeof(Vector3)*m_gridSize*m_gridSize);
+        Vector3 a = normBuffer[5];
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+
+        glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
+        glNormalPointer(GL_FLOAT,0,(char*)NULL);
+        glEnableClientState( GL_NORMAL_ARRAY );
+
+        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
+
+        int indexSize = (m_gridSize + 1)*(m_gridSize- 1)*2;
+        glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+        glDrawElements( GL_TRIANGLE_STRIP, indexSize, GL_UNSIGNED_INT, 0 );
+
+        glDisableClientState( GL_NORMAL_ARRAY );
+        glDisableClientState( GL_VERTEX_ARRAY );
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
     }
     else
     {
@@ -773,7 +724,7 @@ void FluidGPU::dampenWaves(){
  */
 float FluidGPU::computeHRest(){
     float hRest = 0;
-/*
+    /*
     for(int i = 0; i < m_gridSize; i++){
         for(int j = 0; j < m_gridSize; j++){
             hRest += m_depthField[i][j] + m_terrainHeightField[i][j];
@@ -885,8 +836,10 @@ void FluidGPU::updateParticles(){
     //checkForBreakingWaves();
 
     //copy back changes
-    copybackGPU(DEPTH,m_depthField);
-    copybackGPU(HEIGHT,m_heightField);
+   // copybackGPU(DEPTH,m_depthField);
+   // copybackGPU(HEIGHT,m_heightField);
+    copybackGPU(PAINT,(float*)m_paintField);
+
 }
 
 void FluidGPU::removeParticles(){
@@ -1087,19 +1040,19 @@ void FluidGPU::addDroppingParticles(const int posX, const int posZ){
 void FluidGPU::initParticleSources(){
     float halfDomain = m_domainSize / 2.0;
 
-//    //make a big, low flow source
-//    Vector3 startingCorner = Vector3(-halfDomain, 60, -halfDomain);
-//    Vector3 endingCorner = Vector3(halfDomain, 65, halfDomain);
-//    ParticleSource *particleSource = new ParticleSource(startingCorner, endingCorner, 50);
-//    m_particle_sources.append(particleSource);
+    //    //make a big, low flow source
+    //    Vector3 startingCorner = Vector3(-halfDomain, 60, -halfDomain);
+    //    Vector3 endingCorner = Vector3(halfDomain, 65, halfDomain);
+    //    ParticleSource *particleSource = new ParticleSource(startingCorner, endingCorner, 50);
+    //    m_particle_sources.append(particleSource);
 
-//    //make a small, high flow source
-//    Vector3 startingCorner2 = Vector3(-m_dx, 100, -m_dx);
-//    Vector3 endingCorner2 = Vector3(m_dx, 110, m_dx);
-//    Vector3 startingCorner2 = Vector3(-halfDomain, 100, -5);
-//    Vector3 endingCorner2 = Vector3(halfDomain, 120, 5);
-//    ParticleSource *particleSource2 = new ParticleSource(startingCorner2, endingCorner2, 100);
-//    m_particle_sources.append(particleSource2);
+    //    //make a small, high flow source
+    //    Vector3 startingCorner2 = Vector3(-m_dx, 100, -m_dx);
+    //    Vector3 endingCorner2 = Vector3(m_dx, 110, m_dx);
+    //    Vector3 startingCorner2 = Vector3(-halfDomain, 100, -5);
+    //    Vector3 endingCorner2 = Vector3(halfDomain, 120, 5);
+    //    ParticleSource *particleSource2 = new ParticleSource(startingCorner2, endingCorner2, 100);
+    //    m_particle_sources.append(particleSource2);
 }
 
 void FluidGPU::updateParticleSources(){
