@@ -14,15 +14,15 @@ varying float Ratio;
 void main()
 {
 
-    vec4 ecPosition  = gl_ModelViewMatrix * gl_Vertex;
-    vec3 ecPosition3 = ecPosition.xyz / ecPosition.w;
-
-    vec3 i = normalize(ecPosition3);
+    vec3 vertex  = (gl_ModelViewMatrix * gl_Vertex).xyz;
     vec3 n = normalize(gl_NormalMatrix * gl_Normal);
+    vec3 i = normalize(vertex);
+
 
     Ratio   = F + (1.0 - F) * pow((1.0 - dot(-i, n)), FresnelPower);
 
     Refract = refract(i, n, Eta);
+    //I should probably have this sample from the terrain and not the skymap
     Refract = vec3(gl_TextureMatrix[0] * vec4(Refract, 1.0));
 
     Reflect = reflect(i, n);

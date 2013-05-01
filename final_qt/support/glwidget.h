@@ -30,8 +30,8 @@
 //#define USE_FBO
 //#define USE_SKYBOX
 
-#define SEA_WATER 0.0f,0.42f,0.58f,1.0f
-#define TIME_STEP 0.016
+#define SEA_WATER 0.0f,0.42f,0.58f,0.9f
+#define TIME_STEP 0.01
 
 /**
     Uncomment this if you don't want to use CUDA to compute
@@ -82,7 +82,11 @@ private:
     int m_prevTime;
     float m_prevFps, m_fps;
     float m_delta;
+
     float m_timeStep;
+
+    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis, m_useSkybox;
+
 
 
 public:
@@ -158,6 +162,7 @@ public:
 private slots:
     /** Callback function, will be called whenever the timer ticks*/
     void tick();
+
 };
 
 #endif // VIEW_H
