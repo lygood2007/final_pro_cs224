@@ -197,6 +197,8 @@ public:
      */
     void updateParticleSources();
 
+    void drawParticles2() const;
+
 private:
 
 // Variables
@@ -229,8 +231,18 @@ private:
 
     QVector<Tri> m_triangles;
 
+    /**
+     * first attempt at particles
+     */
     QVector<Particle*> m_particles; // stores the particles
     QVector<ParticleSource*> m_particle_sources; // stores sources of particles (faucets)
+
+    /**
+     * second attempt at particles
+     */
+    Vector3 *m_particle_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_particle_velocities; // velocities of particles
+    Vector3 m_particle_acceleration; // acceleration of particles (same for all)
 };
 
 #endif // FLUIDGPU_H

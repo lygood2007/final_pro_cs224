@@ -25,6 +25,10 @@ void addDropGPU(const int posX, const int posZ, const int radius, const float h 
 void advectGPU(const float dt);
 void updateFluidGPU( const float dt );
 bool findSupportDevice();
+
+void initParticlesGPU(const int numParticles);
+void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
+void inputParticlesGPU(const float *particlePositions, const float *particleVelocities );
 }
 
 __host__ __device__ inline float cudaMax( float a, float b )
@@ -71,6 +75,10 @@ float* deviceNextDepthMap; // Temp buffer for storing next depth map
 float* deviceNextVelocityUMap; // Temp buffer for storing next velocity U map
 float* deviceNextVelocityWMap; // Temp buffer for storing next velocity W map
 
+vec3* deviceParticlePositionsArray; // particle positions array
+vec3* deviceParticleVelocitiesArray; // particle velocities array
+int deviceNumParticles; // number of particles
+
 /**
  * pitches for the maps above
  */
@@ -101,6 +109,10 @@ void destroyGPU();
 void advectGPU(const float dt);
 void updateFluidGPU( const float dt );
 
+//particles forward declarations
+void initParticlesGPU(const int numParticles);
+void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
+void inputParticlesGPU( const float *particlePositions, const float *particleVelocities );
 
 void checkInitializedDeviceField( float* device, int width, int height )
 {
@@ -650,6 +662,64 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
      }
  }
 
+ //TODO: CHECK THESE
+/**
+ * Initialize the particle positions field
+ **/
+__global__ void initParticlePositionsCUDA( vec3* positionsMap, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        positionsMap[i].x = 0;
+        positionsMap[i].y = -1;
+        positionsMap[i].z = 0;
+    }
+}
+
+/**
+ * Initialize the particle velocities field
+ **/
+__global__ void initParticleVelocitiesCUDA( vec3* velocitiesMap, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        velocitiesMap[i].x = 0;
+        velocitiesMap[i].y = 0;
+        velocitiesMap[i].z = 0;
+    }
+}
+
+/**
+ * Update the particle positions and velocities fields
+ **/
+__global__ void updateParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMap, float accX, float accY, float accZ, float dt, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        //check if particle is active
+        if(positionsMap[i].y >= 0){
+            //update position vector
+            positionsMap[i].x = positionsMap[i].x +
+                    (velocitiesMap[i].x * dt) +
+                    (accX * dt * dt);
+            positionsMap[i].y = positionsMap[i].y +
+                    (velocitiesMap[i].y * dt) +
+                    (accY * dt * dt);
+            positionsMap[i].z = positionsMap[i].z +
+                    (velocitiesMap[i].z * dt) +
+                    (accZ * dt * dt);
+
+            //update velocity vector
+            velocitiesMap[i].x = velocitiesMap[i].x + (accX * dt);
+            velocitiesMap[i].y = velocitiesMap[i].y + (accY * dt);
+            velocitiesMap[i].z = velocitiesMap[i].z + (accZ * dt);
+        }
+    }
+}
+
  // Review passed
 /**
  * @brief initGrid Initialize our grid
@@ -954,6 +1024,10 @@ void destroyGPUmem()
     cudaFree( deviceNextDepthMap );
     cudaFree( deviceNextVelocityUMap );
     cudaFree( deviceNextVelocityWMap );
+
+    cudaFree( deviceParticlePositionsArray );
+    cudaFree( deviceParticleVelocitiesArray );
+
     cudaThreadExit();
     cudaDeviceReset();
 }
@@ -979,6 +1053,16 @@ void copybackGPU(FieldType type, float* hostMap  )
     case NORMAL:
     {
         error = cudaMemcpy( hostMap, deviceNormalMap, gridSize*gridSize*sizeof(vec3), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case PARTICLE_POSITIONS:
+    {
+        error = cudaMemcpy( hostMap, deviceParticlePositionsArray, deviceNumParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case PARTICLE_VELOCITIES:
+    {
+        error = cudaMemcpy( hostMap, deviceParticleVelocitiesArray, deviceNumParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
         break;
     }
     default:
@@ -1019,4 +1103,67 @@ bool findSupportDevice()
            return true;
        }
 }
+
+// TODO: CHECK THIS
+void initParticlesGPU(const int numParticles){
+    deviceNumParticles = numParticles;
+
+    //malloc the arrays
+    error = cudaMalloc(&deviceParticlePositionsArray,  deviceNumParticles * sizeof(vec3));
+    checkCudaError( error );
+    check1DNotNull( deviceParticlePositionsArray );
+
+    error = cudaMalloc(&deviceParticleVelocitiesArray,  deviceNumParticles * sizeof(vec3));
+    checkCudaError( error );
+    check1DNotNull( deviceParticleVelocitiesArray );
+
+    //set up the iterator properties
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (deviceNumParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //initialize positions
+    initParticlePositionsCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceParticlePositionsArray,
+                                                    deviceNumParticles
+                                                    );
+
+    //initialize velocities
+    initParticleVelocitiesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceParticleVelocitiesArray,
+                                                    deviceNumParticles
+                                                    );
+
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
+// TODO: CHECK THIS
+void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ ){
+    //set up the iterator properties
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (deviceNumParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //update positions and velocities
+    updateParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock >>>(
+                                                    deviceParticlePositionsArray,
+                                                    deviceParticleVelocitiesArray,
+                                                    accX, accY, accZ, dt,
+                                                    deviceNumParticles
+                                                    );
+
+    //error check
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
+// TODO: CHECK THIS
+void inputParticlesGPU( const float *particlePositions, const float *particleVelocities ){
+    //copy over
+    error = cudaMemcpy( deviceParticlePositionsArray, particlePositions, deviceNumParticles * sizeof(vec3), cudaMemcpyHostToDevice );
+    checkCudaError( error );
+
+    error = cudaMemcpy( deviceParticleVelocitiesArray, particleVelocities, deviceNumParticles * sizeof(vec3), cudaMemcpyHostToDevice );
+    checkCudaError( error );
+}
+
 #endif
