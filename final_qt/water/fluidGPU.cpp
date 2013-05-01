@@ -41,7 +41,13 @@ bool findSupportDevice();
 
 void initParticlesGPU(const int numParticles);
 void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
+void intersectParticlesGPU( const float halfDomain, const float mdxInv, const float heightChange );
 void inputParticlesGPU( const float *particlePositions, const float *particleVelocities );
+
+void clampFieldsGPU( const float velocityClamp );
+
+void initDampeningFieldsGPU( const int sizeDampeningRegion, const float quadraticA, const float quadraticB, const float quadraticC );
+void dampenWavesGPU( const float hRest, const float dt, const float dxInv, const float lambdaUpdate, const float lambdaDecay );
 }
 
 FluidGPU::FluidGPU()
@@ -184,10 +190,12 @@ void FluidGPU::update(const float dt)
    m_dt = dt;
 
     updateFluidGPU( dt );
+
+    clampFields();
+
     copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
     copybackGPU(NORMAL,(float*)m_normalField);
-    //clampFields();
 
 #ifdef USE_PARTICLES
     updateParticles();
@@ -195,13 +203,21 @@ void FluidGPU::update(const float dt)
 #endif
 
 #ifdef USE_PARTICLES_2
+    float Veff = C_DEPOSIT * (4 / 3) * M_PI *
+            SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+    float heightChange = Veff * m_dxInv * m_dxInv;
+    float halfDomain = m_domainSize / 2.0;
+
     updateParticlesGPU( dt, m_particle_acceleration.x, m_particle_acceleration.y, m_particle_acceleration.z);
+    intersectParticlesGPU( halfDomain, m_dxInv, heightChange );
+    copybackGPU(DEPTH, m_depthField);
+    copybackGPU(HEIGHT, m_heightField);
     copybackGPU(PARTICLE_POSITIONS, (float*) m_particle_positions);
     copybackGPU(PARTICLE_VELOCITIES, (float*) m_particle_velocities);
 #endif
 
 #ifdef DAMPEN_WAVES
-    //dampenWaves();
+    dampenWaves();
 #endif
 
 //    computeNormal();
@@ -283,6 +299,13 @@ void FluidGPU::backupHeight( Terrain* t )
    copybackGPU(HEIGHT,m_heightField);
    copybackGPU(NORMAL, (float*)m_normalField );
    std::cout<<"Finshed backup"<<std::endl;
+
+   //initialize dampening maps
+   initDampeningFieldsGPU( DAMPENING_REGION, QUADRATIC_A, QUADRATIC_B, QUADRATIC_C );
+   copybackGPU(SIGMA, m_sigmaField);
+   copybackGPU(GAMMA, m_gammaField);
+   copybackGPU(PHI, m_psiField);
+   copybackGPU(PSI, m_phiField);
 
    //initialize particles
    initParticlesGPU(TOTAL_NUM_PARTICLES);
@@ -717,52 +740,22 @@ void FluidGPU::buildTriangleList()
  */
 void FluidGPU::dampenWaves(){
     //compute hRest
-    /*
     float hRest = computeHRest();
 
-    //iterate through the dampening region
-    for(int i = 1; i < m_gridSize - 1; i++){
-        for(int j = 1; j < m_gridSize - 1; j++){
-            if(i < DAMPENING_REGION || i >= m_gridSize - DAMPENING_REGION ||
-                    j < DAMPENING_REGION || j >= m_gridSize - DAMPENING_REGION){
-                // Equation 10
-                // h(i,j) += ((-sigma(i,j) * (h(i,j) - hRest)) + phi(i,j)) * delta_t
-                // Equation 21
-                // h(i,j) += ((-gamma(i,j) * (h(i,j) - hRest)) + psi(i,j)) * delta_t
-                float currH = m_depthField[i][j] + m_terrainHeightField[i][j];
-                float eq10 = ((-m_sigmaField[i][j] * (currH - hRest)) + m_phiField[i][j]) * m_dt;
-                float eq21 = ((-m_gammaField[i][j] * (currH - hRest)) + m_psiField[i][j]) * m_dt;
-                m_depthField[i][j] += eq10 + eq21;
+    //dampen waves on GPU
+    dampenWavesGPU( hRest, m_dt, m_dxInv, LAMBDA_UPDATE, LAMBDA_DECAY );
 
-                // Equation 11
-                // u(i+0.5,j) += -0.5 * (sigma(i+1,j) + sigma(i,j)) * u(i+0.5,j) * delta_t
-                m_velocityU[i][j] += -0.5 * (m_sigmaField[i + 1][j] + m_sigmaField[i][j]) * m_velocityU[i][j] * m_dt;
+    //copyback
+    copybackGPU(DEPTH, m_depthField);
+    copybackGPU(HEIGHT, m_heightField);
+    //copybackGPU(VEL_U, m_velocityU);
+    //copybackGPU(VEL_W, m_velocityU);
 
-                // Equation 22
-                // w(i,j+0.5) += -0.5 * (gamma(i,j+1) + gamma(i,j)) * w(i,j+0.5) * delta_t
-                m_velocityW[i][j] += -0.5 * (m_gammaField[i][j + 1] + m_gammaField[i][j]) * m_velocityW[i][j] * m_dt;
-
-                // Equation 12
-                // phi(i,j) += -LAMBDA_UPDATE * sigma(i,j) * ((w(i,j+0.5) - w(i,j-0.5)) / delta_x) * delta_t
-                m_phiField[i][j] += -LAMBDA_UPDATE * m_sigmaField[i][j] * (m_velocityW[i][j] - m_velocityW[i][j - 1]) *
-                        m_dxInv * m_dt;
-
-                // Equation 13
-                // phi(i,j) *= LAMBDA_DECAY
-                m_phiField[i][j] *= LAMBDA_DECAY;
-
-                // Equation 23
-                // psi(i,j) += -LAMBDA_UPDATE * psi(i,j) * ((u(i+0.5,j) - u(i-0.5,j)) / delta_x) * delta_t
-                // CORRECTION: psi(i,j) should be gamma(i,j) on the right-hand side
-                m_psiField[i][j] += -LAMBDA_UPDATE * m_gammaField[i][j] * (m_velocityU[i][j] - m_velocityU[i - 1][j]) *
-                        m_dxInv * m_dt;
-
-                // Equation 24
-                // psi(i,j) *= LAMBDA_DECAY
-                m_psiField[i][j] *= LAMBDA_DECAY;
-            }
-        }
-    }*/
+    //TODO: needed?
+    //copybackGPU(SIGMA, m_sigmaField);
+    //copybackGPU(GAMMA, m_gammaField);
+    //copybackGPU(PHI, m_phiField);
+    //copybackGPU(PSI, m_psiField);
 }
 
 /**
@@ -773,35 +766,19 @@ void FluidGPU::dampenWaves(){
  */
 float FluidGPU::computeHRest(){
     float hRest = 0;
-/*
-    for(int i = 0; i < m_gridSize; i++){
-        for(int j = 0; j < m_gridSize; j++){
-            hRest += m_depthField[i][j] + m_terrainHeightField[i][j];
-        }
+    for(int i = 0; i < m_gridSize * m_gridSize; i++){
+        hRest += m_heightField[i];
     }
-*/
     return (hRest / (float)(m_gridSize * m_gridSize));
 }
 
 void FluidGPU::clampFields(){
-    /*
     // clamp h(i,j) >= 0
     // clamp u(i,j) < alpha * (delta_x / delta_t)
     // clamp w(i,j) < alpha * (delta_x / delta_t)
 
     float velocityClamp = CLAMP_ALPHA * (m_dx / m_dt);
-
-    for(int i = 0; i < m_gridSize; i++){
-        for(int j = 0; j < m_gridSize; j++){
-            m_depthField[i][j] = max(0.0f, m_depthField[i][j]);
-            m_velocityU[i][j] = min(velocityClamp, m_velocityU[i][j]);
-            m_velocityW[i][j] = min(velocityClamp, m_velocityW[i][j]);
-        }
-
-        m_velocityU[i][m_gridSize] = min(velocityClamp, m_velocityU[i][m_gridSize]);
-        m_velocityW[m_gridSize][i] = min(velocityClamp, m_velocityW[m_gridSize][i]);
-    }
-    */
+    clampFieldsGPU( velocityClamp );
 }
 
 /**

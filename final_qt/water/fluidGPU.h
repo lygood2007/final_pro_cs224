@@ -224,6 +224,10 @@ private:
     float* m_velocityW; // I preserve this for future use
     float* m_terrainHeightField; // Essential
     float* m_heightField; // Essential
+
+    /**
+     * dampening waves structures
+     */
     float* m_sigmaField;
     float* m_gammaField;
     float* m_phiField;

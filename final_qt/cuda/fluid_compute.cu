@@ -28,7 +28,13 @@ bool findSupportDevice();
 
 void initParticlesGPU(const int numParticles);
 void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
+void intersectParticlesGPU( const float halfDomain, const float mdxInv, const float heightChange );
 void inputParticlesGPU(const float *particlePositions, const float *particleVelocities );
+
+void clampFieldsGPU( const float velocityClamp );
+
+void initDampeningFieldsGPU( const int sizeDampeningRegion, const float quadraticA, const float quadraticB, const float quadraticC );
+void dampenWavesGPU( const float hRest, const float dt, const float dxInv, const float lambdaUpdate, const float lambdaDecay );
 }
 
 __host__ __device__ inline float cudaMax( float a, float b )
@@ -75,9 +81,17 @@ float* deviceNextDepthMap; // Temp buffer for storing next depth map
 float* deviceNextVelocityUMap; // Temp buffer for storing next velocity U map
 float* deviceNextVelocityWMap; // Temp buffer for storing next velocity W map
 
+//particle data structures
 vec3* deviceParticlePositionsArray; // particle positions array
 vec3* deviceParticleVelocitiesArray; // particle velocities array
 int deviceNumParticles; // number of particles
+
+//dampening waves data structures
+float* deviceSigmaMap;
+float* deviceGammaMap;
+float* devicePhiMap;
+float* devicePsiMap;
+int deviceDampeningRegion; // size of dampening region
 
 /**
  * pitches for the maps above
@@ -112,7 +126,15 @@ void updateFluidGPU( const float dt );
 //particles forward declarations
 void initParticlesGPU(const int numParticles);
 void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
+void intersectParticlesGPU( const float halfDomain, const float mdxInv, const float heightChange );
 void inputParticlesGPU( const float *particlePositions, const float *particleVelocities );
+
+//stabilize forward declarations
+void clampFieldsGPU( const float velocityClamp );
+
+//dampening waves forward declarations
+void initDampeningFieldsGPU( const int sizeDampeningRegion, const float quadraticA, const float quadraticB, const float quadraticC );
+void dampenWavesGPU( const float hRest, const float dt, const float dxInv, const float lambdaUpdate, const float lambdaDecay );
 
 void checkInitializedDeviceField( float* device, int width, int height )
 {
@@ -685,7 +707,6 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
      }
  }
 
- //TODO: CHECK THESE
 /**
  * Initialize the particle positions field
  **/
@@ -739,6 +760,207 @@ __global__ void updateParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMa
             velocitiesMap[i].x = velocitiesMap[i].x + (accX * dt);
             velocitiesMap[i].y = velocitiesMap[i].y + (accY * dt);
             velocitiesMap[i].z = velocitiesMap[i].z + (accZ * dt);
+        }
+    }
+}
+
+// TODO: CHECK THIS
+// TODO: CONCERNS:
+//  1. no concurrency on depth map, might lose contribution
+/**
+ * Intersect the particles with the height and depth fields
+ **/
+__global__ void updateParticleValuesCUDA( vec3* positionsMap, float* heightMap, float* depthMap,
+                                          const int width, const int height,
+                                          const float halfDomain, const float mdxInv, float heightChange, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        //check if particle is active
+        if(positionsMap[i].y >= 0){
+            //find grid positions x and z
+            float lenX = (positionsMap[i].x + halfDomain) * mdxInv;
+            float lenZ = (positionsMap[i].z + halfDomain) * mdxInv;
+            int x = (int) cudaMin(width - 1, cudaMax(0.0, round(lenX)));
+            int z = (int) cudaMin(height - 1, cudaMax(0.0, round(lenZ)));
+
+            //check if position y < heightMap
+            float eta = map2Dread( heightMap, z, x, width );
+            if(eta >= positionsMap[i].y){
+                float hxz = map2Dread( depthMap, z, x, width );
+                map2Dwrite( depthMap, z, x, hxz + heightChange, width );
+
+                positionsMap[i].y = -1;
+            }
+        }
+    }
+}
+
+// TODO: CHECK THIS
+/**
+ *  clamp the depth (min 0)
+ */
+__global__ void clampDepthCUDA( float* depthMap, const int width, const int height )
+{
+    int i = blockDim.y*blockIdx.y +threadIdx.y;
+    int j = blockDim.x*blockIdx.x +threadIdx.x;
+
+    if( i >= 0 && i < height && j >= 0 && j < width )
+    {
+        float depth = cudaMax(0.f, map2Dread( depthMap, i, j, width ));
+        map2Dwrite( depthMap, i, j, depth, width );
+    }
+}
+
+// TODO: CHECK THIS
+/**
+ * clamp the velocity (max velocity clamp)
+ **/
+__global__ void clampFieldCUDA( float* deviceMap, float velocityClamp, int width, int height )
+{
+    int i = blockDim.y*blockIdx.y + threadIdx.y;
+    int j = blockDim.x*blockIdx.x + threadIdx.x;
+    if( i >= 0&& i < height&&j >= 0 && j < width )
+    {
+        float value = cudaMin(velocityClamp, map2Dread( deviceMap, i, j, width ));
+        map2Dwrite( deviceMap, i, j, value, width );
+    }
+}
+
+//TODO: CHECK THIS
+/**
+ *  Initialize the sigma and gamma fields
+ */
+__global__ void initSigmaGammaCUDA( float* sigmaMap, float* gammaMap, const float dampeningRegion,
+                                    const float quadraticA, const float quadraticB, const float quadraticC,
+                                    const int width, const int height )
+{
+    int i = blockDim.y*blockIdx.y +threadIdx.y;
+    int j = blockDim.x*blockIdx.x +threadIdx.x;
+    if( i >= 0 && i < height && j >= 0 && j < width )
+    {
+        if(i < dampeningRegion || i >= height - dampeningRegion ||
+                j < dampeningRegion || j >= width - dampeningRegion){
+            //compute horizontal and vertical distances
+            float iDistance = 0;
+            float jDistance = 0;
+            if(i < dampeningRegion){
+                iDistance = dampeningRegion - i;
+            } else if(i >= height - dampeningRegion){
+                iDistance = i - (height - dampeningRegion - 1);
+            }
+
+            if(j < dampeningRegion){
+                jDistance = dampeningRegion - j;
+            } else if(j >= width - dampeningRegion){
+                jDistance = j - (width - dampeningRegion - 1);
+            }
+
+            iDistance /= (float)height;
+            jDistance /= (float)width;
+
+            //distance
+            float distance = sqrt((iDistance * iDistance) + (jDistance * jDistance));
+
+            //quadratic function
+            float value = (quadraticA * distance * distance) + (quadraticB * distance) + quadraticC;
+
+            //initialize to value
+            map2Dwrite( sigmaMap, i, j, value, width );
+            map2Dwrite( gammaMap, i, j, value, width );
+        } else {
+            //initialize to 0
+            map2Dwrite( sigmaMap, i, j, 0.0f, width );
+            map2Dwrite( gammaMap, i, j, 0.0f, width );
+        }
+    }
+}
+
+/**
+ *  Initialize the phi and psi fields
+ */
+//TODO: CHECK THIS
+__global__ void initPhiPsiCUDA( float* phiMap, float* psiMap, const int width, const int height )
+{
+    int i = blockDim.y*blockIdx.y +threadIdx.y;
+    int j = blockDim.x*blockIdx.x +threadIdx.x;
+    if( i >= 0 && i < height && j >= 0 && j < width )
+    {
+        //initialize to 0
+        map2Dwrite( phiMap, i, j, 0.0f, width );
+        map2Dwrite( psiMap, i, j, 0.0f, width );
+    }
+}
+
+/**
+ *  Dampen the waves (dampen the depth field), update wave dampening data structures
+ */
+//TODO: CHECK THIS
+__global__ void dampenWavesCUDA( float* depthMap, float* heightMap, float* velUMap, float* velWMap,
+                                 float* sigmaMap, float* gammaMap, float* phiMap, float* psiMap,
+                                 float dampeningRegion, float hRest, float dt, float dxInv, float lambdaUpdate, float lambdaDecay,
+                                 const int width, const int height, const int uwidth, const int uheight, const int wwidth, const int wheight )
+{
+    int i = blockDim.y*blockIdx.y +threadIdx.y;
+    int j = blockDim.x*blockIdx.x +threadIdx.x;
+
+    //TODO: CORRECT ITERATION AREA?
+    if( i >= 1 && i < height - 1 && j >= 1 && j < width - 1 )
+    {
+        if(i < dampeningRegion || i >= height - dampeningRegion ||
+                j < dampeningRegion || j >= width - dampeningRegion){
+            // current values
+            float currH = map2Dread( heightMap, i, j, width );
+            float currDepth = map2Dread( depthMap, i, j, width );
+
+            float currVelU = map2Dread( velUMap, i, j, uwidth );
+            float currVelUDec = map2Dread( velUMap, i - 1, j, uwidth );
+            float currVelW = map2Dread( velWMap, i, j, wwidth );
+            float currVelWDec = map2Dread( velWMap, i, j - 1, wwidth );
+
+            float currSigma = map2Dread( sigmaMap, i, j, width );
+            float currSigmaInc = map2Dread( sigmaMap, i + 1, j, width );
+            float currGamma = map2Dread( gammaMap, i, j, width );
+            float currGammaInc = map2Dread( gammaMap, i, j + 1, width );
+            float currPhi = map2Dread( phiMap, i, j, width );
+            float currPsi = map2Dread( psiMap, i, j, width );
+
+            // Equation 10
+            // h(i,j) += ((-sigma(i,j) * (h(i,j) - hRest)) + phi(i,j)) * delta_t
+            // Equation 21
+            // h(i,j) += ((-gamma(i,j) * (h(i,j) - hRest)) + psi(i,j)) * delta_t
+            float eq10 = ((-currSigma * (currH - hRest)) + currPhi) * dt;
+            float eq21 = ((-currGamma * (currH - hRest)) + currPsi) * dt;
+            map2Dwrite( depthMap, i, j, currDepth + eq10 + eq21, width );
+
+            // Equation 11
+            // u(i+0.5,j) += -0.5 * (sigma(i+1,j) + sigma(i,j)) * u(i+0.5,j) * delta_t
+            float eq11 = -0.5 * (currSigmaInc + currSigma) * currVelU * dt;
+            map2Dwrite( velUMap, i, j, currVelU + eq11, uwidth);
+
+            // Equation 22
+            // w(i,j+0.5) += -0.5 * (gamma(i,j+1) + gamma(i,j)) * w(i,j+0.5) * delta_t
+            float eq22 = -0.5 * (currGammaInc + currGamma) * currVelW * dt;
+            map2Dwrite( velWMap, i, j, currVelW + eq22, wwidth);
+
+            //TODO: reread u and w????
+            //currVelU = map2Dread( velUMap, i, j, uwidth );
+            //currVelW = map2Dread( velWMap, i, j, wwidth );
+
+            // Equation 12
+            // phi(i,j) += -LAMBDA_UPDATE * sigma(i,j) * ((w(i,j+0.5) - w(i,j-0.5)) / delta_x) * delta_t
+            // Equation 13
+            // phi(i,j) *= LAMBDA_DECAY
+            float eq12 = -lambdaUpdate * currSigma * (currVelW - currVelWDec) * dxInv * dt;
+            map2Dwrite( phiMap, i, j, (currPhi + eq12) * lambdaDecay, width );
+
+            // Equation 23
+            // psi(i,j) += -LAMBDA_UPDATE * gamma(i,j) * ((u(i+0.5,j) - u(i-0.5,j)) / delta_x) * delta_t
+            // Equation 24
+            // psi(i,j) *= LAMBDA_DECAY
+            float eq23 = -lambdaUpdate * currGamma * (currVelU - currVelUDec) * dxInv * dt;
+            map2Dwrite( psiMap, i, j, (currPsi + eq23) * lambdaDecay, width );
         }
     }
 }
@@ -1088,6 +1310,26 @@ void copybackGPU(FieldType type, float* hostMap  )
         error = cudaMemcpy( hostMap, deviceParticleVelocitiesArray, deviceNumParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
         break;
     }
+    case SIGMA:
+    {
+        error = cudaMemcpy( hostMap, deviceSigmaMap, gridSize*gridSize*sizeof(float), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case GAMMA:
+    {
+        error = cudaMemcpy( hostMap, deviceGammaMap, gridSize*gridSize*sizeof(float), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case PHI:
+    {
+        error = cudaMemcpy( hostMap, devicePhiMap, gridSize*gridSize*sizeof(float), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case PSI:
+    {
+        error = cudaMemcpy( hostMap, devicePsiMap, gridSize*gridSize*sizeof(float), cudaMemcpyDeviceToHost);
+        break;
+    }
     default:
     {
         assert(0);
@@ -1127,7 +1369,6 @@ bool findSupportDevice()
        }
 }
 
-// TODO: CHECK THIS
 void initParticlesGPU(const int numParticles){
     deviceNumParticles = numParticles;
 
@@ -1160,14 +1401,13 @@ void initParticlesGPU(const int numParticles){
     checkCudaError(error);
 }
 
-// TODO: CHECK THIS
 void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ ){
     //set up the iterator properties
     int threadsPerBlock = 256;
     int blocksPerGrid = (deviceNumParticles + threadsPerBlock - 1) / threadsPerBlock;
 
     //update positions and velocities
-    updateParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock >>>(
+    updateParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
                                                     deviceParticlePositionsArray,
                                                     deviceParticleVelocitiesArray,
                                                     accX, accY, accZ, dt,
@@ -1180,6 +1420,33 @@ void updateParticlesGPU( const float dt, const float accX, const float accY, con
 }
 
 // TODO: CHECK THIS
+void intersectParticlesGPU( const float halfDomain, const float mdxInv, const float heightChange ){
+    //set up the iterator properties
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (deviceNumParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //intersect particles and velocities
+    updateParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceParticlePositionsArray, deviceHeightMap, deviceDepthMap,
+                                                    gridSize, gridSize,
+                                                    halfDomain, mdxInv, heightChange, deviceNumParticles
+                                                    );
+
+    //set up grid iterator
+    dim3 threadsPerBlock2(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid2(blockPerGridX,blockPerGridY);
+
+    //update height field
+    updateHeightCUDA<<<blocksPerGrid2, threadsPerBlock2>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,
+                                 gridSize, gridSize );
+
+    //error check
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
 void inputParticlesGPU( const float *particlePositions, const float *particleVelocities ){
     //copy over
     error = cudaMemcpy( deviceParticlePositionsArray, particlePositions, deviceNumParticles * sizeof(vec3), cudaMemcpyHostToDevice );
@@ -1187,6 +1454,113 @@ void inputParticlesGPU( const float *particlePositions, const float *particleVel
 
     error = cudaMemcpy( deviceParticleVelocitiesArray, particleVelocities, deviceNumParticles * sizeof(vec3), cudaMemcpyHostToDevice );
     checkCudaError( error );
+}
+
+// TODO: CHECK THIS
+void clampFieldsGPU( const float velocityClamp ){
+    //TODO: iterate over depth field, make above 0
+    dim3 threadsPerBlock(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
+    //clamp depth, min value is 0
+    clampDepthCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   deviceDepthMap, gridSize, gridSize
+                                                   );
+    //update height field
+    updateHeightCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,
+                                 gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+
+    //TODO: iterate over velocity U, make below velocity clamp
+    blockPerGridX = (uwidth + blockSizeX - 1)/(blockSizeX);
+    blockPerGridY = (uheight + blockSizeY - 1)/(blockSizeY);
+    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    //clamp velocity u, max value is velocityClamp
+    clampFieldCUDA<<<blocksPerGrid, threadsPerBlock>>>(deviceVelocityUMap, velocityClamp, uwidth, uheight );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    //TODO: iterate over velocity W, make below velocity clamp
+    blockPerGridX = (wwidth + blockSizeX - 1)/(blockSizeX);
+    blockPerGridY = (wheight + blockSizeY - 1)/(blockSizeY);
+    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    //clamp velocity w, max value is velocityClamp
+    clampFieldCUDA<<<blocksPerGrid, threadsPerBlock>>>(deviceVelocityWMap, velocityClamp, wwidth, wheight );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
+//TODO: CHECK THIS
+void initDampeningFieldsGPU( const int sizeDampeningRegion, const float quadraticA, const float quadraticB, const float quadraticC ){
+    //set size of dampening region
+    deviceDampeningRegion = sizeDampeningRegion;
+
+    //get width and height
+    int width = gridSize;
+    int height = gridSize;
+
+    //initialize arrays
+    //initialize sigma
+    error = cudaMalloc(&deviceSigmaMap, width*height*sizeof(float) );
+    checkCudaError( error );
+    check1DNotNull( deviceSigmaMap );
+
+    //initialize gamma
+    error = cudaMalloc(&deviceGammaMap, width*height*sizeof(float) );
+    checkCudaError( error );
+    check1DNotNull( deviceGammaMap );
+
+    //initialize phi
+    error = cudaMalloc(&devicePhiMap, width*height*sizeof(float) );
+    checkCudaError( error );
+    check1DNotNull( devicePhiMap );
+
+    //initialize psi
+    error = cudaMalloc(&devicePsiMap, width*height*sizeof(float) );
+    checkCudaError( error );
+    check1DNotNull( devicePsiMap );
+
+    //fill arrays
+    dim3 threadsPerBlock(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
+
+    //fill sigma and gamma
+    initSigmaGammaCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceSigmaMap, deviceGammaMap,
+                                                    deviceDampeningRegion, quadraticA, quadraticB, quadraticC,
+                                                    gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    //fill phi and psi
+    initPhiPsiCUDA<<<blocksPerGrid, threadsPerBlock>>>( devicePhiMap, devicePsiMap, gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
+//TODO: CHECK THIS
+void dampenWavesGPU( const float hRest, const float dt, const float dxInv, const float lambdaUpdate, const float lambdaDecay ){
+    dim3 threadsPerBlock(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
+
+    //dampen waves
+    dampenWavesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                    deviceDepthMap, deviceHeightMap, deviceVelocityUMap, deviceVelocityWMap,
+                                    deviceSigmaMap, deviceGammaMap, devicePhiMap, devicePsiMap,
+                                    deviceDampeningRegion, hRest, dt, dxInv, lambdaUpdate, lambdaDecay,
+                                    gridSize, gridSize, uwidth, uheight, wwidth, wheight
+                                    );
+    //update height field
+    updateHeightCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,
+                                 gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
 }
 
 #endif
