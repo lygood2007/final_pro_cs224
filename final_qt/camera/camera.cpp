@@ -68,7 +68,7 @@ void OrbitCamera::updateMatrices()
 void OrbitCamera::updateProjectionMatrix()
 {
     glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+//    glLoadIdentity();
     double matrix[16];
     glPushMatrix();
     glLoadIdentity();
@@ -82,7 +82,7 @@ void OrbitCamera::updateProjectionMatrix()
 void OrbitCamera::updateModelviewMatrix()
 {
     glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+//    glLoadIdentity();
     double matrix[16];
     glPushMatrix();
     glLoadIdentity();
@@ -109,10 +109,12 @@ void OrbitCamera::applyPerspectiveCamera( const float width, const float height)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(m_fovy, m_ratio, m_near, m_far);
-    gluLookAt(eye.x, eye.y, eye.z, eye.x + dir.x, eye.y + dir.y, eye.z + dir.z,
-              m_up.x, m_up.y, m_up.z);
+    //from here
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+    //moved this to here
+    gluLookAt(eye.x, eye.y, eye.z, eye.x + dir.x, eye.y + dir.y, eye.z + dir.z,
+              m_up.x, m_up.y, m_up.z); //dave said it's okay
 }
 
 Matrix4x4 OrbitCamera::getInvViewTransMatrix()
@@ -123,7 +125,7 @@ Matrix4x4 OrbitCamera::getInvViewTransMatrix()
     Matrix4x4 invScale = Matrix4x4::identity();
 
     REAL m_heightAngle = m_fovy;
-    REAL heightRadians = m_heightAngle/360*M_PI;
+    REAL heightRadians = m_heightAngle/360*M_PI; //shouldn't this be 180??
     REAL h = m_far*tan(heightRadians);
     REAL w = h*m_ratio;
 
@@ -133,14 +135,22 @@ Matrix4x4 OrbitCamera::getInvViewTransMatrix()
 
     Matrix4x4 invViewTransMat = invModelView*invScale;
     return invViewTransMat;
+
+    //These last two lines are what Dave thinks this entire method should be
+    //however changing these breaks the fluid intersection
+
+//    Matrix4x4 temp = m_modelviewMatrix * m_projectionMatrix;
+
+//    return temp.getInverse();
+
 }
 
 Vector4 OrbitCamera::getEyePos()
 {
     Vector4 eyePos;
-    Vector3 dir2(-Vector3::fromAngles(m_theta, m_phi));
+//    Vector3 dir2(-Vector3::fromAngles(m_theta, m_phi)); //commented out, unused
 
-    updateModelviewMatrix();
+//    updateModelviewMatrix(); //why are you updating in a get method?
     eyePos = m_modelviewMatrix.getInverse()*Vector4(0,0,0,1);
     return eyePos;
 }

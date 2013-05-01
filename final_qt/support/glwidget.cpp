@@ -204,38 +204,38 @@ void GLWidget::paintGL()
 
 
     // use the brightpass shader to render bright area only to fbo_2 for bloom effects
-    m_framebufferObjects["fbo_2"]->bind();
-    m_shaderPrograms["brightpass"]->bind();
-    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
-    renderTexturedQuad(width, height);
-    m_shaderPrograms["brightpass"]->release();
-    glBindTexture(GL_TEXTURE_2D, 0);
-    m_framebufferObjects["fbo_2"]->release();
+//    m_framebufferObjects["fbo_2"]->bind();
+//    m_shaderPrograms["brightpass"]->bind();
+//    glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+//    renderTexturedQuad(width, height);
+//    m_shaderPrograms["brightpass"]->release();
+//    glBindTexture(GL_TEXTURE_2D, 0);
+//    m_framebufferObjects["fbo_2"]->release();
 
-//      running a blurring effect over the bright areas
-    float scales[] = {4.f,8.f};
-    for (int i = 0; i < 2; ++i)
-    {
-        // Render the blurred brightpass filter result to fbo 1
-       renderBlur(width / scales[i], height / scales[i]);
+////      running a blurring effect over the bright areas
+//    float scales[] = {4.f,8.f};
+//    for (int i = 0; i < 2; ++i)
+//    {
+//        // Render the blurred brightpass filter result to fbo 1
+//       renderBlur(width / scales[i], height / scales[i]);
 
-       // Bind the image from fbo to a texture
-        glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//       // Bind the image from fbo to a texture
+//        glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
+//        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+////        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-        // Enable alpha blending and render the texture to the screen
-        glEnable(GL_BLEND);
-        glDisable(GL_LIGHTING);
-        glEnable(GL_TEXTURE_2D);
-        glViewport(0,0,width,height);
-        glBlendFunc(GL_ONE, GL_ONE);
-        renderTexturedQuad(width * scales[i], height * scales[i]);
-        glDisable(GL_BLEND);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glDisable(GL_TEXTURE_2D);
-        glEnable(GL_LIGHTING);
-    }
+//        // Enable alpha blending and render the texture to the screen
+//        glEnable(GL_BLEND);
+//        glDisable(GL_LIGHTING);
+//        glEnable(GL_TEXTURE_2D);
+//        glViewport(0,0,width,height);
+//        glBlendFunc(GL_ONE, GL_ONE);
+//        renderTexturedQuad(width * scales[i], height * scales[i]);
+//        glDisable(GL_BLEND);
+//        glBindTexture(GL_TEXTURE_2D, 0);
+//        glDisable(GL_TEXTURE_2D);
+//        glEnable(GL_LIGHTING);
+//    }
 #endif
     paintText();
 }
@@ -254,8 +254,8 @@ void GLWidget::renderSkybox()
     Vector3 eye(m_camera.m_center - dir * m_camera.m_zoom);
 
     glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
     glPushMatrix();
+//    glLoadIdentity();
     glTranslatef(eye.x,eye.y, eye.z); //keeps the skybox centered around the camera
 
     // Enable cube maps and draw the skybox
@@ -277,11 +277,14 @@ void GLWidget::renderSkybox()
 void GLWidget::renderFluid()
 {
 
+    glEnable (GL_BLEND);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 #ifdef RENDER_FLUID
     // Fluid part
     m_fluid->update( 0.02 );
     m_fluid->draw();
 #endif
+    glDisable(GL_BLEND);
 
 
 }
@@ -320,7 +323,7 @@ void GLWidget::renderScene()
     }
 
     glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+//    glLoadIdentity();
     // Enable depth testing
 
 //    glEnable(GL_DEPTH_TEST);
@@ -328,7 +331,46 @@ void GLWidget::renderScene()
 //    glEnable(GL_CULL_FACE);
 
 #ifdef USE_SKYBOX
+    /*
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        gluluookat shit
+        more gltranslate shit
+        glGet(GL_MODELVIEW_MATRIX) => some array
+        glPopMatrix()
+        Shove the array in a matrix4x4
+        transpose it because of row/column major shit
+        invert it
+        transpose it because of row/column major shit
+        glMatrixMode(GL_TEXTURE)
+        glLoadMatrix(get the data from the matrix4x4)
+
+     */
+
+    //this is entirely awful but appears to be very needed
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    Vector3 dir(-Vector3::fromAngles(m_camera.m_theta, m_camera.m_phi));
+    Vector3 eye( - dir * m_camera.m_zoom);
+    gluPerspective(m_camera.m_fovy, (float)WIN_H/WIN_W, m_camera.m_near, m_camera.m_far);
+    gluLookAt(eye.x, eye.y, eye.z, eye.x + dir.x, eye.y + dir.y, eye.z + dir.z,
+              m_camera.m_up.x, m_camera.m_up.y, m_camera.m_up.z);
+    glTranslatef(eye.x,eye.y, eye.z);
+    double matrix[16];
+    glGetDoublev(GL_MODELVIEW_MATRIX, matrix);
+    glPopMatrix();
+    Matrix4x4 temp = Matrix4x4(matrix);
+    Matrix4x4 tempT = temp.getTranspose();
+    Matrix4x4 tempI = tempT.getInverse();
+    Matrix4x4 tempIT = tempI.getTranspose();
+//    tempIT = m_camera.getInvViewTransMatrix().getTranspose();
+    glMatrixMode(GL_TEXTURE);
+    glPushMatrix();
+    glLoadMatrixd(tempIT.data);
+
 
 //     Render the fluid with the refraction shader bound
 //    glActiveTexture(GL_TEXTURE0);
@@ -340,9 +382,10 @@ void GLWidget::renderScene()
 //    glPopMatrix();
 //    m_shaderPrograms["refract"]->release();
 
-    if(true) //true for perfect reflection, false for fresnel
+    if(false) //true for perfect reflection, false for fresnel
     {
         // Render the fluid with the reflection shader bound
+        //@NOTE - Reflection is currently broken and does not work!! - SH
         m_shaderPrograms["reflect"]->bind();
         m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
         m_shaderPrograms["reflect"]->setUniformValue("CurrColor", SEA_WATER);
@@ -370,6 +413,8 @@ void GLWidget::renderScene()
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     glDisable(GL_TEXTURE_CUBE_MAP);
 
+    glPopMatrix();
+
 #endif
 
 
@@ -383,6 +428,8 @@ void GLWidget::renderScene()
 #endif
 //    glDisable(GL_CULL_FACE);
 //    glDisable(GL_DEPTH_TEST);
+
+//     glMatrixMode(GL_MODELVIEW);
 }
 
 
@@ -749,7 +796,9 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
     Vector4 eyePos = m_camera.getEyePos();
     Vector4 pFilmCam;
     Matrix4x4 invViewTransMat = m_camera.getInvViewTransMatrix();
-    pFilmCam.x = ((REAL)(2*x))/width() - 1; pFilmCam.y = 1- ((REAL)(2*y))/height(); pFilmCam.z = -1;
+    pFilmCam.x = ((REAL)(2*x))/width() - 1;
+    pFilmCam.y = 1- ((REAL)(2*y))/height();
+    pFilmCam.z = -1;
     pFilmCam.w = 1;
 
     Vector4 pFilmWorld = invViewTransMat*pFilmCam;

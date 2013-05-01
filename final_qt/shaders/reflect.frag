@@ -6,7 +6,7 @@ void main (void)
 {
 //	vec4 current_color = CurrColor;
         vec4 final_color = textureCube( CubeMap, r);
-	vec3 N = normalize(normal);
+        vec3 N = normalize(normal);
 	vec3 L = normalize(lightDir);
 	float lambertTerm = dot(N,L);
 	if(lambertTerm > 0.0)
