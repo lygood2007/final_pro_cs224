@@ -16,9 +16,10 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
+#define EPS 0.001
 extern "C"
 {
-void initGridGPU( const int hostGridSize, const float hostdx, const float* hostTerrainMap );
+void initGridGPU( const int hostGridSize, const float hostdx, const float halfdm, const float* hostTerrainMap );
 void copybackGPU(FieldType type, float* hostMap  );
 void destroyGPUmem();
 void addDropGPU(const int posX, const int posZ, const int radius, const float h );
@@ -64,6 +65,7 @@ __host__ __device__ inline float cudaMin( float a, float b )
 const int blockSizeX = 4;
 const int blockSizeY = 4;
 
+vec3* devicePaintMap; // Paint map, we copy back this buffer for drawing. It stores the position of vertices
 vec3* deviceNormalMap; // Normal map for GPU
 float* deviceTerrainMap; // Terrain map for GPU
 float* deviceHeightMap; // Height map for GPU
@@ -100,6 +102,8 @@ int wheight;
 float mapdx;
 // dxInv
 float mapdxInv;
+// halfDomain
+float halfDomain;
 
 // Forward decaration
 void initGridGPU( const int hostGirdSize, const float* hostTerrainMap );
@@ -218,6 +222,7 @@ __global__ void initDepthCUDA( float* depthMap, const float* terrainMap, const i
     if( i >= 0 && i < height && j >= 0 && j < width )
     {
         float depth = cudaMax(0.f,defaultHeight - map2Dread( terrainMap, i,j, width ));
+       // float depth = 5;
         map2Dwrite( depthMap,i,j,depth,width );
     }
 }
@@ -390,7 +395,15 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
             float dep = map2Dread(depthMap,i,j,width);
             float dh = -decay*dep*dxInv*( (map2Dread(velUMap,i,j+1,width+1) - map2Dread(velUMap,i,j,width+1))
                                           + (map2Dread(velWMap,i+1,j,width) - map2Dread(velWMap,i,j,width)) );
-            map2Dwrite(depthMap, i, j, dh*dt+dep, width );
+            float nextDepth = dh*dt+dep;
+            if( nextDepth < EPS )
+            {
+                 map2Dwrite(depthMap, i, j, 0.f, width );
+            }
+            else
+            {
+                map2Dwrite(depthMap, i, j, dh*dt+dep, width );
+            }
      }
  }
 
@@ -414,11 +427,12 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
         // Read the origin value from velUMap
         float vel = map2Dread( velUMap, i,j, width );
 
-        if( d1 < 0.0001 || d2 < 0.0001 )
+        if( d1 < EPS || d2 < EPS )
         {
             float vel1 = map2Dread( velUMap,i,j-1,width);
             float vel2 = map2Dread( velUMap,i,j+1,width);
-            map2Dwrite( velUMap,i,j,0.5*(vel1+vel2),width);
+            float vel3 = map2Dread( velUMap, i,j, width );
+            map2Dwrite( velUMap,i,j,0.33*(vel1+vel2+vel3),width);
             return;
 
         }
@@ -455,9 +469,10 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
 
          if( d1 < 0.0001 || d2 < 0.0001 )
          {
-             float vel1 = map2Dread( velWMap,i-1,j,width);
+             float vel1 = map2Dread( velWMap,i-1,j,width);          
              float vel2 = map2Dread( velWMap,i+1,j,width);
-             map2Dwrite( velWMap,i,j,0.5*(vel1+vel2),width);
+             float vel3 = map2Dread( velWMap, i, j, width );
+             map2Dwrite( velWMap,i,j,0.33*(vel1+vel2+vel3),width);
              return;
 
          }
@@ -566,6 +581,22 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
          normalMap[index].x = 0;
          normalMap[index].y = 1;
          normalMap[index].z = 0;
+     }
+ }
+
+ /**
+  * Initialize the paint field
+  */
+ __global__ void updatePaintCUDA( vec3* paintMap, const float* heightMap, const float halfdm, const float dx, const int width, const int height )
+ {
+     int i = blockDim.y*blockIdx.y + threadIdx.y;
+     int j = blockDim.x*blockIdx.x + threadIdx.x;
+     if( i >= 0&& i < height&&j >= 0 && j < width )
+     {
+         const int index = i*width + j;
+         paintMap[index].x = -halfdm + j*dx;
+         paintMap[index].y = heightMap[index];
+         paintMap[index].z = -halfdm + i*dx;
      }
  }
 
@@ -749,9 +780,10 @@ __global__ void updateParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMa
  * @param girdSize The gridSize
  * @param terrainMap The terrainMap from host
  */
-void initGridGPU( const int hostGridSize, const float hostdx, const float* hostTerrainMap )
+void initGridGPU( const int hostGridSize, const float hostdx, const float halfdm, const float* hostTerrainMap )
 {
     gridSize = hostGridSize;
+    halfDomain = halfdm;
     uwidth = gridSize + 1;
     uheight = gridSize;
     wwidth = gridSize;
@@ -787,6 +819,11 @@ void initGridGPU( const int hostGridSize, const float hostdx, const float* hostT
     error = cudaMalloc(&deviceNormalMap,  width*height*sizeof(vec3));
     checkCudaError( error );
     check1DNotNull( deviceNormalMap );
+
+    // Malloc the paintMap
+    error = cudaMalloc(&devicePaintMap,  width*height*sizeof(vec3));
+    checkCudaError( error );
+    check1DNotNull( devicePaintMap );
 
     width = uwidth;
     height = uheight;
@@ -864,6 +901,10 @@ void initGridGPU( const int hostGridSize, const float hostdx, const float* hostT
                                                    deviceHeightMap,deviceDepthMap,deviceTerrainMap,
                                                    gridSize,gridSize
                                                    );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    updatePaintCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, halfDomain, mapdx, gridSize,gridSize);
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 }
@@ -964,13 +1005,13 @@ void updateFluidGPU( const float dt )
     /**
      * Apply the boundary
      */
-    blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+/*    blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
     blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
     blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
     applyBoundaryCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap, deviceHeightMap, deviceTerrainMap, gridSize,gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
-
+*/
     overshootingReduction<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
                                                               deviceNextDepthMap, deviceHeightMap, mapdx, gridSize, gridSize );
     error = cudaDeviceSynchronize();
@@ -998,6 +1039,13 @@ void updateFluidGPU( const float dt )
      * Compute he normal map
      */
     computeNormalCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceNormalMap, deviceHeightMap, gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    /**
+     * Update the paint map
+     */
+    updatePaintCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, halfDomain, mapdx, gridSize, gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 }
@@ -1038,6 +1086,7 @@ void addDropGPU(const int posX, const int posZ, const int radius, const float h 
  */
 void destroyGPUmem()
 {
+    cudaFree( devicePaintMap );
     cudaFree( deviceNormalMap );
     cudaFree( deviceTerrainMap );
     cudaFree( deviceHeightMap );
@@ -1077,6 +1126,11 @@ void copybackGPU(FieldType type, float* hostMap  )
     {
         error = cudaMemcpy( hostMap, deviceNormalMap, gridSize*gridSize*sizeof(vec3), cudaMemcpyDeviceToHost);
         break;
+    }
+    case PAINT:
+    {
+         error = cudaMemcpy( hostMap, devicePaintMap, gridSize*gridSize*sizeof(vec3), cudaMemcpyDeviceToHost);
+         break;
     }
     case PARTICLE_POSITIONS:
     {

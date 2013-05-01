@@ -6,6 +6,12 @@
  **/
 #include "terrain.h"
 
+extern "C" {
+    void glBindBuffer (GLenum target, GLuint buffer);
+    void  glGenBuffers (GLsizei n, GLuint *buffers);
+    void  glBufferData (GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage);
+}
+
 Terrain::Terrain()
 {
     m_depth =  DEFAULT_TERRAIN_DEPTH;
@@ -13,6 +19,7 @@ Terrain::Terrain()
     int terrain_array_size = m_gridLength*m_gridLength;
     m_vertices = new Vector3[terrain_array_size];
     m_normals = new Vector3[terrain_array_size];
+    m_uvs = new Vector2[terrain_array_size];
     m_renderNormals = false;
     m_textureId = 0;
 
@@ -26,6 +33,10 @@ Terrain::~Terrain()
         delete []m_normals;
     if( m_vertices )
         delete []m_vertices;
+    if( m_uvs )
+        delete []m_uvs;
+    if( m_indices )
+        delete []m_indices;
 
     if( m_textureId != 0 )
         glDeleteTextures(1,&m_textureId);
@@ -43,8 +54,11 @@ void Terrain::draw() const
 
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D,m_textureId);
-    glPushMatrix();
 
+    /**
+     * Old draw, without vbo
+     */
+/*
     int index = 0;
     for( int i = 0; i < m_gridLength-1; i++ )
     {
@@ -67,30 +81,32 @@ void Terrain::draw() const
         }
         glEnd();
     }
+*/
+
+    glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
+    glVertexPointer(3,GL_FLOAT,0,(char*)NULL);
+    glEnableClientState( GL_VERTEX_ARRAY );
+
+    glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
+    glNormalPointer(GL_FLOAT,0,(char*)NULL);
+    glEnableClientState( GL_NORMAL_ARRAY );
+
+    glBindBuffer( GL_ARRAY_BUFFER, m_texBuffer );
+    glTexCoordPointer(2,GL_FLOAT,0,(char*)NULL);
+    glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
+
+    int indexSize = (m_gridLength + 1)*(m_gridLength - 1)*2;
+    glDrawElements( GL_TRIANGLE_STRIP, indexSize, GL_UNSIGNED_INT, 0 );
+
+    glDisableClientState( GL_NORMAL_ARRAY );
+     glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+    glDisableClientState( GL_VERTEX_ARRAY );
+    glBindBuffer( GL_ARRAY_BUFFER, 0 );
+     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
     glDisable( GL_TEXTURE_2D);
-
-    /*
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE,GL_ONE);
-    glBegin(GL_QUADS);
-    glNormal3f(0.f,1.f,0.f);
-    glColor3f(0.3f,0.3f,1.f);
-    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
-    glVertex3f(-TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
-    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,TERRAIN_BOUND);
-    glVertex3f(TERRAIN_BOUND,1.2*TERRAIN_MAX_HEIGHT,-TERRAIN_BOUND);
-    glEnd();
-    glDisable(GL_BLEND);*/
-//    drawBoundary();
     drawNormals();
-
-    glPopMatrix();
-    // Force OpenGL to perform all pending operations -- usually a good idea to call this
-    // We need that?
-   // glFlush();
-    // We need that?
-    // Swap the buffers to show what we have just drawn onto the screen
-    //swapBuffers();
 }
 
 /**
@@ -123,6 +139,7 @@ void Terrain::drawNormals() const
                 glEnd();
             }
         }
+
     }
 }
 
@@ -170,6 +187,76 @@ void Terrain::generate()
         loadTextureToTerrain();
         populateTerrain();
         computeNormals();
+        generateUV();
+        generateIndices();
+        generateVBO();
+}
+
+/**
+ * Generate the UV
+ */
+void Terrain::generateUV()
+{
+    int index = 0;
+    for( int i = 0; i < m_gridLength; i++ )
+    {
+        for( int j = 0; j < m_gridLength; j++ )
+        {
+            index = i*m_gridLength + j;
+            m_uvs[index].x = 1.f - i/(float)m_gridLength;
+            m_uvs[index].y  = j/(float)m_gridLength;
+        }
+    }
+}
+
+/**
+ * Generate indices for triangle strip
+ */
+void Terrain::generateIndices()
+{
+    int size = (m_gridLength+1)*(m_gridLength-1)*2;
+    m_indices = new GLuint[size];
+    int index = 0;
+    for( int z = 0; z < m_gridLength-1; z++ )
+    {
+        int x;
+        for( x =  0; x < m_gridLength; x++ )
+        {
+
+            m_indices[index] = x + z*m_gridLength;
+            index++;
+            m_indices[index] = x + (z+1)*m_gridLength;
+            index++;
+        }
+        m_indices[index] = x-1 + (z+1)*m_gridLength;
+        index++;
+        m_indices[index] = 0 + (z+1)*m_gridLength;
+        index++;
+    }
+}
+
+/**
+ * Generate the vertex buffer
+ */
+void Terrain::generateVBO()
+{
+    int terrainSize = m_gridLength*m_gridLength;
+    glGenBuffers(1,&m_vertexBuffer );
+    glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_vertices, GL_STATIC_DRAW );
+
+    glGenBuffers( 1, &m_normalBuffer );
+    glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_normals, GL_STATIC_DRAW );
+
+    glGenBuffers( 1, &m_texBuffer );
+    glBindBuffer( GL_ARRAY_BUFFER, m_texBuffer );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector2), m_uvs, GL_STATIC_DRAW );
+
+    int indexSize = (m_gridLength+1)*(m_gridLength-1)*2;
+    glGenBuffers(1,&m_indexBuffer );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
+    glBufferData( GL_ELEMENT_ARRAY_BUFFER, indexSize*sizeof(GLuint), m_indices, GL_STATIC_DRAW );
 }
 
 /**

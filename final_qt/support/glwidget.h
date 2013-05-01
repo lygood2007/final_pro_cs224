@@ -18,8 +18,8 @@
 #include "resourceloader.h"
 
 // We fix the size
-#define WIN_W 800.0
-#define WIN_H 800.0
+#define WIN_W 1200.0
+#define WIN_H 1200.0
 
 // Flag for testing
 #define DRAW_TERRAIN
@@ -28,10 +28,10 @@
 
 #define RENDER_FLUID
 //#define USE_FBO
-#define USE_SKYBOX
+//#define USE_SKYBOX
 
 #define SEA_WATER 0.0f,0.42f,0.58f,1.0f
-
+#define TIME_STEP 0.016
 
 /**
     Uncomment this if you don't want to use CUDA to compute
@@ -77,10 +77,12 @@ private:
     bool m_mouseRightDown; // True if mouse right is down
 
     bool m_drawFrame; // True if draw in wireframe mode
+    bool m_animate;
 
     int m_prevTime;
     float m_prevFps, m_fps;
     float m_delta;
+    float m_timeStep;
 
 
 public:

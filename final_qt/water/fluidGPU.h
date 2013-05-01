@@ -105,6 +105,17 @@ public:
      */
     void init(const int gridSize = GRID_SIZE, const float domainSize = DOMAIN_SIZE);
 
+
+    /**
+     * @brief initBuffer Initialize the buffer
+     */
+    void initBuffer();
+
+    /**
+     * @brief init index array
+     */
+    void initIndices();
+
     /**
      * @brief Check boundary
      */
@@ -219,6 +230,8 @@ private:
      * Design for gpu fluid. 2D vector is not suitable for cuda
      **/
     Vector3* m_normalField; // Essential
+    Vector3* m_paintField; // Essential
+    GLuint* m_indices; // Essential
     float* m_depthField; // Essential
     float* m_velocityU; // I preserve this for future use
     float* m_velocityW; // I preserve this for future use
@@ -228,6 +241,11 @@ private:
     float* m_gammaField;
     float* m_phiField;
     float* m_psiField;
+
+    // Buffer for rendering
+    GLuint m_indexBuffer;
+    GLuint m_vertexBuffer;
+    GLuint m_normalBuffer;
 
     QVector<Tri> m_triangles;
 

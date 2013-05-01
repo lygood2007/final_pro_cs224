@@ -74,13 +74,16 @@ void GLWidget::init()
     m_terrain = new RandomTerrain();
 #endif
 
-    // Start a timer that will try to get 60 frames per second (the actual
+    // Start a timer that will try to get 100 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
-    m_timer.start(1000 / 60);
+    m_timer.start(1000 / 100);
 
     m_mouseLeftDown = false;
     m_mouseRightDown = false;
     m_drawFrame = false;
+    m_animate = false;
+
+    m_timeStep = TIME_STEP;
 
     // Center the mouse, which is explained more in mouseMoveEvent() below.
     // This needs to be done here because the mouse may be initially outside
@@ -94,10 +97,12 @@ void GLWidget::init()
     m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
     updateCamera();
 
+#ifdef RENDER_FLUID
 #ifdef USE_GPU_FLUID
         m_fluid = new FluidGPU(m_terrain);
 #else
      m_fluid =  new FluidCPU(m_terrain);
+#endif
 #endif
 }
 
@@ -148,10 +153,10 @@ void GLWidget::initializeResources()
 
     m_terrain->generate();
     cout << "  Generated Terrain ->" << endl;
-
+#ifdef RENDER_FLUID
     m_fluid->backupHeight(m_terrain);
     cout << "  Calculated Fluid Height ->" << endl;
-
+#endif
     m_skybox = ResourceLoader::loadSkybox();
     loadCubeMap();
     cout << "  Loaded Skymap ->" << endl;
@@ -170,7 +175,6 @@ void GLWidget::paintGL()
 {
     int width = this->width();
     int height = this->height();
-    timeUpdate();
 
 #ifdef USE_FBO
     updateCamera();
@@ -179,9 +183,7 @@ void GLWidget::paintGL()
 
 #endif
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
      renderScene();
-
 #ifdef USE_FBO
    m_framebufferObjects["fbo_0"]->release();
 
@@ -276,14 +278,9 @@ void GLWidget::renderSkybox()
 **/
 void GLWidget::renderFluid()
 {
-
 #ifdef RENDER_FLUID
-    // Fluid part
-    m_fluid->update( 0.02 );
     m_fluid->draw();
 #endif
-
-
 }
 
 
@@ -330,20 +327,20 @@ void GLWidget::renderScene()
 #ifdef USE_SKYBOX
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
 
-//     Render the fluid with the refraction shader bound
-//    glActiveTexture(GL_TEXTURE0);
-//    m_shaderPrograms["refract"]->bind();
-//    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
-//    glPushMatrix();
-//    glTranslatef(-1.25f, 0.f, 0.f);
-//    renderFluid();
-//    glPopMatrix();
-//    m_shaderPrograms["refract"]->release();
+    // Render the fluid with the refraction shader bound
+   glActiveTexture(GL_TEXTURE0);
+    m_shaderPrograms["refract"]->bind();
+    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
+    glPushMatrix();
+    glTranslatef(-1.25f, 0.f, 0.f);
+   renderFluid();
+   glPopMatrix();
+    m_shaderPrograms["refract"]->release();
 
     if(true) //true for perfect reflection, false for fresnel
     {
-        // Render the fluid with the reflection shader bound
-        m_shaderPrograms["reflect"]->bind();
+      //  Render the fluid with the reflection shader bound
+       m_shaderPrograms["reflect"]->bind();
         m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
         m_shaderPrograms["reflect"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
@@ -370,6 +367,8 @@ void GLWidget::renderScene()
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     glDisable(GL_TEXTURE_CUBE_MAP);
 
+#else
+    renderFluid();
 #endif
 
 
@@ -655,7 +654,6 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) QApplication::quit();
 
-    // TODO: Handle keyboard presses here
     switch(event->key())
     {
         case Qt::Key_W:
@@ -682,6 +680,7 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         {
             m_terrain->enableNormal();
         }
+#ifdef RENDER_FLUID
         if( m_fluid->isRenderingNormal() )
         {
             m_fluid->disableNormal();
@@ -690,8 +689,15 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         {
             m_fluid->enableNormal();
         }
+#endif
         break;
     }
+
+    case Qt::Key_R:
+      {
+            m_animate = !m_animate;
+            break;
+        }
     }
 }
 
@@ -782,7 +788,7 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
         r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
         r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
         r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-        for( int m = 0; m < 3; m++ )
+        /*for( int m = 0; m < 3; m++ )
         {
 #ifdef USE_GPU_FLUID
             if( tempDepth[m_fluid->getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
@@ -791,11 +797,10 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
             if( m_fluid->m_depthField[r[m]][c[m]] > EPSILON )
                 count++;
 #endif
-        }
-        if( count == 0 )
-            continue;
-        else
-        {
+        }*/
+      /*  if( count == 0 )
+            continue;*/
+
 #ifdef USE_GPU_FLUID
             const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
                                       ,- halfDomain + r[0]*dx );
@@ -817,7 +822,6 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
                  indexCol = r[0];
                  break;
              }
-        }
     }
 
     if( indexRow != -1 && indexCol != -1 )
@@ -825,7 +829,7 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
         if(event->button() == Qt::LeftButton){
             m_fluid->addDrop( indexCol, indexRow );
         } else if(event->button() == Qt::MiddleButton){
-            m_fluid->addDroppingParticles(indexCol, indexRow);
+            //m_fluid->addDroppingParticles(indexCol, indexRow);
         }
     }
 }
@@ -834,7 +838,13 @@ void GLWidget::tick()
 {
     // Get the number of seconds since the last tick (variable update rate)
  //   float seconds = m_time.restart() * 0.001f;
-
+    if( m_animate )
+    {
+        timeUpdate();
+#ifdef RENDER_FLUID
+        m_fluid->update( m_timeStep );
+#endif
+    }
     // Flag this view for repainting (Qt will call paintGL() soon after)
     update();
 }

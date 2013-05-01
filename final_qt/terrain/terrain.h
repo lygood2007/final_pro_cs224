@@ -16,11 +16,6 @@
 #include <iostream>
 #include <assert.h>
 
-#define DEFAULT_DEPTH 6
-#define TERRAIN_BOUND 50
-#define TERRAIN_MIN_HEIGHT 0
-#define TERRAIN_MAX_HEIGHT 25
-
 #define TEXTURE_DIR "./resource/sandy_sea_floor.jpg"
 
 typedef Vector2 GridIndex;
@@ -58,6 +53,20 @@ public:
      */
     void generate();
 
+    /**
+     * Generate the UV
+     */
+    void generateUV();
+
+    /**
+     * Generate indices for triangle strip
+     */
+    void generateIndices();
+
+    /**
+     * Generate the vertex buffer
+     */
+    void generateVBO();
     /**
      * Enable drawing normals
      */
@@ -132,12 +141,19 @@ protected:
 protected:
     Vector3* m_vertices; // The vertices
     Vector3* m_normals; // The normals
+    Vector2* m_uvs; // The uvs
+    GLuint* m_indices; // The indices
 
     int m_depth; // The number of recursion levels to use to generate terrain. Can be used as a level-of-detail parameter.
     bool m_renderNormals; // Flag for rendering normals
     int m_gridLength; // The grid length
     int m_bound; // Specify the actual length of terrain, should be 2*m_bound*2*m_bound
     GLuint m_textureId; // The texture id
+
+    GLuint m_indexBuffer;
+    GLuint m_vertexBuffer;
+    GLuint m_normalBuffer;
+    GLuint m_texBuffer;
 };
 
 #endif // TERRAIN_H
