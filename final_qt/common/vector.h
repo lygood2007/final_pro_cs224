@@ -28,7 +28,7 @@ public:
     union
     {
         struct { float x, y; };
-        float xy[3];
+        float xy[2];
     };
 
     Vector2() : x(0), y(0) {}

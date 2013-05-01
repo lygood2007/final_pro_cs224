@@ -12,7 +12,7 @@
 #define TERRAIN_BOUND 40
 #define TERRAIN_MIN_HEIGHT 0
 #define TERRAIN_MAX_HEIGHT 50
-#define DEFAULT_TERRAIN_DEPTH 7
+#define DEFAULT_TERRAIN_DEPTH 8
 
 #define GRID_SIZE TERRAIN_BOUND*2
 #define DOMAIN_SIZE TERRAIN_BOUND
@@ -24,7 +24,7 @@
 #define DAMPEN_WAVES
 #define LAMBDA_DECAY 0.9
 #define LAMBDA_UPDATE 0.1
-#define DAMPENING_REGION 8
+#define DAMPENING_REGION 30
 #define QUADRATIC_A 10.0f
 #define QUADRATIC_B 0.0f
 #define QUADRATIC_C 0.0f
@@ -49,7 +49,8 @@
 #define USE_PARTICLES_2
 #define TOTAL_NUM_PARTICLES 100000
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-20;
+
+const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;
@@ -69,13 +70,16 @@ enum FieldType
     NORMAL,
     HEIGHT,
     PARTICLE_POSITIONS,
-    PARTICLE_VELOCITIES
+    PARTICLE_VELOCITIES,
+    PAINT
 };
 
 enum DrawMethod
 {
     DRAW_POINTS = 0,
-    DRAW_MESH
+    DRAW_MESH_STRIP,
+    DRAW_MESH,
+    DRAW_MESH_VBO
 };
 
 #endif // FLUID_GLOBAL_H
