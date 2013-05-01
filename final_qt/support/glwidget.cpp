@@ -178,7 +178,8 @@ void GLWidget::paintGL()
     m_framebufferObjects["fbo_0"]->bind();
 
 #endif
-     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
      renderScene();
 
 #ifdef USE_FBO
@@ -291,12 +292,15 @@ void GLWidget::renderFluid()
 **/
 void GLWidget::renderScene()
 {
+
+
 #ifdef USE_SKYBOX
-    renderSkybox();//@NOTE - This must go first!!
+   renderSkybox();//@NOTE - This must go first!!
 #endif
 #ifdef DRAW_TERRAIN
-   m_terrain->draw();
+  m_terrain->draw();
 #endif
+
 
    if(false) // make true to draw some axis'
    {
@@ -319,9 +323,9 @@ void GLWidget::renderScene()
     glLoadIdentity();
     // Enable depth testing
 
-    //glEnable(GL_DEPTH_TEST);
-    // Enable culling (back) faces for rendering the fluid and terrain
- //   glEnable(GL_CULL_FACE);
+//    glEnable(GL_DEPTH_TEST);
+////     Enable culling (back) faces for rendering the fluid and terrain
+//    glEnable(GL_CULL_FACE);
 
 #ifdef USE_SKYBOX
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
@@ -341,9 +345,9 @@ void GLWidget::renderScene()
         // Render the fluid with the reflection shader bound
         m_shaderPrograms["reflect"]->bind();
         m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["reflect"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,0.5f);
+        m_shaderPrograms["reflect"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
-        glTranslatef(1.25f,0.f,0.f);
+        glTranslatef(0.f,1.25f,0.f);
         renderFluid();
         glPopMatrix();
         m_shaderPrograms["reflect"]->release();
@@ -353,28 +357,32 @@ void GLWidget::renderScene()
         // Render the fluid with the fresnel shader bound for reflection and refraction
         m_shaderPrograms["fresnel"]->bind();
         m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", 0.1f,0.4f,0.8f,1.0f);
+        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
         m_shaderPrograms["fresnel"]->setUniformValue("rS", 0.143f);
         m_shaderPrograms["fresnel"]->setUniformValue("eta", 0.77f,0.78f,0.8f);
         glPushMatrix();
-        glTranslatef(1.25f,0.f,0.f);
+        glTranslatef(0.f,1.25f,0.f);
         renderFluid();
         glPopMatrix();
         m_shaderPrograms["fresnel"]->release();
     }
 
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    glDisable(GL_TEXTURE_CUBE_MAP);
+
 #endif
 
 
 #ifdef USE_SKYBOX
-    glPopMatrix();
-    m_shaderPrograms["reflect"]->release();
+//    glPopMatrix();
+//    m_shaderPrograms["reflect"]->release();
+//    m_shaderPrograms["fresnel"]->release();
 //     Disable culling, depth testing and cube maps
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    glDisable(GL_TEXTURE_CUBE_MAP);
+//    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+//    glDisable(GL_TEXTURE_CUBE_MAP);
 #endif
-    //glDisable(GL_CULL_FACE);
-   // glDisable(GL_DEPTH_TEST);
+//    glDisable(GL_CULL_FACE);
+//    glDisable(GL_DEPTH_TEST);
 }
 
 

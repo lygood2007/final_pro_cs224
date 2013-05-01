@@ -638,7 +638,7 @@ void FluidGPU::drawFluid( DrawMethod method ) const
             }
             glEnd();
         }
-        glDisable(GL_BLEND);
+//        glDisable(GL_BLEND);
         glPopMatrix();
     }
     else

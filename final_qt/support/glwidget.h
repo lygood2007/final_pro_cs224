@@ -27,8 +27,11 @@
 //#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
-//#define USE_FBO
+#define USE_FBO
 #define USE_SKYBOX
+
+#define SEA_WATER 0.0f,0.42f,0.58f,1.0f
+
 
 /**
     Uncomment this if you don't want to use CUDA to compute
