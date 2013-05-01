@@ -81,6 +81,7 @@ private:
     int m_prevTime;
     float m_prevFps, m_fps;
     float m_delta;
+    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis, m_useSkybox;
 
 
 public:
@@ -156,6 +157,7 @@ public:
 private slots:
     /** Callback function, will be called whenever the timer ticks*/
     void tick();
+
 };
 
 #endif // VIEW_H
