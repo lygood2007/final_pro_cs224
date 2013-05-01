@@ -209,7 +209,6 @@ void GLWidget::paintGL()
         glDisable(GL_TEXTURE_2D);
         glEnable(GL_LIGHTING);
 
-
         // use the brightpass shader to render bright area only to fbo_2 for bloom effects
         m_framebufferObjects["fbo_2"]->bind();
         m_shaderPrograms["brightpass"]->bind();
@@ -229,7 +228,7 @@ void GLWidget::paintGL()
            // Bind the image from fbo to a texture
             glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    //        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
             // Enable alpha blending and render the texture to the screen
             glEnable(GL_BLEND);
@@ -281,6 +280,8 @@ void GLWidget::renderScene()
 
    if(m_useSkybox)
    {
+       if(m_useShaders){
+
         //this is entirely awful but needed
         //this takes the correct rotation matrix from the camera and applies it to the
         //cube map so the shader works correctly
@@ -305,27 +306,27 @@ void GLWidget::renderScene()
         glPushMatrix();
         glLoadMatrixd(tempIT.data);
 
+        // Render the fluid with the fresnel shader bound for reflection and refraction
+        m_shaderPrograms["fresnel"]->bind();
+        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["fresnel"]->release();
 
-        if(m_useShaders){
-            // Render the fluid with the fresnel shader bound for reflection and refraction
-            m_shaderPrograms["fresnel"]->bind();
-            m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
-            m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
-            glPushMatrix();
-            glTranslatef(0.f,1.25f,0.f);
-            renderFluid();
-            glPopMatrix();
-            m_shaderPrograms["fresnel"]->release();
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+        glDisable(GL_TEXTURE_CUBE_MAP);
+
+        glPopMatrix();
+
         }
         else //plain old fluid, nothing special
         {
             renderFluid();
         }
 
-        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-        glDisable(GL_TEXTURE_CUBE_MAP);
-
-        glPopMatrix();
     }
    else //plain old fluid, nothing special
    {
@@ -689,7 +690,6 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     }
     case Qt::Key_C:
     {
-//        m_useSimpleCube = !m_useSimpleCube;
         m_useSkybox = !m_useSkybox;
         break;
     }
@@ -701,6 +701,17 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_A:
     {
         m_useAxis = !m_useAxis;
+        break;
+    }
+    case Qt::Key_F:
+    {
+        m_useFBO = !m_useFBO;
+        break;
+    }
+    case Qt::Key_X:
+    {
+        m_useSimpleCube = !m_useSimpleCube;
+        loadCubeMap(); //need to reload the textures
         break;
     }
     }
