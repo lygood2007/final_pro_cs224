@@ -49,7 +49,7 @@
 //#define USE_PARTICLES_2
 #define TOTAL_NUM_PARTICLES 50000
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-25;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-40;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;

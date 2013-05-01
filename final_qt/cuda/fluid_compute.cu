@@ -398,7 +398,7 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
  /**
   * Update the velocity U field
   */
- __global__ void updateVelUCUDA( float* velUMap, const float* heightMap,
+ __global__ void updateVelUCUDA( float* velUMap, const float* heightMap, const float* depthMap,
                                  const int width, const int height, const float dt, const float dxInv )
  {
      int i = blockDim.y*blockIdx.y + threadIdx.y;
@@ -408,9 +408,20 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
          // The width of heightmap is 1 smaller than the width of velocity U
         float h1 = map2Dread( heightMap, i,j, width - 1);
         float h2 = map2Dread(  heightMap, i,j-1, width-1 );
+        float d1 = map2Dread(depthMap,i,j,width-1);
+        float d2 = map2Dread(depthMap,i,j-1,width-1);
 
         // Read the origin value from velUMap
         float vel = map2Dread( velUMap, i,j, width );
+
+        if( d1 < 0.0001 || d2 < 0.0001 )
+        {
+            float vel1 = map2Dread( velUMap,i,j-1,width);
+            float vel2 = map2Dread( velUMap,i,j+1,width);
+            map2Dwrite( velUMap,i,j,0.5*(vel1+vel2),width);
+            return;
+
+        }
         float dv = GRAVITY*dt*dxInv*(h1-h2);
 
         // Add
@@ -427,7 +438,7 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
  /**
   * Update the velocity W field
   */
- __global__ void updateVelWCUDA( float* velWMap, const float* heightMap,
+ __global__ void updateVelWCUDA( float* velWMap, const float* heightMap, const float* depthMap,
                                  const int width, const int height, const float dt, const float dxInv )
  {
      int i = blockDim.y*blockIdx.y + threadIdx.y;
@@ -437,7 +448,19 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
          float h1 = map2Dread( heightMap, i,j, width );
          float h2 = map2Dread(  heightMap, i-1,j, width );
 
+         float d1 = map2Dread(depthMap,i,j,width);
+         float d2 = map2Dread(depthMap,i-1,j,width);
+
          float vel = map2Dread( velWMap, i,j, width );
+
+         if( d1 < 0.0001 || d2 < 0.0001 )
+         {
+             float vel1 = map2Dread( velWMap,i-1,j,width);
+             float vel2 = map2Dread( velWMap,i+1,j,width);
+             map2Dwrite( velWMap,i,j,0.5*(vel1+vel2),width);
+             return;
+
+         }
          float dv = GRAVITY*dt*dxInv*(h1-h2);
          map2Dwrite( velWMap, i,j,vel+dv, width );
      }
@@ -924,7 +947,7 @@ void updateFluidGPU( const float dt )
     blockPerGridX = (uwidth + blockSizeX - 1)/(blockSizeX);
     blockPerGridY = (uheight + blockSizeY - 1)/(blockSizeY);
     blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
-    updateVelUCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceVelocityUMap, deviceHeightMap, uwidth, uheight, dt, mapdxInv );
+    updateVelUCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceVelocityUMap, deviceHeightMap, deviceDepthMap, uwidth, uheight, dt, mapdxInv );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
@@ -934,7 +957,7 @@ void updateFluidGPU( const float dt )
     blockPerGridX = (wwidth + blockSizeX - 1)/(blockSizeX);
     blockPerGridY = (wheight + blockSizeY - 1)/(blockSizeY);
     blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
-    updateVelWCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceVelocityWMap, deviceHeightMap, wwidth, wheight, dt, mapdxInv );
+    updateVelWCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceVelocityWMap, deviceHeightMap, deviceDepthMap, wwidth, wheight, dt, mapdxInv );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
