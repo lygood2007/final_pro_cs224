@@ -323,15 +323,31 @@ void GLWidget::renderScene()
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
 
-        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-        // Render the points with the point shader
-        m_shaderPrograms["point"]->bind();
-        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
-        glPushMatrix();
-        glTranslatef(0.f,1.25f,0.f);
-        renderFluid();
-        glPopMatrix();
-        m_shaderPrograms["point"]->release();
+
+//        m_shaderPrograms["brightpass"]->bind();
+//        renderFluid();
+//        m_shaderPrograms["brightpass"]->release();
+
+//        float scales[] = {4.f,8.f};
+//        for (int i = 0; i < 2; ++i)
+//        {
+//            // Render the blurred brightpass filter result to fbo 1
+//           renderBlur(WIN_W / scales[i], WIN_H / scales[i]);
+
+//            // Enable alpha blending and render the texture to the screen
+//            renderFluid();
+//        }
+
+
+//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+//        // Render the points with the point shader
+//        m_shaderPrograms["point"]->bind();
+//        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
+//        glPushMatrix();
+//        glTranslatef(0.f,1.25f,0.f);
+//        renderFluid();
+//        glPopMatrix();
+//        m_shaderPrograms["point"]->release();
 
 
         glPopMatrix();
@@ -356,7 +372,7 @@ void GLWidget::renderScene()
 void GLWidget::renderSkybox()
 {
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);;
+    glDisable(GL_CULL_FACE);
     glDisable(GL_LIGHTING); //so the map will be uniformly bright
     //I should just be able to ask the camera it's position but that doesn't seem to work, so this
     Vector3 dir(-Vector3::fromAngles(m_camera.m_theta, m_camera.m_phi));
@@ -376,7 +392,8 @@ void GLWidget::renderSkybox()
     glBindTexture(GL_TEXTURE_CUBE_MAP,0);
     glDisable(GL_TEXTURE_CUBE_MAP);
     glEnable(GL_LIGHTING);
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+//    glDisable(GL_DEPTH_TEST);
 }
 
 /**
