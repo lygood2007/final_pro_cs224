@@ -31,7 +31,7 @@ using std::endl;
 
 extern "C"
 {
-void initGridGPU( const int hostGridSize, const float hostdx, const float halfdm, const float* hostTerrainMap );
+void initGridGPU( const int hostGridSize, const int hostGridPaintSize, const float hostdx, const float halfdm, const float* hostTerrainMap );
 void copybackGPU(FieldType type, float* hostMap  );
 void destroyGPUmem();
 void addDropGPU(const int posX, const int posZ, const int radius, const float h );
@@ -86,7 +86,7 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_gammaField );
     safeFreeArray1D( m_phiField );
     safeFreeArray1D( m_psiField );
-    safeFreeArray1D( m_normalField );
+    safeFreeArray1D( m_paintNormalField );
     safeFreeArray1D( m_heightField );
     safeFreeArray1D( m_depthField );
 
@@ -147,7 +147,7 @@ void FluidGPU::update(const float dt)
     clampFields();
     copybackGPU(HEIGHT,m_heightField);
     copybackGPU( PAINT, (float*) m_paintField );
-    copybackGPU(NORMAL,(float*)m_normalField);
+    copybackGPU(NORMAL,(float*)m_paintNormalField);
 
 #ifdef USE_PARTICLES
     //updateParticles();
@@ -251,11 +251,11 @@ void FluidGPU::backupHeight( Terrain* t )
     }
     initBuffer();
     float halfDomain = m_domainSize/2.f;
-    initGridGPU( m_gridSize, m_dx, halfDomain, m_terrainHeightField );
+    initGridGPU( m_gridSize, m_gridPaintSize, m_dx, halfDomain, m_terrainHeightField );
     copybackGPU(PAINT,(float*)m_paintField);
   //  copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
-    copybackGPU(NORMAL, (float*)m_normalField );
+    copybackGPU(NORMAL, (float*)m_paintNormalField );
     std::cout<<"Finshed backup"<<std::endl;
 
     //initialize dampening maps
@@ -283,6 +283,12 @@ void FluidGPU::backupHeight( Terrain* t )
 void FluidGPU::init(const int gridSize, const float domainSize)
 {
     m_gridSize = gridSize;
+#ifdef RENDER_VOLUME
+    m_gridPaintSize = gridSize + 2;
+#else
+    m_gridPaintSize = gridSize;
+#endif
+
     m_uWidth = m_gridSize + 1;
     m_domainSize = domainSize;
     m_dx = m_domainSize/(float)m_gridSize;
@@ -305,7 +311,10 @@ void FluidGPU::init(const int gridSize, const float domainSize)
     m_phiField = (float*)malloc(size);
     m_psiField = (float*)malloc(size);
     m_heightField = (float*)malloc(size);
-    m_paintField = (Vector3* )malloc(size);
+
+    int paintSize = (m_gridPaintSize)*(m_gridPaintSize)*sizeof(Vector3);
+    m_paintField = (Vector3*)malloc(paintSize);
+
     for( int i = 0; i < m_gridSize*m_gridSize; i++ )
     {
         m_depthField[i] = 0.f;
@@ -325,12 +334,12 @@ void FluidGPU::init(const int gridSize, const float domainSize)
         m_velocityU[i] = 0.f;
         m_velocityW[i] = 0.f;
     }
-    size = m_gridSize*m_gridSize*sizeof(Vector3);
-    m_normalField = (Vector3*)malloc(size);
-    for( int i = 0; i < m_gridSize*m_gridSize; i++ )
+
+    m_paintNormalField = (Vector3*)malloc(paintSize);
+    for( int i = 0; i < m_gridPaintSize*m_gridPaintSize; i++ )
     {
         // Initial value for normals
-        m_normalField[i] = Vector3(1,1,0);
+        m_paintNormalField[i] = Vector3(0,1,0);
     }
 
     int sizeIndex = (m_gridSize+1)*(m_gridSize-1)*2;
@@ -376,16 +385,21 @@ void FluidGPU::init(const int gridSize, const float domainSize)
 void FluidGPU::initBuffer()
 {
     assert( m_paintField != NULL );
-    int terrainSize = m_gridSize*m_gridSize;
+    int terrainSize;
+
+    terrainSize = (m_gridPaintSize)*(m_gridPaintSize);
+
     glGenBuffers(1,&m_vertexBuffer );
     glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
-    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_paintField, GL_STATIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_paintNormalField, GL_STATIC_DRAW );
 
     glGenBuffers( 1, &m_normalBuffer );
     glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
-    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_normalField, GL_STATIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_paintNormalField, GL_STATIC_DRAW );
 
-    int indexSize = (m_gridSize+1)*(m_gridSize-1)*2;
+    int indexSize;
+    indexSize = (m_gridPaintSize+1)*(m_gridPaintSize-1)*2;
+
     glGenBuffers(1,&m_indexBuffer );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
     glBufferData( GL_ELEMENT_ARRAY_BUFFER, indexSize*sizeof(GLuint), m_indices, GL_STATIC_DRAW );
@@ -398,20 +412,20 @@ void FluidGPU::initIndices()
 {
     assert(m_indices != NULL );
     int index = 0;
-    for( int z = 0; z < m_gridSize-1; z++ )
+    for( int z = 0; z < m_gridPaintSize-1; z++ )
     {
         int x;
-        for( x =  0; x < m_gridSize; x++ )
+        for( x =  0; x < m_gridPaintSize; x++ )
         {
 
-            m_indices[index] = x + z*m_gridSize;
+            m_indices[index] = x + z*m_gridPaintSize;
             index++;
-            m_indices[index] = x + (z+1)*m_gridSize;
+            m_indices[index] = x + (z+1)*m_gridPaintSize;
             index++;
         }
-        m_indices[index] = x-1 + (z+1)*m_gridSize;
+        m_indices[index] = x-1 + (z+1)*m_gridPaintSize;
         index++;
-        m_indices[index] = 0 + (z+1)*m_gridSize;
+        m_indices[index] = 0 + (z+1)*m_gridPaintSize;
         index++;
     }
 }
@@ -492,107 +506,91 @@ void FluidGPU::drawFluid( DrawMethod method ) const
 {
     if( method == DRAW_POINTS )
     {
-        glPushMatrix();
+        // Not applicable
+        /*glPushMatrix();
         glBegin(GL_POINTS);
         glColor4f( m_color.r,m_color.g, m_color.b, m_color.a );
-        for( int i = 0; i < m_gridSize; i++ )
+        for( int i = 0; i < m_gridPaintSize; i++ )
         {
-            for( int j =0; j < m_gridSize; j++ )
+            for( int j =0; j < m_gridPaintSize; j++ )
             {
-                float posX = -m_domainSize+ j;
-                float posZ = -m_domainSize + i;
-                glVertex3f(posX, m_heightField[getIndex1D(i,j,HEIGHT)],posZ);
+                glVertex3fv(m_paintField[getIndex1D(i,j,PAINT)].xyz);
             }
         }
         glPopMatrix();
-        glEnd();
+        glEnd();*/
     }
     else if ( method == DRAW_MESH_STRIP )
     {
         // This mode doesn't deal with the invisible triangles
-        //        glEnable(GL_BLEND);
-        //        glBlendFunc(GL_ONE,GL_ONE);
-        float halfDomain = m_domainSize/2;
-
-
-        for( int i = 0; i < m_gridSize-1; i++ )
+        for( int i = 0; i < m_gridPaintSize-1; i++ )
         {
-
             glBegin( GL_TRIANGLE_STRIP );
             glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-            for( int j = 0; j < m_gridSize; j++ )
+            for( int j = 0; j < m_gridPaintSize; j++ )
             {
-                int index = i*m_gridSize + j;
-                glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
-                float d1 = m_depthField[index];
-                if( d1 < 0.01 )
-                    glVertex3f(  -halfDomain+j*m_dx, m_heightField[index]-0.01, -halfDomain+i*m_dx );
-                else
-                    glVertex3f(  -halfDomain+j*m_dx, m_heightField[index], -halfDomain+i*m_dx );
-                index = (i+1)*m_gridSize + j;
-                glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
-                float d2 = m_depthField[index];
-                if( d2 < 0.01 )
-                    glVertex3f(  -halfDomain +j*m_dx, m_heightField[index] -0.01, -halfDomain +(i+1)*m_dx );
-                else
-                    glVertex3f(  -halfDomain +j*m_dx, m_heightField[index] , -halfDomain +(i+1)*m_dx );
+                int index = i*m_gridPaintSize + j;
+                glNormal3fv( m_paintNormalField[index].xyz);
+                glVertex3fv( m_paintField[index].xyz);
+                index = (i+1)*m_gridPaintSize + j;
+                glNormal3fv( m_paintNormalField[index].xyz );
+                glVertex3fv( m_paintField[index].xyz);
             }
             glEnd();
         }
     }
     else if( method == DRAW_MESH )
     {
-        float halfDomain = m_domainSize/2;
-        // Else we use triangles mode to draw(This will hide the invisible triangles)
-        glBegin( GL_TRIANGLES );
-        glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-        for( int i = 0;  i < m_triangles.size(); i++ )
-        {
-            Tri curTri  = m_triangles[i];
-            int r[3]; int c[3];
-            r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
-            r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
-            r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-            // Firstly check if the triangle is visible
-            /*              int count = 0;
+        // Currently disabled
+//        float halfDomain = m_domainSize/2;
+//        // Else we use triangles mode to draw(This will hide the invisible triangles)
+//        glBegin( GL_TRIANGLES );
+//        glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+//        for( int i = 0;  i < m_triangles.size(); i++ )
+//        {
+//            Tri curTri  = m_triangles[i];
+//            int r[3]; int c[3];
+//            r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
+//            r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
+//            r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
+//            // Firstly check if the triangle is visible
+//            /*              int count = 0;
 
-                for( int m = 0; m < 3; m++ )
-                {
-                    if( m_depthField[getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
-                        count++;
-                }
-                if( count == 0 )
-                    continue;
-*/
-            float tx, ty, tz;
-            for( int m = 0; m < 3; m++ )
-            {
-                //if( m_depthField[getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
-                glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-                /*else
-                        glColor4f(0.f,0.f,0.f, m_color.a );
-                    */
-                int index = r[m]*m_gridSize + c[m];
-                tx = -halfDomain + c[m]*m_dx;
-                ty = m_heightField[index];
-                if( m_depthField[index] < 0.5 )
-                    ty = ty - 0.5;
-                tz = - halfDomain + r[m]*m_dx;
-                glNormal3f( m_normalField[index].x, m_normalField[index].y, m_normalField[index].z );
-                glVertex3f( tx, ty, tz );
-            }
-        }
-        glEnd();
+//                for( int m = 0; m < 3; m++ )
+//                {
+//                    if( m_depthField[getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
+//                        count++;
+//                }
+//                if( count == 0 )
+//                    continue;
+//*/
+//            float tx, ty, tz;
+//            for( int m = 0; m < 3; m++ )
+//            {
+//                //if( m_depthField[getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
+//                glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+//                /*else
+//                        glColor4f(0.f,0.f,0.f, m_color.a );
+//                    */
+//                int index = r[m]*m_gridPaintSize + c[m];
+//                tx = -halfDomain + c[m]*m_dx;
+//                ty = m_heightField[index];
+//                if( m_depthField[index] < 0.5 )
+//                    ty = ty - 0.5;
+//                tz = - halfDomain + r[m]*m_dx;
+//                glNormal3f( m_paintNormalField[index].x, m_paintNormalField[index].y, m_paintNormalField[index].z );
+//                glVertex3f( tx, ty, tz );
+//            }
+//        }
+//        glEnd();
     }
     else if( method = DRAW_MESH_VBO )
     {
         glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
         Vector3* vertBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
-        /*if(!glUnmapBuffer(GL_ARRAY_BUFFER))
-        {
-            assert(0);
-        }*/
-        memcpy( vertBuffer, m_paintField, sizeof(Vector3)*m_gridSize*m_gridSize);
+
+        memcpy( vertBuffer, m_paintField, sizeof(Vector3)*(m_gridPaintSize)*(m_gridPaintSize));
+
         glUnmapBuffer(GL_ARRAY_BUFFER);
 
          glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
@@ -601,12 +599,7 @@ void FluidGPU::drawFluid( DrawMethod method ) const
 
         glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
         Vector3* normBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
-        /*if( !glUnmapBuffer(GL_ARRAY_BUFFER) )
-        {
-            assert(0);
-        }*/
-        memcpy( normBuffer, m_normalField, sizeof(Vector3)*m_gridSize*m_gridSize);
-        Vector3 a = normBuffer[5];
+        memcpy( normBuffer, m_paintNormalField, sizeof(Vector3)*(m_gridPaintSize)*(m_gridPaintSize));
         glUnmapBuffer(GL_ARRAY_BUFFER);
 
         glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
@@ -615,8 +608,10 @@ void FluidGPU::drawFluid( DrawMethod method ) const
 
         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
 
-        int indexSize = (m_gridSize + 1)*(m_gridSize- 1)*2;
+        int indexSize;
+        indexSize = (m_gridPaintSize + 1)*(m_gridPaintSize- 1)*2;
         glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+
         glDrawElements( GL_TRIANGLE_STRIP, indexSize, GL_UNSIGNED_INT, 0 );
 
         glDisableClientState( GL_NORMAL_ARRAY );
@@ -638,19 +633,15 @@ void FluidGPU::drawNormal() const
     if (m_renderNormals)
     {
         glColor3f(1,1,1);
-
-        const float halfDomain = m_domainSize/2;
         const int magn = 2;
-        for (int row = 0; row < m_gridSize; row++)
+        for (int row = 0; row < m_gridPaintSize; row++)
         {
-            for (int column = 0; column < m_gridSize; column++)
+            for (int column = 0; column <  m_gridPaintSize; column++)
             {
                 glBegin(GL_LINES);
 
-                Vector3 curVert = Vector3(-halfDomain+ column*m_dx,
-                                          m_heightField[getIndex1D(row,column,HEIGHT)],
-                                          -halfDomain +row*m_dx);
-                Vector3 curNorm = m_normalField[getIndex1D(row,column,NORMAL)];
+                Vector3 curVert = m_paintField[getIndex1D(row,column,PAINT)];
+                Vector3 curNorm = m_paintNormalField[getIndex1D(row,column,NORMAL)];
 
                 glNormal3f(curNorm.x,curNorm.y,curNorm.z);
                 glVertex3f(curVert.x, curVert.y, curVert.z);
@@ -753,8 +744,11 @@ int FluidGPU::getIndex1D( int i, int j, FieldType type) const
 {
     switch( type )
     {
-    case HEIGHT:
+    case PAINT:
     case NORMAL:
+        return i*m_gridPaintSize + j;
+        break;
+    case HEIGHT:
     case TERRAINH:
     case VEL_W:
     case DEPTH:

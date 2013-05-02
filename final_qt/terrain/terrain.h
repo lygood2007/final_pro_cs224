@@ -49,10 +49,25 @@ public:
     void draw() const;
 
     /**
+     * Render the bottom
+     */
+    void drawBottom() const;
+
+    /**
      * Generate the terrain.
      */
     void generate();
 
+    /**
+     * @brief generatePaintData generate the necessary data for drawing
+     */
+    void generatePaintData();
+
+    /**
+     *@brief Compute the painted vertices (The size of it should be larger than m_vertices.
+     *  The easiest way is to add two more rows and cols)
+     */
+    void computePaintVertices();
     /**
      * Generate the UV
      */
@@ -108,12 +123,16 @@ protected:
      * Returns -1 if the grid coordinate entered is not valid.
      */
    inline int getIndex(const GridIndex &c) const;
+
+   inline int getIndex(const GridIndex &c, const int gridSize ) const;
    /**
      * Converts a grid coordinate (row, column) to an index into a 1-dimensional array.
      * Can be used to index into m_terrain or m_normalMap.
      * Returns -1 if the grid coordinate entered is not valid.
      */
    inline int getIndex(const int row, const int column) const;
+
+   inline int getIndex(const int row, const int column, const int gridWidth ) const;
 
    /**
     * Retrieves the position of each neighbor of the given grid coordinate (i.e. all grid
@@ -122,7 +141,7 @@ protected:
     *
     * @param coordinate The grid coordinate whose neighbors are to be retrieved
     */
-   QList<Vector3*> getSurroundingVertices(const GridIndex &coordinate) const;
+   QList<Vector3*> getSurroundingVertices(const GridIndex &coordinate, const int gridSize ) const;
 
    /**
     * Populate the terrain, need to be implemented in children classes
@@ -140,8 +159,9 @@ protected:
 
 protected:
     Vector3* m_vertices; // The vertices
-    Vector3* m_normals; // The normals
-    Vector2* m_uvs; // The uvs
+    Vector3* m_verticesForPaint; // This is the actual vertices for drawing, the size is large than m_vertices
+    Vector3* m_normalsForPaint; // The normals
+    Vector2* m_uvsForPaint; // The uvs
     GLuint* m_indices; // The indices
 
     int m_depth; // The number of recursion levels to use to generate terrain. Can be used as a level-of-detail parameter.
