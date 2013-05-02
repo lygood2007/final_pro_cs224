@@ -325,7 +325,7 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
      if( Y+1 <= height - 1 && X + 1 <= width - 1)
      {
       //   e4 = vec[(Y+1)*width + X+1];
-         e4 = map2Dread( vec, Y+1,x+1,width );
+         e4 = map2Dread( vec, Y+1,X+1,width );
      }
 
      float result = s0*(t0*e1 + t1*e2 )+
@@ -1183,6 +1183,7 @@ void updateFluidGPU( const float dt )
      */
     cudaMemcpy( deviceVelocityWMap, deviceNextVelocityWMap, wwidth*wheight*sizeof(float),cudaMemcpyDeviceToDevice );
 
+
     /**
      * Update the depth
      */
@@ -1199,6 +1200,21 @@ void updateFluidGPU( const float dt )
      */
     updateHeightCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceHeightMap,
                                                          deviceDepthMap, deviceTerrainMap, gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    /**
+     * Apply the boundary
+     */
+    blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    applyBoundaryCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap, deviceHeightMap, deviceTerrainMap, gridSize,gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    overshootingReduction<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
+                                                              deviceNextDepthMap, deviceHeightMap, mapdx, gridSize, gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
@@ -1225,13 +1241,13 @@ void updateFluidGPU( const float dt )
     /**
      * Apply the boundary
      */
-/*    blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
     blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
     blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
     applyBoundaryCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap, deviceHeightMap, deviceTerrainMap, gridSize,gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
-*/
+
     overshootingReduction<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
                                                               deviceNextDepthMap, deviceHeightMap, mapdx, gridSize, gridSize );
     error = cudaDeviceSynchronize();

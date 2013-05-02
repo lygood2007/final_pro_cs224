@@ -22,7 +22,7 @@
 #define WIN_H 1200.0
 
 // Flag for testing
-#define DRAW_TERRAIN
+//#define DRAW_TERRAIN
 
 //#define USE_HEIGHTMAP
 
@@ -32,7 +32,6 @@
 
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
 #define TIME_STEP 0.01
-
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/

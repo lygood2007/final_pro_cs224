@@ -81,7 +81,7 @@ void GLWidget::init()
 
     // Start a timer that will try to get 100 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
-    m_timer.start(1000 / 100);
+    m_timer.start(1000 / 60);
 
     m_mouseLeftDown = false;
     m_mouseRightDown = false;
