@@ -67,9 +67,11 @@ FluidGPU::FluidGPU(const int gridSize, const float domainSize)
     init( gridSize, domainSize );
 }
 
-FluidGPU::FluidGPU( Terrain *t )
+FluidGPU::FluidGPU(Terrain *t , GLWidget *glw)
 {
+    m_glw = glw;
     init( t->getGridLength(), 2*t->getBound() );
+
 }
 
 FluidGPU::~FluidGPU()
@@ -89,8 +91,11 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_depthField );
 
 #ifdef USE_PARTICLES_2
-    safeFreeArray1D( m_particle_positions );
-    safeFreeArray1D( m_particle_velocities );
+    if(m_glw->m_useParticles)
+    {
+        safeFreeArray1D( m_particle_positions );
+        safeFreeArray1D( m_particle_velocities );
+    }
 #endif
 
     destroyGPUmem();
@@ -118,7 +123,7 @@ void FluidGPU::draw() const
 #endif
 
 #ifdef USE_PARTICLES_2
-    drawParticles2();
+    if(m_glw->m_useParticles) drawParticles2();
 #endif
     if( m_renderNormals )
         drawNormal();
@@ -150,17 +155,20 @@ void FluidGPU::update(const float dt)
 #endif
 
 #ifdef USE_PARTICLES_2
-    float Veff = C_DEPOSIT * (4 / 3) * M_PI *
-            SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
-    float heightChange = Veff * m_dxInv * m_dxInv;
-    float halfDomain = m_domainSize / 2.0;
+    if(m_glw->m_useParticles)
+    {
+        float Veff = C_DEPOSIT * (4 / 3) * M_PI *
+                SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+        float heightChange = Veff * m_dxInv * m_dxInv;
+        float halfDomain = m_domainSize / 2.0;
 
-    updateParticlesGPU( dt, m_particle_acceleration.x, m_particle_acceleration.y, m_particle_acceleration.z);
-    intersectParticlesGPU( halfDomain, m_dxInv, heightChange );
-    copybackGPU(DEPTH, m_depthField);
-    copybackGPU(HEIGHT, m_heightField);
-    copybackGPU(PARTICLE_POSITIONS, (float*) m_particle_positions);
-    copybackGPU(PARTICLE_VELOCITIES, (float*) m_particle_velocities);
+        updateParticlesGPU( dt, m_particle_acceleration.x, m_particle_acceleration.y, m_particle_acceleration.z);
+        intersectParticlesGPU( halfDomain, m_dxInv, heightChange );
+        copybackGPU(DEPTH, m_depthField);
+        copybackGPU(HEIGHT, m_heightField);
+        copybackGPU(PARTICLE_POSITIONS, (float*) m_particle_positions);
+        copybackGPU(PARTICLE_VELOCITIES, (float*) m_particle_velocities);
+    }
 #endif
 
 #ifdef DAMPEN_WAVES
@@ -260,8 +268,11 @@ void FluidGPU::backupHeight( Terrain* t )
     //initialize particles
     initParticlesGPU(TOTAL_NUM_PARTICLES);
 #ifdef USE_PARTICLES_2
-    copybackGPU(PARTICLE_POSITIONS, (float*)m_particle_positions );
-    copybackGPU(PARTICLE_VELOCITIES, (float*)m_particle_velocities );
+    if(m_glw->m_useParticles)
+    {
+        copybackGPU(PARTICLE_POSITIONS, (float*)m_particle_positions );
+        copybackGPU(PARTICLE_VELOCITIES, (float*)m_particle_velocities );
+    }
 #endif
 }
 
@@ -354,14 +365,17 @@ void FluidGPU::init(const int gridSize, const float domainSize)
 #endif
 
 #ifdef USE_PARTICLES_2
-    int particlesSize = sizeof(Vector3) * TOTAL_NUM_PARTICLES;
-    m_particle_positions = (Vector3*) malloc(particlesSize);
-    m_particle_velocities = (Vector3*) malloc(particlesSize);
-    for(int i = 0; i < TOTAL_NUM_PARTICLES; i++){
-        m_particle_positions[i] = Vector3(0, -1, 0);
-        m_particle_velocities[i] = Vector3::zero();
+    if(m_glw->m_useParticles)
+    {
+        int particlesSize = sizeof(Vector3) * TOTAL_NUM_PARTICLES;
+        m_particle_positions = (Vector3*) malloc(particlesSize);
+        m_particle_velocities = (Vector3*) malloc(particlesSize);
+        for(int i = 0; i < TOTAL_NUM_PARTICLES; i++){
+            m_particle_positions[i] = Vector3(0, -1, 0);
+            m_particle_velocities[i] = Vector3::zero();
+        }
+        m_particle_acceleration = Vector3(0, GRAVITY, 0);
     }
-    m_particle_acceleration = Vector3(0, GRAVITY, 0);
 #endif
 }
 
@@ -922,8 +936,8 @@ void FluidGPU::fluidParticleUpdate(QVector<Vector3> values){
 void FluidGPU::drawParticles() const{
     //begin
     //glBegin(GL_QUADS);
-//    glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-//    glPointSize(20);
+    glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+    glPointSize(20);
     glBegin(GL_POINTS);
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
@@ -970,37 +984,40 @@ void FluidGPU::addDroppingParticles(const int posX, const int posZ){
 #endif
 
 #ifdef USE_PARTICLES_2
-    int currIndex = 0;
-    for(int i = 0; i < NUM_DROPPING_PARTICLES; i++){
-        if(currIndex >= TOTAL_NUM_PARTICLES){
-            break;
-        }
-
-        //jitter particle positions
-        float randX = randomFloatGenerator(-radius, radius);
-        float randY = randomFloatGenerator(0, PARTICLE_DROP_RANGE);
-        float randZ = randomFloatGenerator(-radius, radius);
-
-        Vector3 position = Vector3(coordX + randX, PARTICLE_DROP_HEIGHT + randY, coordY + randZ);
-        Vector3 velocity = Vector3::zero();
-
-        //find new inactive particle
-        bool added = false;
-        while(currIndex < TOTAL_NUM_PARTICLES && !added){
-            if(m_particle_positions[currIndex].y < 0){
-                //set new particle as active
-                m_particle_positions[currIndex] = position;
-                m_particle_velocities[currIndex] = velocity;
-
-                added = true;
+    if(m_glw->m_useParticles)
+    {
+        int currIndex = 0;
+        for(int i = 0; i < NUM_DROPPING_PARTICLES; i++){
+            if(currIndex >= TOTAL_NUM_PARTICLES){
                 break;
             }
 
-            currIndex++;
-        }
-    }
+            //jitter particle positions
+            float randX = randomFloatGenerator(-radius, radius);
+            float randY = randomFloatGenerator(0, PARTICLE_DROP_RANGE);
+            float randZ = randomFloatGenerator(-radius, radius);
 
-    inputParticlesGPU((float*)m_particle_positions, (float*)m_particle_velocities);
+            Vector3 position = Vector3(coordX + randX, PARTICLE_DROP_HEIGHT + randY, coordY + randZ);
+            Vector3 velocity = Vector3::zero();
+
+            //find new inactive particle
+            bool added = false;
+            while(currIndex < TOTAL_NUM_PARTICLES && !added){
+                if(m_particle_positions[currIndex].y < 0){
+                    //set new particle as active
+                    m_particle_positions[currIndex] = position;
+                    m_particle_velocities[currIndex] = velocity;
+
+                    added = true;
+                    break;
+                }
+
+                currIndex++;
+            }
+        }
+
+        inputParticlesGPU((float*)m_particle_positions, (float*)m_particle_velocities);
+    }
 #endif
 }
 
@@ -1034,24 +1051,27 @@ void FluidGPU::updateParticleSources(){
 
 void FluidGPU::drawParticles2() const{
 #ifdef USE_PARTICLES_2
-    //begin
-    glBegin(GL_POINTS);
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE,GL_ONE);
+    if(m_glw->m_useParticles)
+    {
+        //begin
+        glBegin(GL_POINTS);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE,GL_ONE);
 
-    //iterate through each position and draw a point
-    for(int i = 0; i < TOTAL_NUM_PARTICLES; i++){
-        Vector3 position = m_particle_positions[i];
-        if(position.y >= 0){
-            glColor4f(m_color.r, m_color.g, m_color.b, m_color.a);
-            glVertex3f(position.x, position.y, position.z);
+        //iterate through each position and draw a point
+        for(int i = 0; i < TOTAL_NUM_PARTICLES; i++){
+            Vector3 position = m_particle_positions[i];
+            if(position.y >= 0){
+                glColor4f(m_color.r, m_color.g, m_color.b, m_color.a);
+                glVertex3f(position.x, position.y, position.z);
+            }
         }
-    }
 
-    //end
-    glDisable(GL_BLEND);
-    glDisable(GL_CULL_FACE);
-    glEnd();
+        //end
+        glDisable(GL_BLEND);
+        glDisable(GL_CULL_FACE);
+        glEnd();
+    }
 #endif
 }

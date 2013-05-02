@@ -104,7 +104,7 @@ void GLWidget::init()
 
 #ifdef RENDER_FLUID
 #ifdef USE_GPU_FLUID
-        m_fluid = new FluidGPU(m_terrain); //might alter this to pass a pointer to the glWidget so I can use the bool values
+        m_fluid = new FluidGPU(m_terrain, this); //I also passed a pointer to glwidget so can control things easier via bool's
 #else
      m_fluid =  new FluidCPU(m_terrain);
 #endif
@@ -216,6 +216,7 @@ void GLWidget::paintGL()
 
         // use the brightpass shader to render bright area only to fbo_2 for bloom effects
         m_framebufferObjects["fbo_2"]->bind();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_shaderPrograms["brightpass"]->bind();
         glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
         renderTexturedQuad(width, height);
@@ -323,15 +324,15 @@ void GLWidget::renderScene()
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
 
-//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-//        // Render the points with the point shader
-//        m_shaderPrograms["point"]->bind();
-//        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
-//        glPushMatrix();
-//        glTranslatef(0.f,1.25f,0.f);
-//        renderFluid();
-//        glPopMatrix();
-//        m_shaderPrograms["point"]->release();
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        // Render the points with the point shader
+        m_shaderPrograms["point"]->bind();
+        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["point"]->release();
 
 
         glPopMatrix();
@@ -779,12 +780,19 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         {
             glPolygonMode(GL_FRONT, GL_LINE);
             m_drawFrame = true;
+            m_useFBO = false; //cannot draw wireframes if FBO is on
+
         }
         else
         {
             glPolygonMode(GL_FRONT,GL_FILL);
             m_drawFrame = false;
+            m_useFBO = true;
         }
+        //update and repaint everything
+        updateCamera();
+        m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
+        paintGL();
         break;
         }
     case Qt::Key_N:
@@ -799,8 +807,7 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
 #ifdef RENDER_FLUID
         if( m_fluid->isRenderingNormal() )
-        {
-            m_fluid->disableNormal();
+        {            m_fluid->disableNormal();
         }
         else
         {
@@ -832,6 +839,10 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_F:
     {
         m_useFBO = !m_useFBO;
+        //update and repaint everything
+        updateCamera();
+        m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
+        paintGL();
         break;
     }
     case Qt::Key_X:
