@@ -30,8 +30,13 @@
 //#define USE_FBO
 //#define USE_SKYBOX
 
+// Colors to use when rendering
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
-#define TIME_STEP 0.02
+#define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
+#define SPLASH_COLOR 1.0f,0.f,1.0f,0.9f
+#define FOAM_COLOR 1.0f,1.0f,0.0f,0.9f
+
+#define TIME_STEP 0.015
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/
@@ -103,12 +108,15 @@ public:
     /** Copied from CS123 Bloom lab - these really aren't the best and could be improved*/
     void applyOrthogonalCamera(float width, float height);
     void applyPerspectiveCamera(float width, float height);
+
+    /** Placing all visible geometry rendering in one method*/
     void renderScene();
+
+    /** The splitting these out to improve rendering and shader passes*/
     void renderTexturedQuad(int width, int height);
     void renderSkybox();
-
-    /** Placeing all visible geometry rendering in one method*/
     void renderFluid();
+    void renderParticles();
 
     /** Updates the current OpenGL state to avoid object distortion when the window is resized. */
     void resizeGL(int w, int h);

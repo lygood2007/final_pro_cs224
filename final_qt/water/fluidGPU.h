@@ -33,6 +33,9 @@ public:
     ~FluidGPU();
     void draw() const; //the name says it all - draw some fluid
 
+    void drawParticles2() const; //moved to public for rendering reasons
+
+
     /**
      * Update the simulation at each time step
     **/
@@ -207,8 +210,6 @@ public:
      * @brief generate new particles for this timestep from the sources
      */
     void updateParticleSources();
-
-    void drawParticles2() const;
 
 private:
 

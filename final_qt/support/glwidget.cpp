@@ -353,16 +353,21 @@ void GLWidget::renderScene()
 
         glPopMatrix();
 
+        renderParticles();
+
+
         }
         else //plain old fluid, nothing special
         {
             renderFluid();
+            renderParticles();
         }
 
     }
    else //plain old fluid, nothing special
    {
        renderFluid();
+       renderParticles();
    }
 }
 
@@ -397,7 +402,7 @@ void GLWidget::renderSkybox()
 }
 
 /**
-  Renders the visible geometry, terrain and fluid only at this point
+  Renders the fluid only
 **/
 void GLWidget::renderFluid()
 {
@@ -414,6 +419,24 @@ void GLWidget::renderFluid()
 #endif
 
 }
+
+/**
+    Render just the particles
+**/
+void GLWidget::renderParticles()
+{
+    if(m_useParticles)
+    {
+        //I think ultimately we want to set the colors in drawparticles2 for the best results
+        glColor4f(SPRAY_COLOR);
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_DEPTH_TEST );
+        m_fluid->drawParticles2();
+        glDisable(GL_DEPTH_TEST );
+    }
+}
+
 
 
 /**
