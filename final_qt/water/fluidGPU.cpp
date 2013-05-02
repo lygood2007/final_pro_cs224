@@ -928,9 +928,9 @@ void FluidGPU::fluidParticleUpdate(QVector<Vector3> values){
 void FluidGPU::drawParticles() const{
     //begin
     //glBegin(GL_QUADS);
+//    glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+//    glPointSize(20);
     glBegin(GL_POINTS);
-    //glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-    //glPointSize(20);
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE,GL_ONE);

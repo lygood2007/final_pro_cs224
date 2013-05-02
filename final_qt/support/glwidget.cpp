@@ -68,7 +68,7 @@ void GLWidget::init()
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
     //use everything
-    m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = true;
+    m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     //except these
     m_useAxis = false;
 
@@ -104,7 +104,7 @@ void GLWidget::init()
 
 #ifdef RENDER_FLUID
 #ifdef USE_GPU_FLUID
-        m_fluid = new FluidGPU(m_terrain);
+        m_fluid = new FluidGPU(m_terrain); //might alter this to pass a pointer to the glWidget so I can use the bool values
 #else
      m_fluid =  new FluidCPU(m_terrain);
 #endif
@@ -258,8 +258,6 @@ void GLWidget::paintGL()
 **/
 void GLWidget::renderScene()
 {
-
-
     if(m_useSkybox) renderSkybox();//@NOTE - This must go first!!
 
 #ifdef DRAW_TERRAIN
@@ -289,7 +287,7 @@ void GLWidget::renderScene()
 
         //this is entirely awful but needed
         //this takes the correct rotation matrix from the camera and applies it to the
-        //cube map so the shader works correctly
+        //cube map so the fresnel shader works correctly
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
@@ -323,6 +321,17 @@ void GLWidget::renderScene()
 
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
+
+//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+//        // Render the points with the point shader
+//        m_shaderPrograms["point"]->bind();
+//        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
+//        glPushMatrix();
+//        glTranslatef(0.f,1.25f,0.f);
+//        renderFluid();
+//        glPopMatrix();
+//        m_shaderPrograms["point"]->release();
+
 
         glPopMatrix();
 
@@ -540,6 +549,7 @@ void GLWidget::createShaderPrograms()
     m_shaderPrograms["fresnel"] = ResourceLoader::newShaderProgram(ctx, "shaders/f2.vert", "shaders/f2.frag");
     m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
     m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
+    m_shaderPrograms["point"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/point.frag");
 }
 
 /**
@@ -827,6 +837,11 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         loadCubeMap(); //need to reload the textures
         break;
     }
+    case Qt::Key_P:
+    {
+        m_useParticles = !m_useParticles;
+        break;
+    }
     }
 }
 
@@ -960,7 +975,7 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
         if(event->button() == Qt::LeftButton){
             m_fluid->addDrop( indexCol, indexRow );
         } else if(event->button() == Qt::MiddleButton){
-            //m_fluid->addDroppingParticles(indexCol, indexRow);
+            m_fluid->addDroppingParticles(indexCol, indexRow);
         }
     }
 }

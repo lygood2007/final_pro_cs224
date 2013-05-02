@@ -53,6 +53,9 @@ public:
     GLWidget(QWidget *parent);
     ~GLWidget();
 
+    //Not the best idea but I'm placing these here in case I need them elsewhere
+    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis, m_useSkybox, m_useParticles;
+
 private:
     // Private variables
     QTime m_time; // The time variable
@@ -84,9 +87,6 @@ private:
     float m_delta;
 
     float m_timeStep;
-
-    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis, m_useSkybox;
-
 
 
 public:
