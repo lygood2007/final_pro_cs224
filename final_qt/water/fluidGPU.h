@@ -29,7 +29,7 @@ public:
     FluidGPU();
     FluidGPU(const int gridSize, const float domainSize );
     // Initialize from terrain, we should use this
-    FluidGPU( Terrain* t );
+    FluidGPU( Terrain* t, GLWidget* glw );
     ~FluidGPU();
     void draw() const; //the name says it all - draw some fluid
 
@@ -214,6 +214,7 @@ private:
 
 // Variables
     int m_gridSize;
+    int m_gridPaintSize;
     int m_uWidth; // width for velocityU (m_gridSize+1)
 
     float m_domainSize;
@@ -229,8 +230,8 @@ private:
     /**
      * Design for gpu fluid. 2D vector is not suitable for cuda
      **/
-    Vector3* m_normalField; // Essential
-    Vector3* m_paintField; // Essential
+    Vector3* m_paintNormalField; // Essential
+    Vector3* m_paintField; // Essential (Old version, only the water surface)
     GLuint* m_indices; // Essential
     float* m_depthField; // Essential
     float* m_velocityU; // I preserve this for future use
@@ -265,6 +266,8 @@ private:
     Vector3 *m_particle_positions; // positions of particles, y = -1 is inactive
     Vector3 *m_particle_velocities; // velocities of particles
     Vector3 m_particle_acceleration; // acceleration of particles (same for all)
+
+    GLWidget* m_glw;
 };
 
 #endif // FLUIDGPU_H

@@ -18,8 +18,8 @@
 #include "resourceloader.h"
 
 // We fix the size
-#define WIN_W 1200.0
-#define WIN_H 1200.0
+#define WIN_W 1000.0
+#define WIN_H 700.0
 
 // Flag for testing
 #define DRAW_TERRAIN
@@ -31,8 +31,7 @@
 //#define USE_SKYBOX
 
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
-#define TIME_STEP 0.01
-
+#define TIME_STEP 0.02
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/
@@ -52,6 +51,9 @@ class GLWidget : public QGLWidget
 public:
     GLWidget(QWidget *parent);
     ~GLWidget();
+
+    //Not the best idea but I'm placing these here in case I need them elsewhere
+    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis, m_useSkybox, m_useParticles;
 
 private:
     // Private variables
@@ -84,9 +86,6 @@ private:
     float m_delta;
 
     float m_timeStep;
-
-    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis, m_useSkybox;
-
 
 
 public:

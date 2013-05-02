@@ -68,7 +68,7 @@ void GLWidget::init()
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
     //use everything
-    m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = true;
+    m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     //except these
     m_useAxis = false;
 
@@ -81,7 +81,7 @@ void GLWidget::init()
 
     // Start a timer that will try to get 100 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
-    m_timer.start(1000 / 100);
+    m_timer.start(1000 / 60);
 
     m_mouseLeftDown = false;
     m_mouseRightDown = false;
@@ -104,7 +104,7 @@ void GLWidget::init()
 
 #ifdef RENDER_FLUID
 #ifdef USE_GPU_FLUID
-        m_fluid = new FluidGPU(m_terrain);
+        m_fluid = new FluidGPU(m_terrain, this); //I also passed a pointer to glwidget so can control things easier via bool's
 #else
      m_fluid =  new FluidCPU(m_terrain);
 #endif
@@ -214,9 +214,9 @@ void GLWidget::paintGL()
         glDisable(GL_TEXTURE_2D);
         glEnable(GL_LIGHTING);
 
-
         // use the brightpass shader to render bright area only to fbo_2 for bloom effects
         m_framebufferObjects["fbo_2"]->bind();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_shaderPrograms["brightpass"]->bind();
         glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
         renderTexturedQuad(width, height);
@@ -234,7 +234,7 @@ void GLWidget::paintGL()
            // Bind the image from fbo to a texture
             glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    //        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
             // Enable alpha blending and render the texture to the screen
             glEnable(GL_BLEND);
@@ -259,14 +259,13 @@ void GLWidget::paintGL()
 **/
 void GLWidget::renderScene()
 {
-
-
     if(m_useSkybox) renderSkybox();//@NOTE - This must go first!!
-
 #ifdef DRAW_TERRAIN
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST );
   m_terrain->draw();
+  glDisable(GL_DEPTH_TEST);
 #endif
-
    if(m_useAxis) // make true to draw some axis'
    {
        static GLUquadric * quad = gluNewQuadric();
@@ -286,9 +285,11 @@ void GLWidget::renderScene()
 
    if(m_useSkybox)
    {
+       if(m_useShaders){
+
         //this is entirely awful but needed
         //this takes the correct rotation matrix from the camera and applies it to the
-        //cube map so the shader works correctly
+        //cube map so the fresnel shader works correctly
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
@@ -310,33 +311,43 @@ void GLWidget::renderScene()
         glPushMatrix();
         glLoadMatrixd(tempIT.data);
 
+        // Render the fluid with the fresnel shader bound for reflection and refraction
+        m_shaderPrograms["fresnel"]->bind();
+        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["fresnel"]->release();
 
-        if(m_useShaders){
-            // Render the fluid with the fresnel shader bound for reflection and refraction
-            m_shaderPrograms["fresnel"]->bind();
-            m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
-            m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
-            glPushMatrix();
-            glTranslatef(0.f,1.25f,0.f);
-            renderFluid();
-            glPopMatrix();
-            m_shaderPrograms["fresnel"]->release();
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+        glDisable(GL_TEXTURE_CUBE_MAP);
+
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        // Render the points with the point shader
+        m_shaderPrograms["point"]->bind();
+        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderFluid();
+        glPopMatrix();
+        m_shaderPrograms["point"]->release();
+
+
+        glPopMatrix();
+
         }
         else //plain old fluid, nothing special
         {
             renderFluid();
         }
 
-        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-        glDisable(GL_TEXTURE_CUBE_MAP);
-
-        glPopMatrix();
     }
    else //plain old fluid, nothing special
    {
        renderFluid();
    }
-
 }
 
 /**
@@ -380,7 +391,9 @@ void GLWidget::renderFluid()
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 #ifdef RENDER_FLUID
+    glEnable(GL_DEPTH_TEST );
     m_fluid->draw();
+    glDisable(GL_DEPTH_TEST );
 #endif
 
 }
@@ -539,6 +552,7 @@ void GLWidget::createShaderPrograms()
     m_shaderPrograms["fresnel"] = ResourceLoader::newShaderProgram(ctx, "shaders/f2.vert", "shaders/f2.frag");
     m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
     m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
+    m_shaderPrograms["point"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/point.frag");
 }
 
 /**
@@ -711,7 +725,8 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     else
     {
 #ifdef RENDER_FLUID
-         intersectFluid( event->x(), event->y(), event);
+        if( m_animate )
+          intersectFluid( event->x(), event->y(), event);
 #endif
         m_mouseLeftDown = true;
     }
@@ -765,12 +780,19 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         {
             glPolygonMode(GL_FRONT, GL_LINE);
             m_drawFrame = true;
+            m_useFBO = false; //cannot draw wireframes if FBO is on
+
         }
         else
         {
             glPolygonMode(GL_FRONT,GL_FILL);
             m_drawFrame = false;
+            m_useFBO = true;
         }
+        //update and repaint everything
+        updateCamera();
+        m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
+        paintGL();
         break;
         }
     case Qt::Key_N:
@@ -785,8 +807,7 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
 #ifdef RENDER_FLUID
         if( m_fluid->isRenderingNormal() )
-        {
-            m_fluid->disableNormal();
+        {            m_fluid->disableNormal();
         }
         else
         {
@@ -802,7 +823,6 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
     case Qt::Key_C:
     {
-//        m_useSimpleCube = !m_useSimpleCube;
         m_useSkybox = !m_useSkybox;
         break;
     }
@@ -814,6 +834,26 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_A:
     {
         m_useAxis = !m_useAxis;
+        break;
+    }
+    case Qt::Key_F:
+    {
+        m_useFBO = !m_useFBO;
+        //update and repaint everything
+        updateCamera();
+        m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
+        paintGL();
+        break;
+    }
+    case Qt::Key_X:
+    {
+        m_useSimpleCube = !m_useSimpleCube;
+        loadCubeMap(); //need to reload the textures
+        break;
+    }
+    case Qt::Key_P:
+    {
+        m_useParticles = !m_useParticles;
         break;
     }
     }

@@ -57,10 +57,10 @@ void RandomTerrain::subdivideSquare(GridIndex topleft, GridIndex botright, GLint
     GridIndex BR = GridIndex(botright.x, botright.y);
 
     // corner vertices on the terrain (in the grid space [x,y,z])
-    Vector3 &vTL = m_vertices[getIndex(TL)];
-    Vector3 &vTR = m_vertices[getIndex(TR)];
-    Vector3 &vBL = m_vertices[getIndex(BL)];
-    Vector3 &vBR = m_vertices[getIndex(BR)];
+    Vector3 &vTL = m_vertices[getIndex(TL,m_gridLength)];
+    Vector3 &vTR = m_vertices[getIndex(TR,m_gridLength)];
+    Vector3 &vBL = m_vertices[getIndex(BL,m_gridLength)];
+    Vector3 &vBR = m_vertices[getIndex(BR,m_gridLength)];
 
     if( curDepth  == 0 )
         return ;
@@ -72,11 +72,11 @@ void RandomTerrain::subdivideSquare(GridIndex topleft, GridIndex botright, GLint
     GridIndex MM = GridIndex( (topleft.x + botright.x )/2.0, (topleft.y + botright.y )/2.0 );
 
 
-    Vector3 &vML = m_vertices[getIndex(ML)];
-    Vector3 &vTM = m_vertices[getIndex(TM)];
-    Vector3 &vMR = m_vertices[getIndex(MR)];
-    Vector3 &vBM = m_vertices[getIndex(BM)];
-    Vector3 &vMM = m_vertices[getIndex(MM)];
+    Vector3 &vML = m_vertices[getIndex(ML,m_gridLength)];
+    Vector3 &vTM = m_vertices[getIndex(TM,m_gridLength)];
+    Vector3 &vMR = m_vertices[getIndex(MR,m_gridLength)];
+    Vector3 &vBM = m_vertices[getIndex(BM,m_gridLength)];
+    Vector3 &vMM = m_vertices[getIndex(MM,m_gridLength)];
 
     vML.x = 0.5*(vTL.x + vBL.x);
     vML.z = 0.5*(vTL.z + vBL.z);
@@ -116,9 +116,9 @@ void RandomTerrain::populateTerrain()
         GridIndex trg(0,m_gridLength-1);
         GridIndex blg(m_gridLength-1, 0);
         GridIndex brg(m_gridLength-1, m_gridLength-1);
-        m_vertices[getIndex(tlg)] = tl;
-        m_vertices[getIndex(trg)] = tr;
-        m_vertices[getIndex(blg)] = bl;
-        m_vertices[getIndex(brg)] = br;
+        m_vertices[getIndex(tlg,m_gridLength)] = tl;
+        m_vertices[getIndex(trg,m_gridLength)] = tr;
+        m_vertices[getIndex(blg,m_gridLength)] = bl;
+        m_vertices[getIndex(brg,m_gridLength)] = br;
         subdivideSquare(tlg, brg, m_depth);
 }
