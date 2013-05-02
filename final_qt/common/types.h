@@ -7,6 +7,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include "vector.h"
+
 struct Colorf
 {
     Colorf() {r = g = b = 0.f; a= 1.f;}
@@ -28,7 +30,7 @@ struct Index1D
     unsigned int ind;
 };
 
-union Tri
+union TriIndex
 {
     struct
     {
@@ -45,6 +47,15 @@ union Tri
         Index1D b1D;
         Index1D c1D;
     };
+};
+
+struct Tri{
+    Vector3 verts[3];
+    Vector3 norms[3];
+    Vector2 uvs[3];
+    float area;
+    Vector3 avgNorm;
+    Vector3 avgPos;
 };
 
 #endif // TYPES_H

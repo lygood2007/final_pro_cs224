@@ -108,6 +108,12 @@ public:
     inline int getBound() const{ return m_bound; }
 
     /**
+     * @brief getdx Get the dx
+     * @return The dx
+     */
+    inline float getdx() const{ return m_dx; }
+
+    /**
      * @brief getVerts Get the vertices of the terrain
      * @return
      */
@@ -168,6 +174,7 @@ protected:
     bool m_renderNormals; // Flag for rendering normals
     int m_gridLength; // The grid length
     int m_bound; // Specify the actual length of terrain, should be 2*m_bound*2*m_bound
+    float m_dx;
     GLuint m_textureId; // The texture id
 
     GLuint m_indexBuffer;

@@ -144,7 +144,7 @@ void FluidGPU::update(const float dt)
     m_dt = dt;
 
     updateFluidGPU( dt );
-    clampFields();
+   // clampFields();
     copybackGPU(HEIGHT,m_heightField);
     copybackGPU( PAINT, (float*) m_paintField );
     copybackGPU(NORMAL,(float*)m_paintNormalField);
@@ -665,7 +665,7 @@ void FluidGPU::buildTriangleList()
     {
         for( int j = 0; j < m_gridSize-1; j++ )
         {
-            Tri t1,t2;
+            TriIndex t1,t2;
             t1.a2D.indRow = i;
             t1.a2D.indCol = j;
             t1.b2D.indRow = i+1;

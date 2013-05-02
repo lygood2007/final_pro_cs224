@@ -13,6 +13,7 @@
 #include "fluidGPU.h"
 #include "utils.h"
 #include "terrain.h"
+#include "box.h"
 #include "random_terrain.h"
 #include "heightmap_terrain.h"
 #include <QApplication>
@@ -162,6 +163,7 @@ void GLWidget::initializeResources()
     m_fluid->backupHeight(m_terrain);
     cout << "  Calculated Fluid Height ->" << endl;
 #endif
+    loadObjectTexMap();
     m_skybox = ResourceLoader::loadSkybox();
     loadCubeMap();
     cout << "  Loaded Skymap ->" << endl;
@@ -255,17 +257,35 @@ void GLWidget::paintGL()
 }
 
 /**
+ * @brief GLWidget::renderObjects render the objects
+ */
+void GLWidget::renderObjects()
+{
+    for( int i  = 0; i < m_boxes.size(); i++ )
+    {
+        if( m_boxes[i] )
+        {
+            m_boxes[i]->draw();
+        }
+    }
+}
+
+/**
   Renders the scene.  May be called multiple times by paintGL() if necessary.
 **/
 void GLWidget::renderScene()
 {
     if(m_useSkybox) renderSkybox();//@NOTE - This must go first!!
+    renderObjects();
 #ifdef DRAW_TERRAIN
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST );
   m_terrain->draw();
   glDisable(GL_DEPTH_TEST);
 #endif
+
+ //renderObjects();
+
    if(m_useAxis) // make true to draw some axis'
    {
        static GLUquadric * quad = gluNewQuadric();
@@ -348,6 +368,8 @@ void GLWidget::renderScene()
    {
        renderFluid();
    }
+
+  // renderObjects();
 }
 
 /**
@@ -542,6 +564,14 @@ void GLWidget::loadCubeMap()
 }
 
 /**
+ * @brief GLWidget::loadObjectTexMap Load the object's texture map into memory
+ */
+void GLWidget::loadObjectTexMap()
+{
+   m_boxTexID = loadTexture("resource/box_tex.jpg");
+}
+
+/**
   Create shader programs.
  **/
 void GLWidget::createShaderPrograms()
@@ -726,7 +756,19 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     {
 #ifdef RENDER_FLUID
         if( m_animate )
-          intersectFluid( event->x(), event->y(), event);
+        {
+            int indexRow;
+            int indexCol;
+            Vector3 pos;
+          //intersectFluid( event->x(), event->y(), event);
+          //addObject( pos.z, -pos.x );
+            if(intersectFluid( event->x(), event->y(), indexRow, indexCol,pos ))
+            {
+                m_fluid->addDrop( indexCol, indexRow );
+              // the coordinate is problematic
+                addObject( pos.z, -pos.x );
+            }
+        }
 #endif
         m_mouseLeftDown = true;
     }
@@ -814,6 +856,17 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
             m_fluid->enableNormal();
         }
 #endif
+        for( int i = 0; i < m_boxes.size(); i++ )
+        {
+            if( m_boxes[i]->isRenderingNormal() )
+            {
+                m_boxes[i]->disableNormal();
+            }
+            else
+            {
+                m_boxes[i]->enableNormal();
+            }
+        }
         break;
     }
     case Qt::Key_R:
@@ -908,6 +961,7 @@ void GLWidget::timeUpdate()
  * @param y, The y position in screen space
  * @return Return if it is intersected
  */
+/*
 void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
 {
     Vector4 eyePos = m_camera.getEyePos();
@@ -926,7 +980,7 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
     float halfDomain = m_fluid->m_domainSize/2;
     float dx = m_fluid->m_dx;
 
-    const QVector<Tri>& temp = m_fluid->m_triangles;
+    const QVector<TriIndex>& temp = m_fluid->m_triangles;
 
 #ifdef USE_GPU_FLUID
     const float* tempHeight = m_fluid->m_heightField;
@@ -941,25 +995,13 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
 
     for( int i = 0; i < temp.size(); i++ )
     {
-        Tri curTri = temp[i];
+        TriIndex curTri = temp[i];
         // Firstly check if the triangle is visible
         int count = 0;
         int r[3]; int c[3];
         r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
         r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
         r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-        /*for( int m = 0; m < 3; m++ )
-        {
-#ifdef USE_GPU_FLUID
-            if( tempDepth[m_fluid->getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
-                count++;
-#else
-            if( m_fluid->m_depthField[r[m]][c[m]] > EPSILON )
-                count++;
-#endif
-        }*/
-      /*  if( count == 0 )
-            continue;*/
 
 #ifdef USE_GPU_FLUID
             const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
@@ -992,6 +1034,137 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
             m_fluid->addDroppingParticles(indexCol, indexRow);
         }
     }
+}*/
+
+/**
+ * @brief intersectFluid Check if the ray shooting from position (x, y)  intersects the fluid
+ * @param x, The x position in screen spacem_fluid->addDrop( event->x(), event->y() );
+ * @param y, The y position in screen space
+ */
+bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& indexCol, Vector3& pos )
+{
+    Vector4 eyePos = m_camera.getEyePos();
+    Vector4 pFilmCam;
+    Matrix4x4 invViewTransMat = m_camera.getInvViewTransMatrix();
+    pFilmCam.x = ((REAL)(2*x))/width() - 1; pFilmCam.y = 1- ((REAL)(2*y))/height(); pFilmCam.z = -1;
+    pFilmCam.w = 1;
+
+    Vector4 pFilmWorld = invViewTransMat*pFilmCam;
+    Vector4 d = pFilmWorld - eyePos;
+    d = d.getNormalized();
+    Vector3 dir3 = Vector3(d.x,d.y,d.z);
+    Vector3 eye3 = Vector3(eyePos.x,eyePos.y,eyePos.z);
+    float halfDomain = m_fluid->m_domainSize/2;
+    float dx = m_fluid->m_dx;
+
+    const QVector<TriIndex>& temp = m_fluid->m_triangles;
+
+#ifdef USE_GPU_FLUID
+    const float* tempHeight = m_fluid->m_heightField;
+    const float* tempDepth = m_fluid->m_depthField;
+#else
+    const QVector<QVector<float> >& tempHeight = m_fluid->m_terrainHeightField;
+    const QVector<QVector<float> >& tempDepth = m_fluid->m_depthField;
+#endif
+    indexRow = -1;
+    indexCol = -1;
+    const int gridSize = m_fluid->m_gridSize;
+
+    for( int i = 0; i < temp.size(); i++ )
+    {
+        TriIndex curTri = temp[i];
+        // Firstly check if the triangle is visible
+        int count = 0;
+        int r[3]; int c[3];
+        r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
+        r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
+        r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
+        for( int m = 0; m < 3; m++ )
+        {
+#ifdef USE_GPU_FLUID
+            if( tempDepth[m_fluid->getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
+                count++;
+#else
+            if( m_fluid->m_depthField[r[m]][c[m]] > EPSILON )
+                count++;
+#endif
+        }
+        if( count == 0 )
+            continue;
+        else
+        {
+#ifdef USE_GPU_FLUID
+            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
+                                      ,- halfDomain + r[0]*dx );
+            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[m_fluid->getIndex1D(r[1],c[1],HEIGHT)]
+                                       ,- halfDomain + r[1]*dx );
+            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[m_fluid->getIndex1D(r[2],c[2],HEIGHT)]
+                                      ,- halfDomain + r[2]*dx );
+#else
+            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[r[0]][c[0]] + tempDepth[r[0]][c[0]],
+                                      - halfDomain + r[0]*dx );
+            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[r[1]][c[1]] + tempDepth[r[1]][c[1]],
+                                      - halfDomain + r[1]*dx );
+            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[r[2]][c[2]] + tempDepth[r[2]][c[2]],
+                                      - halfDomain + r[2]*dx );
+#endif
+             if( doIntersectTriangles( eye3, dir3, p0, p1, p2 ) )
+             {
+                 // ******************************************************************************************************
+                 // Here, it's a hack that it shouldn't be like this !
+                 // I don't know where is wrong, the indexRow should equal to r[0] and indexCol should
+                 // equal to c[0]
+                 // I guess the intersect check is wrong
+                 // But the result is not correct
+                 // ******************************************************************************************************
+                 indexRow =  gridSize - c[0];
+                 indexCol = r[0];
+                 pos = (p0 + p1 + p2)/3.f;
+                 break;
+             }
+        }
+    }
+
+    if( indexRow != -1 && indexCol != -1 )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+/**
+ * @brief addObject Drop objects from the air
+ * @param x The x position
+ * @param z The z position
+ * @param Height The height
+ */
+void GLWidget::addObject( const float x, const float z, const float y )
+{
+    const float length = 2.f;
+    const float height = 2.f;
+    const float width = 2.f;
+    Box* newBox = new Box( m_fluid, Vector3(x,y,z), length,
+                           height, width, m_terrain->getdx(), m_boxTexID );
+    newBox->initPhysics();
+    m_boxes.push_back( newBox );
+}
+
+/**
+ * @brief updateObjects Update the objects' positions
+ * @param dt the time step
+ */
+void GLWidget::updateObjects( float dt )
+{
+    foreach( Box* b, m_boxes )
+    {
+        if( b )
+        {
+            b->update( dt, m_fluid);
+        }
+    }
 }
 
 void GLWidget::tick()
@@ -1000,6 +1173,7 @@ void GLWidget::tick()
  //   float seconds = m_time.restart() * 0.001f;
     if( m_animate )
     {
+        updateObjects( m_timeStep);
         timeUpdate();
 #ifdef RENDER_FLUID
         m_fluid->update( m_timeStep );

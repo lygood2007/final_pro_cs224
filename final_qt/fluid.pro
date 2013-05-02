@@ -14,14 +14,16 @@ INCLUDEPATH += common \
     terrain \
     water \
     camera \
-    loader
+    loader \
+    object
 
 DEPENDPATH += common \
     support \
     terrain \
     water \
     camera  \
-    loader
+    loader \
+    object
 
 SOURCES += \
     camera/camera.cpp \
@@ -42,7 +44,9 @@ SOURCES += \
     water/fluidCPU.cpp \
     water/fluidGPU.cpp \
     water/particle.cpp \
-    water/particlesource.cpp
+    water/particlesource.cpp \
+    object/box.cpp \
+    object/object.cpp
 
 HEADERS  += \
     camera/camera.h \
@@ -67,7 +71,10 @@ HEADERS  += \
     water/fluid_global.h \
     water/fluidGPU.h \
     water/particle.h \
-    water/particlesource.h
+    water/particlesource.h \
+    object/box.h \
+    object/object.h \
+    object/object_defs.h
 
 OTHER_FILES += cuda/fluid_compute.cu \
     cuda/test.cu \
