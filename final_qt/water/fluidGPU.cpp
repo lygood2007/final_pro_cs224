@@ -123,7 +123,7 @@ void FluidGPU::draw() const
 #endif
 
 #ifdef USE_PARTICLES_2
-    if(m_glw->m_useParticles) drawParticles2();
+//    if(m_glw->m_useParticles) drawParticles2();
 #endif
     if( m_renderNormals )
         drawNormal();
@@ -1054,6 +1054,10 @@ void FluidGPU::drawParticles2() const{
     if(m_glw->m_useParticles)
     {
         //begin
+        //@NOTE these next two lines must come outside the glBegin/glEnd block
+        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+        glPointSize(5);
+
         glBegin(GL_POINTS);
         glEnable(GL_CULL_FACE);
         glEnable(GL_BLEND);
@@ -1063,7 +1067,7 @@ void FluidGPU::drawParticles2() const{
         for(int i = 0; i < TOTAL_NUM_PARTICLES; i++){
             Vector3 position = m_particle_positions[i];
             if(position.y >= 0){
-                glColor4f(m_color.r, m_color.g, m_color.b, m_color.a);
+//                glColor4f(m_color.r, m_color.g, m_color.b, m_color.a);
                 glVertex3f(position.x, position.y, position.z);
             }
         }
