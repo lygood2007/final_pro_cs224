@@ -50,9 +50,10 @@
 #define USE_PARTICLES_2
 #define TOTAL_NUM_PARTICLES 100000
 
-/**
- * Not applicable now!
- */
+#define OBJECT_ORIGIN_HEIGHT TERRAIN_MAX_HEIGHT
+#define WATER_DENSITY 1000
+
+// If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
 const float defaultHeight = TERRAIN_MAX_HEIGHT-25;

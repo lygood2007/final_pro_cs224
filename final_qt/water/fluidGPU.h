@@ -99,9 +99,15 @@ public:
      */
     float* getFieldArray( FieldType type, int& buffLength ) const;
 
+    /**
+     * Get the domain size
+     */
+    inline float getDomainSize() const {return m_domainSize; }
+
  private:
 
-     friend void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event);
+    // friend void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event);
+       friend bool GLWidget::intersectFluid(  const int x, const int y, int& indexRow, int& indexCol, Vector3& pos );
     /**
      * @brief init Initialize the variables
      * @param gridSize The length of the grid
@@ -253,7 +259,7 @@ private:
     GLuint m_vertexBuffer;
     GLuint m_normalBuffer;
 
-    QVector<Tri> m_triangles;
+    QVector<TriIndex> m_triangles;
 
     /**
      * first attempt at particles

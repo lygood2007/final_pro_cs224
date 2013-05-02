@@ -27,6 +27,7 @@ Terrain::Terrain()
 
     // The actual size of terrain is hard coded
     m_bound = TERRAIN_BOUND;
+    m_dx = m_bound*2.f/(m_gridLength+1);
 }
 
 Terrain::~Terrain()

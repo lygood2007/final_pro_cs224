@@ -58,6 +58,59 @@
 
      return  result;
  }
+
+ /**
+  * @brief bilinearInterpReal 2D dimension bilinear interpolation based on real vector, not the index.
+  * @brief This function will do bilinear intepolation based on x,z value of the vector
+  * @param vec The 2D array
+  * @param pos The position
+  * @param dx The delta x
+  * @param width The width of the grid
+  * @param height The height of the grid
+  * @return The result y value
+  */
+ float bilinearInterpReal( const float* vec, Vector3 pos, float origX, float origZ, float dx, const int width, const int height )
+ {
+     float x = pos.x - origX;
+     float z = pos.z - origZ;
+     if( x < 0 )
+         x = 0.f;
+     if( z < 0 )
+         z = 0.f;
+     if( x > (width - 1)*dx )
+         x = (width - 1)*dx;
+     if( z > (height - 1)*dx )
+         z = (height -1)*dx;
+
+     // Get the index
+     const int X = (int)(x/dx);
+     const int Y = (int)(z/dx);
+     const float s1 = x - X*dx;
+     const float s0 = 1.f - s1;
+     const float t1 = z - Y*dx;
+     const float t0 = 1.f-t1;
+     float e1, e2, e3,e4;
+     e1 = e2 = e3 = e4 = 0;
+     e1 = vec[Y*width+X];
+     if( Y+1 <= height- 1 )
+     {
+         e2 = vec[(Y+1)*width + X];
+     }
+     if( X +1 <= width -1 )
+     {
+         e3 = vec[Y*width + X+1];
+     }
+     if( Y+1 <= height - 1 && X + 1 <= width - 1)
+     {
+         e4 = vec[(Y+1)*width + X+1];
+     }
+
+     float result = s0*(t0*e1 + t1*e2 )+
+             s1*(t0*e3  + t1*e4 );
+
+     return  result;
+ }
+
  /**
   * @brief randomFloatGenerator Generate a float number between min and max
   * @param min The lower bound
