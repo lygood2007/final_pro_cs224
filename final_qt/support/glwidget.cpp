@@ -949,7 +949,7 @@ void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
         if(event->button() == Qt::LeftButton){
             m_fluid->addDrop( indexCol, indexRow );
         } else if(event->button() == Qt::MiddleButton){
-            //m_fluid->addDroppingParticles(indexCol, indexRow);
+            m_fluid->addDroppingParticles(indexCol, indexRow);
         }
     }
 }
