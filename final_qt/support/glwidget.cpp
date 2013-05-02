@@ -216,6 +216,7 @@ void GLWidget::paintGL()
 
         // use the brightpass shader to render bright area only to fbo_2 for bloom effects
         m_framebufferObjects["fbo_2"]->bind();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_shaderPrograms["brightpass"]->bind();
         glBindTexture(GL_TEXTURE_2D, m_framebufferObjects["fbo_1"]->texture());
         renderTexturedQuad(width, height);

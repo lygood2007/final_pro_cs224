@@ -18,8 +18,8 @@
 #include "resourceloader.h"
 
 // We fix the size
-#define WIN_W 1200.0
-#define WIN_H 1200.0
+#define WIN_W 1000.0
+#define WIN_H 700.0
 
 // Flag for testing
 #define DRAW_TERRAIN
