@@ -214,6 +214,7 @@ private:
 
 // Variables
     int m_gridSize;
+    int m_gridPaintSize;
     int m_uWidth; // width for velocityU (m_gridSize+1)
 
     float m_domainSize;
@@ -229,8 +230,8 @@ private:
     /**
      * Design for gpu fluid. 2D vector is not suitable for cuda
      **/
-    Vector3* m_normalField; // Essential
-    Vector3* m_paintField; // Essential
+    Vector3* m_paintNormalField; // Essential
+    Vector3* m_paintField; // Essential (Old version, only the water surface)
     GLuint* m_indices; // Essential
     float* m_depthField; // Essential
     float* m_velocityU; // I preserve this for future use

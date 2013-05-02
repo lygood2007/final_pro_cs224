@@ -259,11 +259,12 @@ void GLWidget::paintGL()
 void GLWidget::renderScene()
 {
     if(m_useSkybox) renderSkybox();//@NOTE - This must go first!!
-
 #ifdef DRAW_TERRAIN
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST );
   m_terrain->draw();
+  glDisable(GL_DEPTH_TEST);
 #endif
-
    if(m_useAxis) // make true to draw some axis'
    {
        static GLUquadric * quad = gluNewQuadric();
@@ -346,7 +347,6 @@ void GLWidget::renderScene()
    {
        renderFluid();
    }
-
 }
 
 /**
@@ -390,7 +390,9 @@ void GLWidget::renderFluid()
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 #ifdef RENDER_FLUID
+    glEnable(GL_DEPTH_TEST );
     m_fluid->draw();
+    glDisable(GL_DEPTH_TEST );
 #endif
 
 }
@@ -722,7 +724,8 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     else
     {
 #ifdef RENDER_FLUID
-         intersectFluid( event->x(), event->y(), event);
+        if( m_animate )
+          intersectFluid( event->x(), event->y(), event);
 #endif
         m_mouseLeftDown = true;
     }

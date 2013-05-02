@@ -10,6 +10,7 @@
 #define FLUID_GLOBAL_H
 
 #define TERRAIN_BOUND 40
+#define TERRAIN_BOTTOM_BOUND -10
 #define TERRAIN_MIN_HEIGHT -30
 #define TERRAIN_MAX_HEIGHT 20
 #define DEFAULT_TERRAIN_DEPTH 8
@@ -21,7 +22,7 @@
 #define SAVE_NAME_VELOCITY "velocity"
 //#define SAVE_IMAGE
 
-#define DAMPEN_WAVES
+//#define DAMPEN_WAVES
 #define LAMBDA_DECAY 0.9
 #define LAMBDA_UPDATE 0.1
 #define DAMPENING_REGION 30
@@ -32,7 +33,7 @@
 #define INIT_PHI_PSI 0.0f
 #define CLAMP_ALPHA 0.5f
 
-//#define USE_PARTICLES
+#define USE_PARTICLES
 #define C_DEPOSIT 1
 #define SPLASH_PARTICLE_RADIUS 0.2
 #define ALPHA_MIN_SPLASH 0.45
@@ -49,9 +50,12 @@
 #define USE_PARTICLES_2
 #define TOTAL_NUM_PARTICLES 100000
 
+/**
+ * Not applicable now!
+ */
+#define RENDER_VOLUME
 
-
-const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-25;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;
