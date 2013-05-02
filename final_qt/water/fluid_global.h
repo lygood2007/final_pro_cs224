@@ -55,7 +55,7 @@
  */
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-15;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-25;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;

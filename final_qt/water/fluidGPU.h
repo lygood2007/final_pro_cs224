@@ -268,7 +268,7 @@ private:
     Vector3 *m_particle_velocities; // velocities of particles
     Vector3 m_particle_acceleration; // acceleration of particles (same for all)
 
-    GLWidget* m_glw;
+    GLWidget* m_glw; //a pointer to glWidget so we can access the use booleans
 };
 
 #endif // FLUIDGPU_H
