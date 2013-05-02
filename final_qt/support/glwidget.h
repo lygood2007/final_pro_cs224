@@ -22,7 +22,7 @@
 #define WIN_H 1200.0
 
 // Flag for testing
-//#define DRAW_TERRAIN
+#define DRAW_TERRAIN
 
 //#define USE_HEIGHTMAP
 

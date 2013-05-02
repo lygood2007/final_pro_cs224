@@ -776,12 +776,18 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         {
             glPolygonMode(GL_FRONT, GL_LINE);
             m_drawFrame = true;
+            m_useFBO = false; //cannot draw wireframes if FBO is on
+
         }
         else
         {
             glPolygonMode(GL_FRONT,GL_FILL);
             m_drawFrame = false;
+            m_useFBO = true;
         }
+        updateCamera();
+        m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
+        paintGL();
         break;
         }
     case Qt::Key_N:
@@ -796,8 +802,7 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
 #ifdef RENDER_FLUID
         if( m_fluid->isRenderingNormal() )
-        {
-            m_fluid->disableNormal();
+        {            m_fluid->disableNormal();
         }
         else
         {
@@ -829,6 +834,9 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_F:
     {
         m_useFBO = !m_useFBO;
+        updateCamera();
+        m_camera.applyPerspectiveCamera(WIN_W,WIN_H);
+        paintGL();
         break;
     }
     case Qt::Key_X:
