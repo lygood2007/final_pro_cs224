@@ -15,7 +15,7 @@ varying float radius;
 
 void main() {
   gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
-  gl_PointSize = 100.0;
+  gl_PointSize = 20.0;
 
   // Convert position to window coordinates
   vec2 halfsize = vec2(windowSize.x, windowSize.y) * 0.5;

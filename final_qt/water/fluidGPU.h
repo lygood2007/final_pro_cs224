@@ -29,7 +29,7 @@ public:
     FluidGPU();
     FluidGPU(const int gridSize, const float domainSize );
     // Initialize from terrain, we should use this
-    FluidGPU( Terrain* t );
+    FluidGPU( Terrain* t, GLWidget* glw );
     ~FluidGPU();
     void draw() const; //the name says it all - draw some fluid
 
@@ -265,6 +265,8 @@ private:
     Vector3 *m_particle_positions; // positions of particles, y = -1 is inactive
     Vector3 *m_particle_velocities; // velocities of particles
     Vector3 m_particle_acceleration; // acceleration of particles (same for all)
+
+    GLWidget* m_glw;
 };
 
 #endif // FLUIDGPU_H
