@@ -10,7 +10,7 @@
 #define FLUID_GLOBAL_H
 
 #define TERRAIN_BOUND 40
-#define TERRAIN_BOTTOM_BOUND -10
+#define TERRAIN_BOTTOM_BOUND 0
 #define TERRAIN_MIN_HEIGHT 0
 #define TERRAIN_MAX_HEIGHT 50
 #define DEFAULT_TERRAIN_DEPTH 8
@@ -67,7 +67,7 @@
 // If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-25;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-15;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;

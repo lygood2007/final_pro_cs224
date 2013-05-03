@@ -11,7 +11,7 @@
 #include "object_defs.h"
 
 
-#define JITTER_ORIGIN
+//#define JITTER_ORIGIN
 
 #define MAX_INIT_U 20
 #define MAX_INIT_W 20
@@ -65,6 +65,25 @@ public:
      */
     void initPhysics();
 
+    /**
+     * @brief setW Set the w parameter
+     * @param w
+     */
+
+    inline void setW( float w ){ m_w = w; }
+
+    /**
+     * @brief setCoeffDrag Set the drag coefficient
+     * @param dragCoef
+     */
+    inline void setCoeffDrag( float dragCoef ){ m_dragCoeff = dragCoef; }
+
+    /**
+     * @brief setCoeffLift Set the lift coefficient
+     * @param liftCoef
+     */
+    inline void setCoeffLift( float liftCoef ){ m_liftCoeff = liftCoef; }
+
 private:
 
     /**
@@ -114,6 +133,9 @@ private:
 
     bool m_upwards;
     bool m_decay;
+    float m_w;
+
+    Vector3 m_lastBuoAcc;
 
 protected:
 

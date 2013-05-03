@@ -151,6 +151,9 @@ void FluidGPU::update(const float dt)
     updateFluidGPU( dt );
    // clampFields();
     copybackGPU(HEIGHT,m_heightField);
+
+    copybackGPU(VEL_U,m_velocityU);
+    copybackGPU(VEL_W,m_velocityW);
     copybackGPU( PAINT, (float*) m_paintField );
     copybackGPU(NORMAL,(float*)m_paintNormalField);
 
