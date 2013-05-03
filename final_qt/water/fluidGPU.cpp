@@ -1107,7 +1107,7 @@ void FluidGPU::drawParticles2() const{
         //drawings spray only
         //@NOTE these next two lines must come outside the glBegin/glEnd block
         glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(5);
+        glPointSize(0.5);
         glColor4f(SPRAY_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);
@@ -1128,7 +1128,7 @@ void FluidGPU::drawParticles2() const{
 
         //now draw splash a different size and color
         glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(2.5);
+        glPointSize(1.5);
         glColor4f(SPLASH_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);
@@ -1152,7 +1152,7 @@ void FluidGPU::drawParticles2() const{
 
         //now draw foam a different size and color
         glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(20);
+        glPointSize(5);
         glColor4f(FOAM_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);

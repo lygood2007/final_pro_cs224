@@ -11,8 +11,8 @@
 
 #define TERRAIN_BOUND 40
 #define TERRAIN_BOTTOM_BOUND 0
-#define TERRAIN_MIN_HEIGHT 0
-#define TERRAIN_MAX_HEIGHT 50
+#define TERRAIN_MIN_HEIGHT -30
+#define TERRAIN_MAX_HEIGHT 20
 #define DEFAULT_TERRAIN_DEPTH 8
 
 #define GRID_SIZE TERRAIN_BOUND*2
@@ -67,7 +67,7 @@
 // If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-15;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;

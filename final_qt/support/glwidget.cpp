@@ -338,40 +338,23 @@ void GLWidget::renderScene()
         glPopMatrix();
         m_shaderPrograms["fresnel"]->release();
 
+
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        // Render the points with the point shader
+        m_shaderPrograms["point"]->bind();
+//        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
+        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderParticles();
+        glPopMatrix();
+        m_shaderPrograms["point"]->release();
+
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
 
-
-//        m_shaderPrograms["brightpass"]->bind();
-//        renderFluid();
-//        m_shaderPrograms["brightpass"]->release();
-
-//        float scales[] = {4.f,8.f};
-//        for (int i = 0; i < 2; ++i)
-//        {
-//            // Render the blurred brightpass filter result to fbo 1
-//           renderBlur(WIN_W / scales[i], WIN_H / scales[i]);
-
-//            // Enable alpha blending and render the texture to the screen
-//            renderFluid();
-//        }
-
-
-//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-//        // Render the points with the point shader
-//        m_shaderPrograms["point"]->bind();
-//        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
-//        glPushMatrix();
-//        glTranslatef(0.f,1.25f,0.f);
-//        renderFluid();
-//        glPopMatrix();
-//        m_shaderPrograms["point"]->release();
-
-
         glPopMatrix();
-
-        renderParticles();
-
 
 
         }
@@ -803,7 +786,7 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
                 m_fluid->addDrop( indexCol, indexRow );
 //                m_fluid->addDroppingParticles( indexCol, indexRow );
               // the coordinate is problematic
-               // addObject( pos.z, -pos.x );
+//                addObject( pos.z, -pos.x );
             }
         }
 #endif
