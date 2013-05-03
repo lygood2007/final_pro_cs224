@@ -202,7 +202,7 @@ void FluidGPU::update(const float dt)
     }
 
 #ifdef DAMPEN_WAVES
-    dampenWaves();
+    if(m_glw->m_useDampening) dampenWaves();
 #endif
 
     m_timeElapsed += dt;
@@ -219,10 +219,10 @@ void FluidGPU::update(const float dt)
 void FluidGPU::addDrop(const int posX, const int posZ)
 {
     // Fixed size
-    int radius = m_gridSize/18;
+    int radius = m_gridSize/25;
     if( radius < 1 )
         radius = 1;
-    float h = m_domainSize/30;
+    float h = m_domainSize/15;
 
     addDropGPU( posX, posZ, radius, h );
     //copybackGPU(DEPTH,m_depthField);
@@ -1134,7 +1134,7 @@ void FluidGPU::drawParticles2() {
         //drawings spray only
         //@NOTE these next two lines must come outside the glBegin/glEnd block
         glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(1);
+        glPointSize(0.5);
         glColor4f(SPRAY_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);
@@ -1156,7 +1156,7 @@ void FluidGPU::drawParticles2() {
 
         //now draw splash a different size and color
         glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(2.5);
+        glPointSize(1.5);
         glColor4f(SPLASH_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);

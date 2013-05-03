@@ -9,20 +9,20 @@
 #ifndef FLUID_GLOBAL_H
 #define FLUID_GLOBAL_H
 
-#define TERRAIN_BOUND 40
+#define TERRAIN_BOUND 80
 #define TERRAIN_BOTTOM_BOUND 0
 #define TERRAIN_MIN_HEIGHT 0
-#define TERRAIN_MAX_HEIGHT 50
+#define TERRAIN_MAX_HEIGHT 40
 #define DEFAULT_TERRAIN_DEPTH 8
 
 #define GRID_SIZE TERRAIN_BOUND*2
-#define DOMAIN_SIZE TERRAIN_BOUND
+#define DOMAIN_SIZE TERRAIN_BOUND/2
 #define GRAVITY -10
 #define SAVE_NAME_DEPTH "depth"
 #define SAVE_NAME_VELOCITY "velocity"
 //#define SAVE_IMAGE
 
-//#define DAMPEN_WAVES
+#define DAMPEN_WAVES
 #define LAMBDA_DECAY 0.9
 #define LAMBDA_UPDATE 0.1
 #define DAMPENING_REGION 16
@@ -59,9 +59,9 @@
 #define TOTAL_NUM_FOAM_PARTICLES 40000 // NOTE: need to separate these in CUDA before can change here
 
 //particle colors - @NOTE these awful colors are only temporary
-#define SPRAY_COLOR 1.0f,1.f,0.f,0.9f
-#define SPLASH_COLOR 1.0f,0.f,1.0f,0.9f //0.0f,0.42f,0.58f,1.0f
-#define FOAM_COLOR 1.0f,1.0f,1.0f,0.9f
+#define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
+#define SPLASH_COLOR 1.0f,1.0f,1.0f,1.0f //1.0f,0.f,1.0f,0.9f
+#define FOAM_COLOR 1.0f,1.0f,0.0f,0.9f
 
 #define OBJECT_ORIGIN_HEIGHT TERRAIN_MAX_HEIGHT
 #define WATER_DENSITY 1000

@@ -1,26 +1,19 @@
-//attribute vec4 qt_Vertex;
-//attribute vec4 qt_MultiTexCoord0;
-//uniform mat4 qt_ModelViewProjectionMatrix;
-//varying vec4 qt_TexCoord0;
 
-//void main(void)
-//{
-//    gl_Position = qt_ModelViewProjectionMatrix * qt_Vertex;
-//    qt_TexCoord0 = qt_MultiTexCoord0;
-//}
+varying vec3 n, lightDir, r;
+const vec3 L = vec3(0.,0.,1.);
 
-uniform vec2 windowSize;
-varying vec2 screenPos;
-varying float radius;
+void main()
+{
+        vec3 vertex = vec3(gl_ModelViewMatrix * gl_Vertex).xyz;
+        n = normalize( gl_NormalMatrix * gl_Normal );
+        vec3 i = normalize(vertex);
+        lightDir = vec3(L - vVertex);
 
-void main() {
-  gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
-  gl_PointSize = 20.0;
+         r = reflect(I,normal);
 
-  // Convert position to window coordinates
-  vec2 halfsize = vec2(windowSize.x, windowSize.y) * 0.5;
-  screenPos = halfsize + ((gl_Position.xy / gl_Position.w) * halfsize);
 
-  // Convert radius to window coordinates
-  radius = gl_PointSize * 0.5;
+    gl_Position = ftransform();
 }
+
+
+

@@ -1,17 +1,23 @@
-//uniform sampler2D qt_Texture0;
-//varying vec4 qt_TexCoord0;
+uniform samplerCube CubeMap; //the skymap
+uniform vec4 CurrColor; //the current color of the water
+varying vec3 n, lightDir, r;
 
-//void main(void)
-//{
-//    gl_FragColor = texture2D(qt_Texture0, qt_TexCoord0.st);
-//}
-varying vec2 screenPos;
-varying float radius;
-
-void main() {
-
-  // Sphere shaded
-  if( distance(gl_FragCoord.xy, screenPos) > radius ) discard;
-  gl_FragData[0] = gl_Color;
-
+void main (void)
+{
+//	vec4 current_color = CurrColor;
+//        vec4 final_color = textureCube( CubeMap, r);
+        vec4 final_color = vec4(1.0,1.0,1.0,1.0);
+        vec3 N = normalize(n);
+        vec3 L = normalize(lightDir);
+        float lambertTerm = dot(N,L);
+        if(lambertTerm > 0.0)
+        {
+                // Specular
+                final_color += textureCube( CubeMap, r);
+//            final_color += vec4(1.0, 1.0, 1.0, 1.0);
+        }
+//                gl_FragColor = CurrColor;
+//        gl_FragColor = CurrColor *(0.5) +  final_color * (0.5);
+        gl_FragColor = mix(CurrColor, final_color,0.85);
+//        gl_FragColor = final_color;
 }

@@ -19,7 +19,7 @@ OrbitCamera::OrbitCamera()
     m_phi = 1.2f;
     m_fovy = 60.f;
     m_near = 0.1f;
-    m_far = 1000.0f;
+    m_far = 100000000.0f;
     m_ratio = 1.0f;
 
     updateMatrices();
