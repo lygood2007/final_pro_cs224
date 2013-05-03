@@ -20,8 +20,9 @@ Object::Object()
     m_density = WATER_DENSITY;
     m_upwards = false;
     m_decay = false;
-    m_dragCoeff = DRAG_COEEF;
-    m_liftCoeff = DRAG_COEEF;
+    m_dragCoeff = DRAG_COEFF;
+    m_liftCoeff = LIFT_COEFF;
+    m_w = DEFAULT_W;
     m_texID = 0;
     memset( m_tessell, -1, 3*sizeof(int ) );
     computeOrigin();
@@ -35,8 +36,9 @@ Object::Object(FluidGPU *fluid, Vector3 position, float dx, GLuint texID, float 
     m_texID = texID;
     m_color = color;
     m_renderNormals = false;
-    m_dragCoeff = DRAG_COEEF;
-    m_liftCoeff = DRAG_COEEF;
+    m_dragCoeff = DRAG_COEFF;
+    m_liftCoeff = LIFT_COEFF;
+    m_w = DEFAULT_W;
     m_upwards = false;
     m_decay = false;
     m_density = density;
@@ -88,6 +90,8 @@ void Object::update( float dt, FluidGPU* fluid )
      * Compute the buoyance
      */
 
+  //  int buf;
+    //printf("%f\n",fluid->getFieldArray(VEL_U,buf)[750]);
     Vector3 decay = Vector3(1.f,1.f,1.f);
     Vector3 yUnit = Vector3(0.f,1.f,0.f );
     Vector3 buoyTotal = Vector3(0.f,0.f,0.f);
@@ -108,10 +112,26 @@ void Object::update( float dt, FluidGPU* fluid )
             continue;
 
         Vector3 relVelocity = m_velocity - fluidVelocity;
-        Vector3 drag = -WATER_DENSITY*m_dragCoeff*0.5*relVelocity.length()*relVelocity;
-        Vector3 tmp = (m_tris[i].avgNorm.cross( relVelocity)).getNormalized();
-        Vector3 lift = WATER_DENSITY*m_liftCoeff*0.5*relVelocity.length()
-                *( relVelocity.cross( tmp ) );
+        float cos = m_tris[i].avgNorm.dot(relVelocity.getNormalized());
+        float Aef;
+        if( cos <= 0.001 )
+            Aef = 0;
+        else
+            Aef =m_tris[i].area*((1-m_w) + m_w*m_tris[i].avgNorm.dot(relVelocity.getNormalized()));
+
+        Vector3 drag = -WATER_DENSITY*m_dragCoeff*0.5*relVelocity.length()*relVelocity*Aef;
+        Vector3 tmp1 = m_tris[i].avgNorm.cross( relVelocity);
+        Vector3 lift;
+        if( tmp1.length() <= 0.00001)
+        {
+            lift = Vector3::zero();
+        }
+        else
+        {
+        Vector3 tmp2 = tmp1.getNormalized();
+         lift = -WATER_DENSITY*m_liftCoeff*0.5*relVelocity.length()
+                *( relVelocity.cross( tmp2 ) )*Aef;
+        }
         float buoy = WATER_DENSITY*GRAVITY*m_tris[i].area*(h - pos.y )*m_tris[i].avgNorm.dot(yUnit);
         buoyTotal += Vector3( 0.f, buoy, 0.f );
         dragTotal += drag;
@@ -120,26 +140,28 @@ void Object::update( float dt, FluidGPU* fluid )
     buoyAccTotal = buoyTotal/m_mass;
     dragAccTotal = dragTotal/m_mass;
     liftAccTotal = liftTotal/m_mass;
-  //  printf("Drag a: %f, %f, %f\n",dragAccTotal.x, dragAccTotal.y, dragAccTotal.z );
-    printf("Lift a: %f, %f, %f\n",liftAccTotal.x, liftAccTotal.y, liftAccTotal.z );
-    /*if( m_upwards &&fabs(m_lastBuoAcc.y) > fabs(GRAVITY) && fabs(buoyAccTotal.y) <= fabs(GRAVITY) )
+   //printf("Drag a: %f, %f, %f\n",dragAccTotal.x, dragAccTotal.y, dragAccTotal.z );
+   printf("Lift a: %f, %f, %f\n",liftAccTotal.x, liftAccTotal.y, liftAccTotal.z );
+    if( m_upwards &&fabs(m_lastBuoAcc.y) > fabs(GRAVITY) && fabs(buoyAccTotal.y) <= fabs(GRAVITY) )
     {
         // In this case, it means the object pass through the point where Buoyancy
         // Equals GRAVITY
-        m_decay = true;
+        //m_decay = false;
     }
     if( m_decay )
     {
         // Decay faster for y direction, slower for x,z direction
-       // decay.x = 0.9f;decay.y = 0.8f;decay.z = 0.9f;
-    }*/
+        //decay.x = 0.99f;
+        decay.y = m_density/WATER_DENSITY;
+        //decay.z = 0.99f;
+    }
     /*decay*/
     m_velocity.x = m_velocity.x*decay.x;m_velocity.y = m_velocity.y*decay.y;m_velocity.z = m_velocity.z*decay.z;
 
-    m_velocity += 2*(buoyAccTotal*dt + Vector3(0.f,GRAVITY,0.f)*dt +dragAccTotal*dt );
-    m_velocity.y += 2*liftAccTotal.y*dt;
+    m_velocity += 2*(buoyAccTotal*dt + Vector3(0.f,GRAVITY,0.f)*dt +dragAccTotal*dt +liftAccTotal*dt);
+    //m_velocity.y += 2*liftAccTotal.y*dt;
     // Backup the buoyancy in this frame
-    //m_lastBuoAcc = buoyAccTotal;
+    m_lastBuoAcc = buoyAccTotal;
     if( m_velocity.y < 0 )
     {
         m_decay = false;
@@ -290,6 +312,8 @@ void Object::updatePosWithBoundaryCheck( float dt )
      float* hf = fluid->getFieldArray( HEIGHT, buffLength );
      float* uf  =fluid->getFieldArray( VEL_U, buffLength );
      float* wf  =fluid->getFieldArray( VEL_W, buffLength );
+
+  //   float a = wf[2];
 
      /**
       * Get the size. width and height are the size of the height field
