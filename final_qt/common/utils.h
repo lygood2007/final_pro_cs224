@@ -29,6 +29,14 @@
  float randomFloatGenerator( float min = 0.f, float max = 1.f);
 
  /**
+  * @brief randomFloatGenerator Generate a float number between min and max
+  * @param min The lower bound
+  * @param max The upper bound
+  * @return The random float number we get
+  */
+ float bilinearInterpReal( const float* vec, Vector3 pos, float origX, float origZ, float dx, const int width, const int height );
+
+ /**
   * @brief doIntersectTriangles Check if the ray intersects the triangle
   * @param eyePos The start point of the ray
   * @param d The direction of ray

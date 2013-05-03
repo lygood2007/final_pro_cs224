@@ -928,8 +928,8 @@ __global__ void intersectParticleValuesCUDA( vec3* positionsMap, vec3* velocitie
             if(eta >= positionsMap[i].y){
                 //update height
                 float hxz = map2Dread( depthMap, z, x, width );
-//                map2Dwrite( depthMap, z, x, hxz + heightChange, width );
-                map2Dwrite( depthMap, z, x, hxz + (1.5 * heightChange), width );
+                map2Dwrite( depthMap, z, x, hxz + heightChange, width );
+//                map2Dwrite( depthMap, z, x, hxz + (1.5 * heightChange), width );
 
                 //update velocities
                 //TODO: check these! u and w might be swapped?

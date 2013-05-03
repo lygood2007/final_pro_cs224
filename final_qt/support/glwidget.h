@@ -15,6 +15,7 @@
 #include <QString>
 #include "utils.h"
 #include "camera.h"
+#include "fluid_global.h"
 #include "resourceloader.h"
 
 // We fix the size
@@ -30,8 +31,9 @@
 //#define USE_FBO
 //#define USE_SKYBOX
 
+// Colors to use when rendering
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
-#define TIME_STEP 0.01
+#define TIME_STEP 0.015
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/
@@ -43,7 +45,7 @@ class QGLFramebufferObject;
 class Terrain;
 class FluidCPU;
 class FluidGPU;
-
+class Box;
 class GLWidget : public QGLWidget
 {
     Q_OBJECT
@@ -61,7 +63,8 @@ private:
     QTimer m_timer; // The timer variable
     OrbitCamera m_camera; // Camera
     Terrain* m_terrain;
-
+    QList<Box*> m_boxes;
+    GLuint m_boxTexID;
 #ifdef USE_GPU_FLUID
     FluidGPU* m_fluid;
 #else
@@ -103,12 +106,22 @@ public:
     /** Copied from CS123 Bloom lab - these really aren't the best and could be improved*/
     void applyOrthogonalCamera(float width, float height);
     void applyPerspectiveCamera(float width, float height);
+
+    /** Placing all visible geometry rendering in one method*/
     void renderScene();
+
+    /** The splitting these out to improve rendering and shader passes*/
     void renderTexturedQuad(int width, int height);
     void renderSkybox();
 
+    /**
+     * @brief GLWidget::renderObjects render the objects
+     */
+    void renderObjects();
+
     /** Placeing all visible geometry rendering in one method*/
     void renderFluid();
+    void renderParticles();
 
     /** Updates the current OpenGL state to avoid object distortion when the window is resized. */
     void resizeGL(int w, int h);
@@ -148,15 +161,30 @@ public:
      * @param y, The y position in screen space
      * @return Return if it is intersected
      */
-    void intersectFluid( const int x, const int y, QMouseEvent *event);
+    bool intersectFluid(  const int x, const int y, int& indexRow, int& indexCol, Vector3& pos );
 
     //copied from CS123 lab 09 - SH
     void loadCubeMap();
+    void loadObjectTexMap();
     void createShaderPrograms();
     void createFramebufferObjects(int width, int height);
     void createBlurKernel(int radius, int width, int height, GLfloat* kernel, GLfloat* offsets);
 
     void renderBlur(int width, int height);
+
+    /**
+     * @brief addObject Drop objects from the air
+     * @param x The x position
+     * @param z The z position
+     * @param Height The height
+     */
+    void addObject( const float x, const float z, const float y = OBJECT_ORIGIN_HEIGHT );
+
+    /**
+     * @brief updateObjects Update the objects' positions
+     * @param dt the time step
+     */
+    void updateObjects( float dt );
 
 private slots:
     /** Callback function, will be called whenever the timer ticks*/

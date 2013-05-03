@@ -709,7 +709,7 @@ void FluidCPU::drawFluid( DrawMethod method ) const
             glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
             for( int i = 0;  i < m_triangles.size(); i++ )
             {
-                Tri curTri  = m_triangles[i];
+                TriIndex curTri  = m_triangles[i];
                 int r[3]; int c[3];
                 r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
                 r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
@@ -855,7 +855,7 @@ void FluidCPU::buildTriangleList()
     {
         for( int j = 0; j < m_gridSize-1; j++ )
         {
-            Tri t1,t2;
+            TriIndex t1,t2;
             t1.a2D.indRow = i;
             t1.a2D.indCol = j;
             t1.b2D.indRow = i+1;

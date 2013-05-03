@@ -108,7 +108,8 @@ public:
 
  private:
 
-     friend void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event);
+    friend bool GLWidget::intersectFluid(  const int x, const int y, int& indexRow, int& indexCol, Vector3& pos );
+   //  friend void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event);
     /**
      * @brief init Initialize the variables
      * @param gridSize The length of the grid
@@ -265,7 +266,7 @@ private:
     QVector<QVector<float> > m_velocityU;
     QVector<QVector<float> > m_velocityW;
     QVector<QVector<float> > m_terrainHeightField;
-    QVector<Tri> m_triangles;
+    QVector<TriIndex> m_triangles;
     QVector<QVector<float> > m_sigmaField; // stores sigma values for wave dampening
     QVector<QVector<float> > m_gammaField; // stores gamma values for wave dampening
     QVector<QVector<float> > m_phiField; // stores phi values for wave dampening

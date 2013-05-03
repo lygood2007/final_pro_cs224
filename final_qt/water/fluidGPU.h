@@ -33,6 +33,9 @@ public:
     ~FluidGPU();
     void draw() const; //the name says it all - draw some fluid
 
+    void drawParticles2() const; //moved to public for rendering reasons
+
+
     /**
      * Update the simulation at each time step
     **/
@@ -96,9 +99,15 @@ public:
      */
     float* getFieldArray( FieldType type, int& buffLength ) const;
 
+    /**
+     * Get the domain size
+     */
+    inline float getDomainSize() const {return m_domainSize; }
+
  private:
 
-     friend void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event);
+    // friend void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event);
+       friend bool GLWidget::intersectFluid(  const int x, const int y, int& indexRow, int& indexCol, Vector3& pos );
     /**
      * @brief init Initialize the variables
      * @param gridSize The length of the grid
@@ -208,8 +217,6 @@ public:
      */
     void updateParticleSources();
 
-    void drawParticles2() const;
-
     void addBreakingWaveParticles();
 
 private:
@@ -254,7 +261,7 @@ private:
     GLuint m_vertexBuffer;
     GLuint m_normalBuffer;
 
-    QVector<Tri> m_triangles;
+    QVector<TriIndex> m_triangles;
 
     /**
      * first attempt at particles
@@ -265,16 +272,26 @@ private:
     /**
      * second attempt at particles
      */
-    Vector3 *m_particle_positions; // positions of particles, y = -1 is inactive
-    Vector3 *m_particle_velocities; // velocities of particles
+    Vector3 *m_spray_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_spray_velocities; // velocities of particles
+    int m_last_active_spray_index; // index of last active spray particle
+
+    Vector3 *m_splash_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_splash_velocities; // velocities of particles
+    int m_last_active_splash_index; // index of last active splash particle
+
+    Vector3 *m_foam_positions; // positions of particles, y = -1 is inactive
+    int m_last_active_foam_index; // index of last active foam particle
+
     Vector3 m_particle_acceleration; // acceleration of particles (same for all)
+    float m_VeffSplash, m_VeffSpray, m_splashHeightChange, m_sprayHeightChange; //to pre-calc
 
     /**
      * breaking waves
      */
     float* m_breakingWavesGrid; //grid of the number of particles instantiated by breaking waves
 
-    GLWidget* m_glw;
+    GLWidget* m_glw; //a pointer to glWidget so we can access the use booleans
 };
 
 #endif // FLUIDGPU_H

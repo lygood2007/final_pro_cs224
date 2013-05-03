@@ -35,29 +35,39 @@
 
 //#define USE_PARTICLES
 #define C_DEPOSIT 1
-#define SPLASH_PARTICLE_RADIUS 0.1 //0.2
-#define ALPHA_MIN_SPLASH 0.45 //0.45
-#define V_MIN_SPLASH 4 //4
-#define L_MIN_SPLASH -4 //-4
-#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 1
-#define LAMBDA_Y 0.1 //0.1
-
-#define BREAKING_WAVE_VEL_MULTIPLIER 5.0f
+#define SPRAY_PARTICLE_RADIUS 0.05
+#define SPLASH_PARTICLE_RADIUS 0.1
+#define FOAM_PARTICLE_RADIUS 0.25
+#define ALPHA_MIN_SPLASH 0.45
+#define V_MIN_SPLASH 4
+#define L_MIN_SPLASH -4
+#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 2
+#define LAMBDA_Y 0.1
+#define BREAKING_WAVE_VEL_MULTIPLIER 2.0f
 
 #define NUM_DROPPING_PARTICLES 10000
 #define PARTICLE_DROPPING_RADIUS 2.0
 #define PARTICLE_DROP_HEIGHT 60
 #define PARTICLE_DROP_RANGE 20
 
-#define USE_PARTICLES_2
-#define TOTAL_NUM_PARTICLES 100000
+//#define USE_PARTICLES_2 //no longer needed - SH
+#define TOTAL_NUM_SPRAY_PARTICLES 50000
+#define TOTAL_NUM_SPLASH_PARTICLES 100000
+#define TOTAL_NUM_FOAM_PARTICLES 5000
 
-/**
- * Not applicable now!
- */
+//particle colors - @NOTE these awful colors are only temporary
+#define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
+#define SPLASH_COLOR 0.0f,0.42f,0.58f,1.0f //1.0f,0.f,1.0f,0.9f
+#define FOAM_COLOR 1.0f,1.0f,0.0f,0.9f
+
+#define OBJECT_ORIGIN_HEIGHT TERRAIN_MAX_HEIGHT
+#define WATER_DENSITY 1000
+
+
+// If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-25;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;
