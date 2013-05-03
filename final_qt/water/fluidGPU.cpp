@@ -193,7 +193,7 @@ void FluidGPU::update(const float dt)
     }
 
 #ifdef DAMPEN_WAVES
-    dampenWaves();
+    if(m_glw->m_useDampening) dampenWaves();
 #endif
 
     m_timeElapsed += dt;

@@ -71,7 +71,7 @@ void GLWidget::init()
     //use everything
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     //except these
-    m_useAxis = false;
+    m_useAxis = false; m_useDampening = false;
 
 
 #ifdef USE_HEIGHTMAP
@@ -320,6 +320,7 @@ void GLWidget::renderScene()
         double matrix[16];
         glGetDoublev(GL_MODELVIEW_MATRIX, matrix);
         glPopMatrix();
+        //some of this could maybe be simplified but this spells it out correctly at least
         Matrix4x4 temp = Matrix4x4(matrix);
         Matrix4x4 tempT = temp.getTranspose();
         Matrix4x4 tempI = tempT.getInverse();
@@ -339,12 +340,11 @@ void GLWidget::renderScene()
         m_shaderPrograms["fresnel"]->release();
 
 
-        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
         // Render the points with the point shader
         m_shaderPrograms["point"]->bind();
-//        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
-        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
+        m_shaderPrograms["point"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["point"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
         renderParticles();
@@ -929,12 +929,12 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         m_useParticles = !m_useParticles;
         break;
     }
-    case Qt::Key_O:
+    case Qt::Key_O: //add an object
     {
          addObject( 0, 0 );
         break;
     }
-    case Qt::Key_U:
+    case Qt::Key_U: //make all ojects denser
     {
         foreach( Box* b, m_boxes )
         {
@@ -945,7 +945,7 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
         break;
     }
-    case Qt::Key_I:
+    case Qt::Key_I: //reduce all object density
     {
         foreach( Box* b, m_boxes )
         {
@@ -956,6 +956,12 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
         break;
     }
+    case Qt::Key_D:
+    {
+        m_useDampening = !m_useDampening;
+        break;
+    }
+
     }
 }
 

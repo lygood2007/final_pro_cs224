@@ -9,7 +9,7 @@
 #ifndef FLUID_GLOBAL_H
 #define FLUID_GLOBAL_H
 
-#define TERRAIN_BOUND 60
+#define TERRAIN_BOUND 80
 #define TERRAIN_BOTTOM_BOUND 0
 #define TERRAIN_MIN_HEIGHT 0
 #define TERRAIN_MAX_HEIGHT 40
@@ -22,7 +22,7 @@
 #define SAVE_NAME_VELOCITY "velocity"
 //#define SAVE_IMAGE
 
-//#define DAMPEN_WAVES
+#define DAMPEN_WAVES
 #define LAMBDA_DECAY 0.9
 #define LAMBDA_UPDATE 0.1
 #define DAMPENING_REGION 16

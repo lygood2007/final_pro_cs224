@@ -33,7 +33,7 @@
 
 // Colors to use when rendering
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
-#define TIME_STEP 0.025
+#define TIME_STEP 0.035
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/
@@ -55,7 +55,8 @@ public:
     ~GLWidget();
 
     //Not the best idea but I'm placing these here in case I need them elsewhere
-    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis, m_useSkybox, m_useParticles;
+    bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis,
+        m_useSkybox, m_useParticles, m_useDampening;
 
 private:
     // Private variables
