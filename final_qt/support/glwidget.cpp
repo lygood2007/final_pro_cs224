@@ -950,6 +950,28 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
          addObject( 0, 0 );
         break;
     }
+    case Qt::Key_U:
+    {
+        foreach( Box* b, m_boxes )
+        {
+            if( b )
+            {
+                b->setDensity(b->getDensity()+50);
+            }
+        }
+        break;
+    }
+    case Qt::Key_I:
+    {
+        foreach( Box* b, m_boxes )
+        {
+            if( b )
+            {
+                b->setDensity(b->getDensity()-50);
+            }
+        }
+        break;
+    }
     }
 }
 
@@ -1184,9 +1206,9 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
  */
 void GLWidget::addObject( const float x, const float z, const float y )
 {
-    const float length = 2.f;
-    const float height = 2.f;
-    const float width = 2.f;
+    const float length = 3.f;
+    const float height = 3.f;
+    const float width = 3.f;
     Box* newBox = new Box( m_fluid, Vector3(x,y,z), length,
                            height, width, m_terrain->getdx(), m_boxTexID );
     newBox->initPhysics();

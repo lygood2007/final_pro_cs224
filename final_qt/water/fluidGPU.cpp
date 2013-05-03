@@ -210,10 +210,10 @@ void FluidGPU::update(const float dt)
 void FluidGPU::addDrop(const int posX, const int posZ)
 {
     // Fixed size
-    int radius = m_gridSize/18;
+    int radius = m_gridSize/25;
     if( radius < 1 )
         radius = 1;
-    float h = m_domainSize/30;
+    float h = m_domainSize/15;
 
     addDropGPU( posX, posZ, radius, h );
     //copybackGPU(DEPTH,m_depthField);

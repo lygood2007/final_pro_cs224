@@ -33,7 +33,7 @@
 
 // Colors to use when rendering
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
-#define TIME_STEP 0.015
+#define TIME_STEP 0.025
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/

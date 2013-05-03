@@ -14,7 +14,9 @@ Object::Object()
 {
     m_domainSize = TERRAIN_BOUND*2;
     m_position = Vector3(0.f,0.f,0.f);
-    m_fluiddx = 1.f;
+    //m_fluiddx = 1.f;
+    m_dx = 1.f;
+    m_dxInv = 1.f/m_dx;
     m_color = Colorf(1.f,1.f,1.f,1.f);
     m_renderNormals = false;
     m_density = WATER_DENSITY;
@@ -24,6 +26,9 @@ Object::Object()
     m_liftCoeff = LIFT_COEFF;
     m_w = DEFAULT_W;
     m_texID = 0;
+    c1 = -WATER_DENSITY*m_dragCoeff*0.5;
+    c2 = -WATER_DENSITY*m_liftCoeff*0.5;
+    c3 = WATER_DENSITY*GRAVITY;
     memset( m_tessell, -1, 3*sizeof(int ) );
     computeOrigin();
 }
@@ -32,7 +37,8 @@ Object::Object(FluidGPU *fluid, Vector3 position, float dx, GLuint texID, float 
 {
     m_domainSize = fluid->getDomainSize();
     m_position = position;
-    m_fluiddx = dx;
+    m_dx = dx;
+    m_dxInv = 1.f/dx;
     m_texID = texID;
     m_color = color;
     m_renderNormals = false;
@@ -42,8 +48,12 @@ Object::Object(FluidGPU *fluid, Vector3 position, float dx, GLuint texID, float 
     m_upwards = false;
     m_decay = false;
     m_density = density;
+    c1 = -WATER_DENSITY*m_dragCoeff*0.5;
+    c2 = -WATER_DENSITY*m_liftCoeff*0.5;
+    c3 = WATER_DENSITY*GRAVITY;
     memset( m_tessell, -1, 3*sizeof(int ) );
     computeOrigin();
+    initFluidInfo( fluid );
 }
 
 Object::~Object()
@@ -51,15 +61,21 @@ Object::~Object()
 
 }
 
+
+void Object::setFluid( FluidGPU* fluid )
+{
+    initFluidInfo( fluid );
+}
+
 void Object::draw()
 {
     glEnable(GL_DEPTH_TEST);
     glMatrixMode( GL_MODELVIEW );
      glPushMatrix();
-     glTranslatef( m_position.x, m_position.y, m_position.z );
-     glRotatef( m_angle[2]/(2*M_PI)*360,0,0,1);
-    glRotatef( m_angle[1]/(2*M_PI)*360,0,1,0);
-    glRotatef( m_angle[0]/(2*M_PI)*360,1,0,0 );
+    glTranslatef( m_position.x, m_position.y, m_position.z );
+    glRotatef( m_angle[4],0,0,1);
+    glRotatef( m_angle[5],0,1,0);
+    glRotatef( m_angle[6],1,0,0 );
     glEnable(GL_TEXTURE_2D );
     glBindTexture( GL_TEXTURE_2D, m_texID );
      glBegin(GL_TRIANGLES);
@@ -92,7 +108,7 @@ void Object::update( float dt, FluidGPU* fluid )
 
   //  int buf;
     //printf("%f\n",fluid->getFieldArray(VEL_U,buf)[750]);
-    Vector3 decay = Vector3(1.f,1.f,1.f);
+    //Vector3 decay = Vector3(1.f,1.f,1.f);
     Vector3 yUnit = Vector3(0.f,1.f,0.f );
     Vector3 buoyTotal = Vector3(0.f,0.f,0.f);
     Vector3 buoyAccTotal = Vector3(0.f,0.f,0.f);
@@ -106,7 +122,7 @@ void Object::update( float dt, FluidGPU* fluid )
         Vector3 pos = m_tris[i].avgPos;
         float h;
         Vector3 fluidVelocity;
-        getInterpVelocityAndHeight( fluid, pos, fluidVelocity,h);
+        getInterpVelocityAndHeight( pos, fluidVelocity,h);
 
         if( pos.y > h )
             continue;
@@ -114,12 +130,16 @@ void Object::update( float dt, FluidGPU* fluid )
         Vector3 relVelocity = m_velocity - fluidVelocity;
         float cos = m_tris[i].avgNorm.dot(relVelocity.getNormalized());
         float Aef;
+
         if( cos <= 0.001 )
             Aef = 0;
         else
-            Aef =m_tris[i].area*((1-m_w) + m_w*m_tris[i].avgNorm.dot(relVelocity.getNormalized()));
-
-        Vector3 drag = -WATER_DENSITY*m_dragCoeff*0.5*relVelocity.length()*relVelocity*Aef;
+        {
+         // No w currently
+            Aef =m_tris[i].area*cos;
+        }
+        float l = relVelocity.length();
+        Vector3 drag = c1*l*relVelocity*Aef;
         Vector3 tmp1 = m_tris[i].avgNorm.cross( relVelocity);
         Vector3 lift;
         if( tmp1.length() <= 0.00001)
@@ -129,19 +149,19 @@ void Object::update( float dt, FluidGPU* fluid )
         else
         {
         Vector3 tmp2 = tmp1.getNormalized();
-         lift = -WATER_DENSITY*m_liftCoeff*0.5*relVelocity.length()
+         lift = c2*l
                 *( relVelocity.cross( tmp2 ) )*Aef;
         }
-        float buoy = WATER_DENSITY*GRAVITY*m_tris[i].area*(h - pos.y )*m_tris[i].avgNorm.dot(yUnit);
+        float buoy = c3*m_tris[i].area*(h - pos.y )*m_tris[i].avgNorm.dot(yUnit);
         buoyTotal += Vector3( 0.f, buoy, 0.f );
         dragTotal += drag;
         liftTotal += lift;
     }
-    buoyAccTotal = buoyTotal/m_mass;
-    dragAccTotal = dragTotal/m_mass;
-    liftAccTotal = liftTotal/m_mass;
+    buoyAccTotal = buoyTotal*m_massInv;
+    dragAccTotal = dragTotal*m_massInv;
+    liftAccTotal = liftTotal*m_massInv;
    //printf("Drag a: %f, %f, %f\n",dragAccTotal.x, dragAccTotal.y, dragAccTotal.z );
-   printf("Lift a: %f, %f, %f\n",liftAccTotal.x, liftAccTotal.y, liftAccTotal.z );
+  /* printf("Lift a: %f, %f, %f\n",liftAccTotal.x, liftAccTotal.y, liftAccTotal.z );
     if( m_upwards &&fabs(m_lastBuoAcc.y) > fabs(GRAVITY) && fabs(buoyAccTotal.y) <= fabs(GRAVITY) )
     {
         // In this case, it means the object pass through the point where Buoyancy
@@ -155,13 +175,12 @@ void Object::update( float dt, FluidGPU* fluid )
         decay.y = m_density/WATER_DENSITY;
         //decay.z = 0.99f;
     }
-    /*decay*/
     m_velocity.x = m_velocity.x*decay.x;m_velocity.y = m_velocity.y*decay.y;m_velocity.z = m_velocity.z*decay.z;
-
+*/
     m_velocity += 2*(buoyAccTotal*dt + Vector3(0.f,GRAVITY,0.f)*dt +dragAccTotal*dt +liftAccTotal*dt);
     //m_velocity.y += 2*liftAccTotal.y*dt;
     // Backup the buoyancy in this frame
-    m_lastBuoAcc = buoyAccTotal;
+    /*m_lastBuoAcc = buoyAccTotal;
     if( m_velocity.y < 0 )
     {
         m_decay = false;
@@ -169,20 +188,21 @@ void Object::update( float dt, FluidGPU* fluid )
     }
     else
         m_upwards = true;
-
+*/
     // Check if the next position is below terrain, if it is, we set the velocity to zero
     // Actually if one of the box's triangle is below terrain
     bool hitBottom = false;
     int buff;
     float* terrainHeight = fluid->getFieldArray( TERRAINH, buff );
      float gridSize =fluid->getGridSize();
+     Vector3 next = m_position + dt*(m_velocity);
     for( int i = 0; i < m_tris.size(); i++ )
     {
-        for( int j = 0; j < 3; j++ )
-        {
-            Vector3 tmpPos =  m_position + m_tris[i].verts[0] + dt*(m_velocity);
+       // for( int j = 0; j < 3; j++ )
+     //   {
+            Vector3 tmpPos =  next + m_tris[i].verts[0];
             float th = bilinearInterpReal( terrainHeight, tmpPos,
-                                           m_origX,m_origZ,m_fluiddx,
+                                           m_origX,m_origZ,m_dx,
                                            gridSize, gridSize
                                            );
             if( tmpPos.y < th )
@@ -190,7 +210,7 @@ void Object::update( float dt, FluidGPU* fluid )
                 hitBottom = true;
                 break;
             }
-        }
+     //   }
     }
     if( hitBottom )
     {
@@ -199,7 +219,7 @@ void Object::update( float dt, FluidGPU* fluid )
         m_velocity.x = m_velocity.x*hitDecay;
         m_velocity.y = 0;
         m_velocity.z = m_velocity.z*hitDecay;
-        return;
+
     }
 
     updatePosWithBoundaryCheck(dt);
@@ -230,6 +250,21 @@ void Object::initPhysics()
 }
 
 /**
+ * @brief initFluidInfo Initialize the data from fluid
+ */
+void Object::initFluidInfo( FluidGPU* fluid )
+{
+    int buff;
+    m_curH  = fluid->getFieldArray( HEIGHT, buff );
+    m_curU  = fluid->getFieldArray( VEL_U, buff );
+    m_curW  = fluid->getFieldArray( VEL_W, buff );
+
+    m_gridSize = fluid->getGridSize();
+    m_uwidth = m_gridSize+1;
+    m_wheight = m_gridSize+1;
+}
+
+/**
  * @brief drawNormal Draw the normals of this box
  */
 void Object::drawNormal() const
@@ -241,9 +276,9 @@ void Object::drawNormal() const
 
         glPushMatrix();
          glTranslatef( m_position.x, m_position.y, m_position.z );
-         glRotatef( m_angle[2]/(2*M_PI)*360,0,0,1);
-        glRotatef( m_angle[1]/(2*M_PI)*360,0,1,0);
-        glRotatef( m_angle[0]/(2*M_PI)*360,1,0,0 );
+         glRotatef( m_angle[4],0,0,1);
+         glRotatef( m_angle[5],0,1,0);
+         glRotatef( m_angle[6],1,0,0 );
         for( int i = 0; i < m_tris.size(); i++ )
         {
             for( int j = 0; j < 3; j++ )
@@ -271,7 +306,7 @@ void Object::updatePosAndNorm()
     // Currently, we don't update the normals because no rotation is included
     for( int i = 0; i < m_tris.size(); i++ )
     {
-        m_tris[i].avgPos = (m_tris[i].verts[0] + m_tris[i].verts[1] + m_tris[i].verts[2])/3.f + m_position;
+        m_tris[i].avgPos = (m_tris[i].verts[0] + m_tris[i].verts[1] + m_tris[i].verts[2])*0.33f + m_position;
     }
 }
 
@@ -304,61 +339,63 @@ void Object::updatePosWithBoundaryCheck( float dt )
  * @param fv the fluid velocity
  * @param the interpolated height
  */
- void Object::getInterpVelocityAndHeight( const FluidGPU* fluid, Vector3 pos,
+ void Object::getInterpVelocityAndHeight(/* const FluidGPU* fluid,*/ Vector3 pos,
                                     Vector3& fv, float&h )
  {
-     int buffLength;
+  /*   int buffLength;
      // Get the field
      float* hf = fluid->getFieldArray( HEIGHT, buffLength );
      float* uf  =fluid->getFieldArray( VEL_U, buffLength );
      float* wf  =fluid->getFieldArray( VEL_W, buffLength );
-
+*/
   //   float a = wf[2];
 
      /**
       * Get the size. width and height are the size of the height field
       */
-     int width = fluid->getGridSize();
+   /*  int width = fluid->getGridSize();
      int height = width;
      // width of velocity u
      int uwidth = fluid->getGridSize()+1;
      // height of velocity v
      int wheight = fluid->getGridSize()+1;
-
+*/
      float x = pos.x - m_origX;
      float z = pos.z - m_origZ;
-     float dx = m_fluiddx;
+//     float dx = m_fluiddx
 
      if( x < 0 )
          x = 0.f;
      if( z < 0 )
          z = 0.f;
-     if( x > (width - 1)*dx )
-         x = (width - 1)*dx;
-     if( z > (height - 1)*dx )
-         z = (height -1)*dx;
+     float xx = (m_gridSize - 1)*m_dx;
+     if( x > xx )
+         x = xx;
+     float zz = (m_gridSize - 1)*m_dx;
+     if( z > zz )
+         z = zz;
 
      // Get the index
-     const int X = (int)(x/dx);
-     const int Y = (int)(z/dx);
-     const float s1 = x - X*dx;
+     const int X = (int)(x*m_dxInv);
+     const int Y = (int)(z*m_dxInv);
+     const float s1 = x - X*m_dx;
      const float s0 = 1.f - s1;
-     const float t1 = z - Y*dx;
+     const float t1 = z - Y*m_dx;
      const float t0 = 1.f-t1;
      float e1, e2, e3,e4;
      e1 = e2 = e3 = e4 = 0;
-     e1 = hf[Y*width+X];
-     if( Y+1 <= height- 1 )
+     e1 = m_curH[Y*m_gridSize+X];
+     if( Y+1 <= m_gridSize- 1 )
      {
-         e2 = hf[(Y+1)*width + X];
+         e2 = m_curH[(Y+1)*m_gridSize+ X];
      }
-     if( X +1 <= width -1 )
+     if( X +1 <= m_gridSize-1 )
      {
-         e3 = hf[Y*width + X+1];
+         e3 = m_curH[Y*m_gridSize + X+1];
      }
-     if( Y+1 <= height - 1 && X + 1 <= width - 1)
+     if( Y+1 <= m_gridSize - 1 && X + 1 <= m_gridSize - 1)
      {
-         e4 = hf[(Y+1)*width + X+1];
+         e4 = m_curH[(Y+1)*m_gridSize + X+1];
      }
 
      h= s0*(t0*e1 + t1*e2 )+
@@ -367,36 +404,36 @@ void Object::updatePosWithBoundaryCheck( float dt )
 
      // Deal with the fluid's velocity
      fv = Vector3(0.f,0.f,0.f);
-     if( X+1 <= uwidth -1 )
+     if( X+1 <= m_uwidth -1 )
      {
          // The u component,average the two
-         fv.x = 0.5*(uf[Y*uwidth + X+1 ] + uf[Y*uwidth+X]);
+         fv.x = 0.5*(m_curU[Y*m_uwidth + X+1 ] + m_curU[Y*m_uwidth +X]);
      }
      else
      {
-         fv.x = uf[Y*uwidth+X];
+         fv.x = m_curU[Y*m_uwidth +X];
      }
 
-     if( Y+1 <= wheight - 1)
+     if( Y+1 <= m_wheight - 1)
      {
-         fv.z = 0.5*(wf[Y*width + X] + wf[(Y+1)*width + X]);
+         fv.z = 0.5*(m_curW[Y*m_gridSize + X] + m_curW[(Y+1)*m_gridSize+ X]);
      }
      else
-         fv.z = wf[Y*width + X ];
+         fv.z = m_curW[Y*m_gridSize + X ];
 
      float c1 = 0.f;
      float c2 = 0.f;
-     if( X-1 >= 0 && X+1 <= width - 1)
+     if( X-1 >= 0 && X+1 <= m_gridSize - 1)
      {
-         c1 = (hf[Y*width + X+1] - hf[Y*width + X - 1])/(2.f*dx);
+         c1 = (m_curH[Y*m_gridSize+ X+1] - m_curH[Y*m_gridSize+ X - 1])*0.5*m_dxInv;
      }
-     if( Y-1 >= 0 && Y + 1 <= height -1 )
+     if( Y-1 >= 0 && Y + 1 <= m_gridSize -1 )
      {
-         c2 = (hf[(Y+1)*width + X ] - hf[(Y-1)*width+X])/(2.f*dx);
+         c2 = (m_curH[(Y+1)*m_gridSize + X ] - m_curH[(Y-1)*m_gridSize+X])*0.5*m_dxInv;
      }
     fv.y  = c1*fv.x + c2*fv.z;
-    fv.x *= 2.5;
-    fv.z *= 2.5;
+     fv.x *= MAG_U;
+    fv.z *= MAG_W;
  }
 
 /**
@@ -412,10 +449,14 @@ void Object::generateRotation()
 {
     float angle = 2*M_PI*(rand()/(float)RAND_MAX);
     m_angle[0] = angle;
+
     angle = 2*M_PI*(rand()/(float)RAND_MAX);
     m_angle[1] = angle;
     angle = 2*M_PI*(rand()/(float)RAND_MAX);
     m_angle[2] = angle;
+    m_angle[3] = m_angle[2]/(2*M_PI)*360;
+    m_angle[4] = m_angle[1]/(2*M_PI)*360;
+    m_angle[5] = m_angle[0]/(2*M_PI)*360;
 
 
     m_rotMat[0] = Matrix4x4::identity();

@@ -36,7 +36,7 @@ Box::~Box()
 // In Box, we can just make the tessellation larger without computing the area
 void Box::computeTessel( )
 {
-    float dx = m_fluiddx;
+    float dx = m_dx;
     for( int i = 1; i < MAX_TES_X; i++ )
     {
         if( m_length/(float)i < dx )
@@ -355,5 +355,6 @@ void Box::buildTriangleList()
 void Box::computeMass()
 {
     m_mass = m_density*m_length*m_height*m_width;
+    m_massInv = 1/m_mass;
 }
 
