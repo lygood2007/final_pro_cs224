@@ -210,10 +210,10 @@ void FluidGPU::update(const float dt)
 void FluidGPU::addDrop(const int posX, const int posZ)
 {
     // Fixed size
-    int radius = m_gridSize/18;
+    int radius = m_gridSize/25;
     if( radius < 1 )
         radius = 1;
-    float h = m_domainSize/30;
+    float h = m_domainSize/15;
 
     addDropGPU( posX, posZ, radius, h );
     //copybackGPU(DEPTH,m_depthField);
@@ -401,6 +401,7 @@ void FluidGPU::init(const int gridSize, const float domainSize)
             m_spray_positions[i] = Vector3(0, -1, 0);
             m_spray_velocities[i] = Vector3::zero();
         }
+        m_last_active_spray_index = -1;
 
         //splash array
         int splashSize = sizeof(Vector3) * TOTAL_NUM_SPLASH_PARTICLES;
@@ -410,6 +411,7 @@ void FluidGPU::init(const int gridSize, const float domainSize)
             m_splash_positions[i] = Vector3(0, -1, 0);
             m_splash_velocities[i] = Vector3::zero();
         }
+        m_last_active_splash_index = -1;
 
         //foam array
         int foamSize = sizeof(Vector3) * TOTAL_NUM_FOAM_PARTICLES;
@@ -417,6 +419,7 @@ void FluidGPU::init(const int gridSize, const float domainSize)
         for(int i = 0; i < TOTAL_NUM_FOAM_PARTICLES; i++){
             m_foam_positions[i] = Vector3(0, -1, 0);
         }
+        m_last_active_foam_index = -1;
 
         //pre-caclulating several needed values to speed up things throughout
         m_VeffSpray = C_DEPOSIT * (4.0 / 3.0) * M_PI *
@@ -1100,7 +1103,7 @@ void FluidGPU::updateParticleSources(){
     }
 }
 
-void FluidGPU::drawParticles2() const{
+void FluidGPU::drawParticles2() {
     if(m_glw->m_useParticles)
     {
         //begin
@@ -1136,13 +1139,43 @@ void FluidGPU::drawParticles2() const{
 //        glBlendFunc(GL_ONE,GL_ONE);
 
         //iterate through each position and draw a point
-        //for(int i = 0; i < TOTAL_NUM_SPLASH_PARTICLES; i++){
         for(int i = 0; i < TOTAL_NUM_SPLASH_PARTICLES; i++){
             Vector3 position = m_splash_positions[i];
             if(position.y >= 0){
                 glVertex3f(position.x, position.y, position.z);
             }
         }
+
+        //TODO: try to make more efficient
+        //iterate through each position, swap positions/velocities as needed
+//        int particleIndex = 0;
+//        while(particleIndex <= m_last_active_splash_index){
+//            Vector3 position = m_splash_positions[particleIndex];
+
+//            //check if active
+//            if(position.y >= 0){
+//                //draw and move on
+//                glVertex3f(position.x, position.y, position.z);
+//                particleIndex++;
+//            } else {
+//                //if this is last or greater, error, break
+//                if(particleIndex >= m_last_active_splash_index){
+//                    break;
+//                }
+
+//                //swap with last
+//                m_splash_positions[particleIndex] = m_splash_positions[m_last_active_splash_index];
+//                m_splash_velocities[particleIndex] = m_splash_velocities[m_last_active_splash_index];
+
+//                //walk back to last particle index
+//                while(m_last_active_splash_index >= -1){
+//                    if(m_splash_positions[m_last_active_splash_index].y >= 0){
+//                        break;
+//                    }
+//                    m_last_active_splash_index--;
+//                }
+//            }
+//        }
 
         //end
 //        glDisable(GL_BLEND);
@@ -1224,7 +1257,7 @@ void FluidGPU::addBreakingWaveParticles(){
                                                LAMBDA_Y * V_MIN_SPLASH,
                                                BREAKING_WAVE_VEL_MULTIPLIER * m_velocityW[windex]);
 
-                    //find new inactive particle
+                    //add new active particle
                     bool added = false;
                     while(currIndex < TOTAL_NUM_SPLASH_PARTICLES && !added){
                         if(m_splash_positions[currIndex].y < 0){
@@ -1243,6 +1276,54 @@ void FluidGPU::addBreakingWaveParticles(){
                 }
             }
         }
+
+        //TODO: try to make more efficient
+//        for(int i = 1; i < m_gridSize - 1; i++){
+//            if(m_last_active_splash_index >= TOTAL_NUM_SPLASH_PARTICLES - 1){
+//                break;
+//            }
+
+//            for(int j = 1; j < m_gridSize - 1; j++){
+//                if(m_last_active_splash_index >= TOTAL_NUM_SPLASH_PARTICLES - 1){
+//                    break;
+//                }
+
+//                //index of current cell
+//                int index = getIndex1D(i, j, DEPTH);
+//                int uindex = getIndex1D(i, j, VEL_U);
+//                int windex = getIndex1D(i, j, VEL_W);
+
+//                int numToAdd = (int) floor(m_breakingWavesGrid[index]);
+//                int startIndex = m_last_active_splash_index + 1;
+//                int afterEndIndex = min(TOTAL_NUM_SPLASH_PARTICLES, startIndex + numToAdd);
+
+//                //TODO: position of current grid cell
+//                float posX = -halfDomain + (j * m_dx);
+//                float posZ = -halfDomain + (i * m_dx);
+
+//                for(int a = startIndex; a < afterEndIndex; a++){
+//                    if(m_depthField[index] < heightChange){
+//                        break;
+//                    }
+
+//                    //jitter particle positions
+//                    float randX = randomFloatGenerator(-halfDx, halfDx);
+//                    float randZ = randomFloatGenerator(-halfDx, halfDx);
+
+//                    Vector3 position = Vector3(posX + randX, m_heightField[index], posZ + randZ);
+//                    //TODO: wrong y component!
+//                    Vector3 velocity = Vector3(BREAKING_WAVE_VEL_MULTIPLIER * m_velocityU[uindex],
+//                                               LAMBDA_Y * V_MIN_SPLASH,
+//                                               BREAKING_WAVE_VEL_MULTIPLIER * m_velocityW[windex]);
+
+//                    //add new active particle
+//                    m_splash_positions[a] = position;
+//                    m_splash_velocities[a] = velocity;
+//                    m_depthField[index] -= heightChange;
+//                    m_last_active_splash_index = a;
+//                }
+//            }
+//        }
 
         inputParticlesGPU((float*)m_splash_positions, (float*)m_splash_velocities);
         inputDepthGPU( m_depthField );

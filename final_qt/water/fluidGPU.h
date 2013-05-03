@@ -33,7 +33,7 @@ public:
     ~FluidGPU();
     void draw() const; //the name says it all - draw some fluid
 
-    void drawParticles2() const; //moved to public for rendering reasons
+    void drawParticles2(); //moved to public for rendering reasons
 
 
     /**

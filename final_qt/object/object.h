@@ -11,10 +11,13 @@
 #include "object_defs.h"
 
 
-//#define JITTER_ORIGIN
+#define JITTER_ORIGIN
 
 #define MAX_INIT_U 20
 #define MAX_INIT_W 20
+#define MAG_U 2.2
+#define MAG_W 2.2
+#define MIN_DENSITY 300
 
 class FluidGPU;
 
@@ -25,6 +28,8 @@ public:
     Object();
     Object( FluidGPU* fluid, Vector3 position, float dx, GLuint texID, float density, const Colorf color = Colorf(1.f,1.f,1.f,1.f) );
     virtual ~Object();
+
+    void setFluid( FluidGPU* fluid );
     /**
      * @brief draw Draw the box
      */
@@ -58,7 +63,7 @@ public:
 
     inline float getDensity() const { return m_density; }
 
-    inline void setDensity( float density ){ if( density <= 100 )return; m_density = density; computeMass(); }
+    inline void setDensity( float density ){ if( density <= MIN_DENSITY || density >= 2000)return; m_density = density; computeMass(); }
 
     /**
      * @brief Compute mass, tesselation,etc
@@ -76,16 +81,20 @@ public:
      * @brief setCoeffDrag Set the drag coefficient
      * @param dragCoef
      */
-    inline void setCoeffDrag( float dragCoef ){ m_dragCoeff = dragCoef; }
+    inline void setCoeffDrag( float dragCoef ){ m_dragCoeff = dragCoef;c1 = -WATER_DENSITY*m_dragCoeff*0.5; }
 
     /**
      * @brief setCoeffLift Set the lift coefficient
      * @param liftCoef
      */
-    inline void setCoeffLift( float liftCoef ){ m_liftCoeff = liftCoef; }
+    inline void setCoeffLift( float liftCoef ){ m_liftCoeff = liftCoef; c2 = -WATER_DENSITY*m_liftCoeff*0.5;}
 
 private:
 
+    /**
+     * @brief initFluidInfo Initialize the data from fluid
+     */
+    void initFluidInfo( FluidGPU* fluid );
     /**
      * @brief drawNormal Draw the normals of this box
      */
@@ -108,7 +117,7 @@ private:
      * @param fv the fluid velocity
      * @param the interpolated height
      */
-     void getInterpVelocityAndHeight( const FluidGPU* fluid, Vector3 pos,
+     void getInterpVelocityAndHeight( Vector3 pos,
                                        Vector3& fv, float&h );
      /**
       * @brief computeOrigin compute the origin position of x and z
@@ -126,7 +135,7 @@ private:
     float m_dragCoeff;
     float m_liftCoeff;
 
-    float m_angle[3];
+    float m_angle[6];
     Matrix4x4 m_rotMat[3];
 
     Colorf m_color;
@@ -136,6 +145,19 @@ private:
     float m_w;
 
     Vector3 m_lastBuoAcc;
+
+    // Only for speeding up
+    float c1;
+    float c2;
+    float c3;
+
+    float* m_curH;
+    float* m_curU;
+    float* m_curW;
+
+    int m_gridSize;
+    int m_uwidth;
+    int m_wheight;
 
 protected:
 
@@ -165,7 +187,9 @@ protected:
 
 protected:
 
-      float m_fluiddx; // backup the dx of fluid's grid
+      float m_dx;
+      float m_dxInv;
+      //float m_fluiddx; // backup the dx of fluid's grid
 
      Vector3 m_velocity;
      Vector3 m_position;
@@ -175,6 +199,7 @@ protected:
     int m_tessell[3];
 
     float m_mass;
+    float m_massInv;
 
     float m_density;
 

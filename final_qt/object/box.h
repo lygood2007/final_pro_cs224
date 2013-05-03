@@ -10,7 +10,7 @@
 
 #include "object.h"
 
-#define BOX_DENSITY 500
+#define BOX_DENSITY 800
 #define MAX_TES_X 20
 #define MAX_TES_Y 20
 #define MAX_TES_Z 20
