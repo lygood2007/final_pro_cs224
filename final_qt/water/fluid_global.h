@@ -22,10 +22,10 @@
 #define SAVE_NAME_VELOCITY "velocity"
 //#define SAVE_IMAGE
 
-#define DAMPEN_WAVES
+//#define DAMPEN_WAVES
 #define LAMBDA_DECAY 0.9
 #define LAMBDA_UPDATE 0.1
-#define DAMPENING_REGION 10
+#define DAMPENING_REGION 16
 #define QUADRATIC_A 10.0f
 #define QUADRATIC_B 0.0f
 #define QUADRATIC_C 0.0f
@@ -35,12 +35,14 @@
 
 //#define USE_PARTICLES
 #define C_DEPOSIT 1
-#define SPLASH_PARTICLE_RADIUS 0.2
-#define ALPHA_MIN_SPLASH 0.45
-#define V_MIN_SPLASH 4
-#define L_MIN_SPLASH -4
-#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 100
-#define LAMBDA_Y 0.1
+#define SPLASH_PARTICLE_RADIUS 0.1 //0.2
+#define ALPHA_MIN_SPLASH 0.45 //0.45
+#define V_MIN_SPLASH 4 //4
+#define L_MIN_SPLASH -4 //-4
+#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 1
+#define LAMBDA_Y 0.1 //0.1
+
+#define BREAKING_WAVE_VEL_MULTIPLIER 5.0f
 
 #define NUM_DROPPING_PARTICLES 10000
 #define PARTICLE_DROPPING_RADIUS 2.0
@@ -55,7 +57,7 @@
  */
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-25;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;
@@ -76,7 +78,8 @@ enum FieldType
     HEIGHT,
     PARTICLE_POSITIONS,
     PARTICLE_VELOCITIES,
-    PAINT
+    PAINT,
+    BREAKING_WAVES
 };
 
 enum DrawMethod

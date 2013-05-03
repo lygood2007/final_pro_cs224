@@ -210,6 +210,8 @@ public:
 
     void drawParticles2() const;
 
+    void addBreakingWaveParticles();
+
 private:
 
 // Variables
@@ -266,6 +268,11 @@ private:
     Vector3 *m_particle_positions; // positions of particles, y = -1 is inactive
     Vector3 *m_particle_velocities; // velocities of particles
     Vector3 m_particle_acceleration; // acceleration of particles (same for all)
+
+    /**
+     * breaking waves
+     */
+    float* m_breakingWavesGrid; //grid of the number of particles instantiated by breaking waves
 
     GLWidget* m_glw;
 };

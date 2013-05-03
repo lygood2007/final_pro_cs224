@@ -41,8 +41,13 @@ bool findSupportDevice();
 
 void initParticlesGPU(const int numParticles);
 void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
-void intersectParticlesGPU( const float halfDomain, const float mdxInv, const float heightChange );
+void intersectParticlesGPU( const float halfDomain, const float mdx, const float mdxInv, const float Veff, const float heightChange );
 void inputParticlesGPU( const float *particlePositions, const float *particleVelocities );
+
+void checkBreakingWavesGPU( const float condition1, const float condition2, const float condition3,
+                            const float mdx, const float mdxInv, const float dt, const float halfDomain,
+                            const float heightChange, const float lambdaY, const int numParticlesToAdd );
+void inputDepthGPU( const float* newDepthField );
 
 void clampFieldsGPU( const float velocityClamp );
 
@@ -157,17 +162,30 @@ void FluidGPU::update(const float dt)
 #ifdef USE_PARTICLES_2
     if(m_glw->m_useParticles)
     {
-        float Veff = C_DEPOSIT * (4 / 3) * M_PI *
+        float Veff = C_DEPOSIT * (4.0 / 3.0) * M_PI *
                 SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
         float heightChange = Veff * m_dxInv * m_dxInv;
         float halfDomain = m_domainSize / 2.0;
 
         updateParticlesGPU( dt, m_particle_acceleration.x, m_particle_acceleration.y, m_particle_acceleration.z);
-        intersectParticlesGPU( halfDomain, m_dxInv, heightChange );
+        intersectParticlesGPU( halfDomain, m_dx, m_dxInv, Veff, heightChange );
+
+        //copy back the changed data
         copybackGPU(DEPTH, m_depthField);
         copybackGPU(HEIGHT, m_heightField);
         copybackGPU(PARTICLE_POSITIONS, (float*) m_particle_positions);
         copybackGPU(PARTICLE_VELOCITIES, (float*) m_particle_velocities);
+
+        copybackGPU(VEL_U, m_velocityU);
+        copybackGPU(VEL_W, m_velocityW);
+
+        //check for breaking waves
+        //TODO!!!!
+        checkBreakingWavesGPU( ALPHA_MIN_SPLASH * GRAVITY * m_dt * m_dxInv, V_MIN_SPLASH, L_MIN_SPLASH,
+                                    m_dx, m_dxInv, m_dt, halfDomain, heightChange, LAMBDA_Y, BREAKING_WAVE_NUM_SPLASH_PARTICLES );
+        copybackGPU( BREAKING_WAVES, m_breakingWavesGrid);
+        addBreakingWaveParticles();
+        //TODO!!!!
     }
 #endif
 
@@ -311,6 +329,7 @@ void FluidGPU::init(const int gridSize, const float domainSize)
     m_phiField = (float*)malloc(size);
     m_psiField = (float*)malloc(size);
     m_heightField = (float*)malloc(size);
+    m_breakingWavesGrid = (float*)malloc(size);
 
     int paintSize = (m_gridPaintSize)*(m_gridPaintSize)*sizeof(Vector3);
     m_paintField = (Vector3*)malloc(paintSize);
@@ -324,6 +343,7 @@ void FluidGPU::init(const int gridSize, const float domainSize)
         m_phiField[i] = 0.f;
         m_psiField[i] = 0.f;
         m_heightField[i] = 0.f;
+        m_breakingWavesGrid[i] = 0.f;
     }
 
     size = (m_gridSize)*(m_gridSize+1)*sizeof(float);
@@ -1075,3 +1095,135 @@ void FluidGPU::drawParticles2() const{
     }
 #endif
 }
+
+void FluidGPU::addBreakingWaveParticles(){
+    if(m_glw->m_useParticles)
+    {
+        float halfDomain = m_domainSize / 2.0;
+        float halfDx = m_dx / 2.0;
+
+        //compute volume
+        double Veff = C_DEPOSIT * (4.0 / 3.0) * M_PI *
+                SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+        double heightChange = Veff * m_dxInv * m_dxInv; // / (m_dx * m_dx);
+
+        int currIndex = 0;
+        for(int i = 1; i < m_gridSize - 1; i++){
+            if(currIndex >= TOTAL_NUM_PARTICLES){
+                break;
+            }
+
+            for(int j = 1; j < m_gridSize - 1; j++){
+                if(currIndex >= TOTAL_NUM_PARTICLES){
+                    break;
+                }
+
+                //index of current cell
+                int index = getIndex1D(i, j, DEPTH);
+                int uindex = getIndex1D(i, j, VEL_U);
+                int windex = getIndex1D(i, j, VEL_W);
+
+                int numToAdd = (int) floor(m_breakingWavesGrid[index]);
+
+                //TODO: position of current grid cell
+                float posX = -halfDomain + (j * m_dx);
+                float posZ = -halfDomain + (i * m_dx);
+
+                for(int a = 0; a < numToAdd; a++){
+                    if(m_depthField[index] < heightChange){
+                        break;
+                    }
+
+                    //TODO
+                    //if(a > 0){
+                    //    break;
+                    //}
+
+                    //jitter particle positions
+                    float randX = randomFloatGenerator(-halfDx, halfDx);
+                    float randZ = randomFloatGenerator(-halfDx, halfDx);
+
+                    Vector3 position = Vector3(posX + randX, m_heightField[index], posZ + randZ);
+                    //TODO: wrong y component!
+                    Vector3 velocity = Vector3(BREAKING_WAVE_VEL_MULTIPLIER * m_velocityU[uindex],
+                                               LAMBDA_Y * V_MIN_SPLASH,
+                                               BREAKING_WAVE_VEL_MULTIPLIER * m_velocityW[windex]);
+                    //Vector3 velocity = Vector3(5.0 * m_velocityU[uindex], LAMBDA_Y * V_MIN_SPLASH, 5.0 * m_velocityW[windex]);
+
+                    //find new inactive particle
+                    bool added = false;
+                    while(currIndex < TOTAL_NUM_PARTICLES && !added){
+                        if(m_particle_positions[currIndex].y < 0){
+                            //set new particle as active
+                            m_particle_positions[currIndex] = position;
+                            m_particle_velocities[currIndex] = velocity;
+
+                            m_depthField[index] -= heightChange;
+
+                            added = true;
+                            break;
+                        }
+
+                        currIndex++;
+                    }
+                }
+            }
+        }
+
+        inputParticlesGPU((float*)m_particle_positions, (float*)m_particle_velocities);
+        inputDepthGPU( m_depthField );
+        copybackGPU(HEIGHT, m_heightField );
+    }
+}
+
+/*void FluidCPU::generateSplashParticles(int i, int j, int numParticles){
+    //get position
+    double halfDomain = m_domainSize / 2.0;
+    double posX = -halfDomain + (i * m_dx);
+    double posZ = -halfDomain + (j * m_dx);
+    Vector3 position = Vector3(posX, m_terrainHeightField[i][j] + m_depthField[i][j], posZ);
+
+    double halfDx = m_dx / 2.0;
+
+    for(int a = 0; a < numParticles; a++){
+        //jitter particle positions
+        double randX = ((rand() / RAND_MAX) * m_dx) - halfDx;
+        double randZ = ((rand() / RAND_MAX) * m_dx) - halfDx;
+        Vector3 newPosition = Vector3(position.x + randX, position.y, position.z + randZ);
+
+        generateSplashParticle(i, j, newPosition);
+    }
+}
+
+void FluidCPU::generateSplashParticle(int i, int j, Vector3 position){
+    //check amount of fluid
+    if(m_depthField[i][j] <= 0){
+        return;
+    }
+
+    //compute volume
+    double Veff = C_DEPOSIT * (4 / 3) * M_PI *
+            SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+    double heightChange = Veff / (m_dx * m_dx);
+
+    //check height change
+    if(m_depthField[i][j] < heightChange){
+        heightChange = m_depthField[i][j];
+        Veff = heightChange * (m_dx * m_dx);
+    }
+
+    //reduce height field
+    m_depthField[i][j] -= heightChange;
+
+    //get velocity
+    Vector3 velocity = Vector3(m_velocityU[i][j], LAMBDA_Y * computeBreakingWaveCondition2(i, j), m_velocityW[i][j]);
+
+    //get acceleration
+    Vector3 acceleration = Vector3(0, GRAVITY, 0);
+
+    //make new particle
+    Particle *newParticle = new Particle(SPLASH_PARTICLE_RADIUS, Veff, position, velocity, acceleration);
+
+    //append new particle
+    m_particles.append(newParticle);
+}*/
