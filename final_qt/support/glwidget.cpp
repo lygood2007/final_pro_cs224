@@ -803,6 +803,7 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
             if(intersectFluid( event->x(), event->y(), indexRow, indexCol,pos ))
             {
                 m_fluid->addDrop( indexCol, indexRow );
+//                m_fluid->addDroppingParticles( indexCol, indexRow );
               // the coordinate is problematic
 //                addObject( pos.z, -pos.x );
             }
