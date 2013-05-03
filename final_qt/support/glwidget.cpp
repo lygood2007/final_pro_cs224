@@ -376,6 +376,7 @@ void GLWidget::renderScene()
         renderParticles();
 
 
+
         }
         else //plain old fluid, nothing special
         {

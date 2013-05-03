@@ -57,7 +57,7 @@
 
 //particle colors - @NOTE these awful colors are only temporary
 #define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
-#define SPLASH_COLOR 0.0f,0.42f,0.58f,1.0f //1.0f,0.f,1.0f,0.9f
+#define SPLASH_COLOR 1.0f,1.0f,1.0f,1.0f //1.0f,0.f,1.0f,0.9f
 #define FOAM_COLOR 1.0f,1.0f,0.0f,0.9f
 
 #define OBJECT_ORIGIN_HEIGHT TERRAIN_MAX_HEIGHT
@@ -67,7 +67,7 @@
 // If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-25;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-15;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;
