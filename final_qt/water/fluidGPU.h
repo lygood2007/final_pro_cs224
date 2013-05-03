@@ -270,9 +270,16 @@ private:
     /**
      * second attempt at particles
      */
-    Vector3 *m_particle_positions; // positions of particles, y = -1 is inactive
-    Vector3 *m_particle_velocities; // velocities of particles
+    Vector3 *m_spray_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_spray_velocities; // velocities of particles
+
+    Vector3 *m_splash_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_splash_velocities; // velocities of particles
+
+    Vector3 *m_foam_positions; // positions of particles, y = -1 is inactive
+
     Vector3 m_particle_acceleration; // acceleration of particles (same for all)
+    float m_VeffSplash, m_VeffSpray, m_splashHeightChange, m_sprayHeightChange; //to pre-calc
 
     GLWidget* m_glw; //a pointer to glWidget so we can access the use booleans
 };

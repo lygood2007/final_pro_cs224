@@ -449,8 +449,6 @@ void GLWidget::renderParticles()
 {
     if(m_useParticles)
     {
-        //I think ultimately we want to set the colors in drawparticles2 for the best results
-        glColor4f(SPRAY_COLOR);
         glEnable (GL_BLEND);
         glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_DEPTH_TEST );
@@ -608,7 +606,7 @@ void GLWidget::loadCubeMap()
  */
 void GLWidget::loadObjectTexMap()
 {
-   m_boxTexID = loadTexture("resource/box_tex.jpg");
+//   m_boxTexID = loadTexture("resource/box_tex.jpg");
 }
 
 /**
@@ -806,7 +804,7 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
             {
                 m_fluid->addDrop( indexCol, indexRow );
               // the coordinate is problematic
-                addObject( pos.z, -pos.x );
+//                addObject( pos.z, -pos.x );
             }
         }
 #endif

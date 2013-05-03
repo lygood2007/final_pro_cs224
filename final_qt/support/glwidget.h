@@ -34,9 +34,7 @@
 // Colors to use when rendering
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
 
-#define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
-#define SPLASH_COLOR 1.0f,0.f,1.0f,0.9f
-#define FOAM_COLOR 1.0f,1.0f,0.0f,0.9f
+
 
 #define TIME_STEP 0.015
 /**
