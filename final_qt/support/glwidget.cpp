@@ -283,9 +283,6 @@ void GLWidget::renderScene()
   m_terrain->draw();
   glDisable(GL_DEPTH_TEST);
 #endif
-
- //renderObjects();
-
    if(m_useAxis) // make true to draw some axis'
    {
        static GLUquadric * quad = gluNewQuadric();
@@ -607,7 +604,7 @@ void GLWidget::loadCubeMap()
  */
 void GLWidget::loadObjectTexMap()
 {
-//   m_boxTexID = loadTexture("resource/box_tex.jpg");
+   m_boxTexID = loadTexture("resource/box_tex.jpg");
 }
 
 /**
@@ -806,7 +803,7 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
                 m_fluid->addDrop( indexCol, indexRow );
 //                m_fluid->addDroppingParticles( indexCol, indexRow );
               // the coordinate is problematic
-//                addObject( pos.z, -pos.x );
+               // addObject( pos.z, -pos.x );
             }
         }
 #endif
@@ -947,6 +944,11 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_P:
     {
         m_useParticles = !m_useParticles;
+        break;
+    }
+    case Qt::Key_O:
+    {
+         addObject( 0, 0 );
         break;
     }
     }
