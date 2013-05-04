@@ -93,7 +93,7 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_gammaField );
     safeFreeArray1D( m_phiField );
     safeFreeArray1D( m_psiField );
-    safeFreeArray1D( m_paintNormalField );
+//    safeFreeArray1D( m_paintNormalField ); //@TODO - this is causing the memory error
     safeFreeArray1D( m_heightField );
     safeFreeArray1D( m_depthField );
 
@@ -1100,6 +1100,10 @@ void FluidGPU::updateParticleSources(){
     inputParticlesGPU((float*) m_splash_positions, (float*) m_splash_velocities);
 }
 
+/*
+ * This method is being obsoleted and replaced with one for each type of particle - SH
+ */
+
 void FluidGPU::drawParticles2() {
     if(m_glw->m_useParticles)
     {
@@ -1177,6 +1181,76 @@ void FluidGPU::drawParticles2() {
 
     }
 }
+
+//drawings spray only
+void FluidGPU::drawSpray()
+{
+
+    if(m_glw->m_useParticles)
+    {
+        //@NOTE these next two lines must come outside the glBegin/glEnd block
+//        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+        glPointSize(0.5);
+        glColor4f(SPRAY_COLOR);  // testing color only, true color determined by shader
+        glBegin(GL_POINTS);
+        //iterate through each position and draw a point
+        for(int i = 0; i < TOTAL_NUM_SPRAY_PARTICLES; i++){
+            Vector3 position = m_spray_positions[i];
+            //if(position.y >= 0){
+            if(position.y >= TERRAIN_MIN_HEIGHT){
+                glVertex3f(position.x, position.y, position.z);
+            }
+        }
+        glEnd();
+    }
+
+}
+
+//now draw splash a different size and color
+void FluidGPU::drawSplash()
+{
+    if(m_glw->m_useParticles)
+    {
+        //@NOTE these next two lines must come outside the glBegin/glEnd block
+//        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+        glPointSize(1.5);
+        glColor4f(SPLASH_COLOR); // testing color only, true color determined by shader
+        glBegin(GL_POINTS);
+        //iterate through each position and draw a point
+        for(int i = 0; i < TOTAL_NUM_SPLASH_PARTICLES; i++){
+            Vector3 position = m_splash_positions[i];
+            //if(position.y >= 0){
+            if(position.y >= TERRAIN_MIN_HEIGHT){
+                glVertex3f(position.x, position.y, position.z);
+            }
+        }
+        glEnd();
+    }
+}
+
+//now draw foam
+void FluidGPU::drawFoam()
+{
+    if(m_glw->m_useParticles)
+    {
+        //@NOTE these next two lines must come outside the glBegin/glEnd block
+//        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+        glPointSize(2);
+        glColor4f(FOAM_COLOR);// testing color only, true color determined by shader
+        glBegin(GL_POINTS);
+        //iterate through each position and draw a point
+        for(int i = 0; i < TOTAL_NUM_FOAM_PARTICLES; i++){
+            Vector3 position = m_foam_positions[i];
+            //if(position.y >= 0){
+            if(position.y >= TERRAIN_MIN_HEIGHT){
+                glVertex3f(position.x, position.y, position.z);
+            }
+        }
+        glEnd();
+    }
+}
+
+
 
 void FluidGPU::addBreakingWaveParticles(){
     if(m_glw->m_useParticles)

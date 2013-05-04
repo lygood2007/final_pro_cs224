@@ -90,7 +90,11 @@ OTHER_FILES += cuda/fluid_compute.cu \
     shaders/f2.frag \
     shaders/f2.vert \
     shaders/point.frag \
-    shaders/point.vert
+    shaders/point.vert \
+    shaders/splash.vert \
+    shaders/splash.frag \
+    shaders/foam.vert \
+    shaders/foam.frag
 
 CUDA_SOURCES += cuda/test.cu cuda/fluid_compute.cu
 

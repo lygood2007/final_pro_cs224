@@ -125,6 +125,10 @@ public:
     /** Placeing all visible geometry rendering in one method*/
     void renderFluid();
     void renderParticles();
+    /** So we can render the particles separately for shading purposes*/
+    void renderSpray();
+    void renderSplash();
+    void renderFoam();
 
     /** Updates the current OpenGL state to avoid object distortion when the window is resized. */
     void resizeGL(int w, int h);
