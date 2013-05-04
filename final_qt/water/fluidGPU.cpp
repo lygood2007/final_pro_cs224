@@ -1313,12 +1313,15 @@ void FluidGPU::addBreakingWaveParticles(){
                     //not breaking
                     continue;
                 }
-                int numToAdd = BREAKING_WAVE_NUM_SPLASH_PARTICLES;
+
+                //get a number of particles to add (randomly in the range)
+                int numToAdd = BREAKING_WAVE_MIN_GEN_PARTICLES + (rand() % BREAKING_WAVE_RANGE_GEN_PARTICLES);
 
                 //position of current grid cell
                 float posX = -halfDomain + (j * m_dx);
                 float posZ = -halfDomain + (i * m_dx);
 
+                //add splash particles
                 for(int a = 0; a < numToAdd; a++){
                     //jitter particle positions
                     float randX = randomFloatGenerator(-halfDx, halfDx);
@@ -1346,6 +1349,18 @@ void FluidGPU::addBreakingWaveParticles(){
                             currSplashIndex++;
                         }
                     }
+                }
+
+                //add spray particles
+                for(int a = 0; a < numToAdd; a++){
+                    //jitter particle positions
+                    float randX = randomFloatGenerator(-halfDx, halfDx);
+                    float randZ = randomFloatGenerator(-halfDx, halfDx);
+
+                    Vector3 position = Vector3(posX + randX, m_heightField[index], posZ + randZ);
+                    Vector3 velocity = Vector3(BREAKING_WAVE_VEL_MULTIPLIER * m_velocityU[uindex],
+                                               BREAKING_WAVE_VEL_MULTIPLIER * LAMBDA_Y * depthChange,
+                                               BREAKING_WAVE_VEL_MULTIPLIER * m_velocityW[windex]);
 
                     //if possible, add new spray particle
                     if(m_depthField[index] >= m_sprayHeightChange){
