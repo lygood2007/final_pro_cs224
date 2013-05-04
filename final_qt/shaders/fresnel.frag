@@ -9,6 +9,7 @@ uniform float rS;		// The R0 value to use in Schlick's approximation
 uniform float eta1D;		// The eta value to use initially
 uniform vec3  eta;		// Contains one eta for each channel (ue eta.r, eta.g, eta.b in your code)
 
+
 // IoR of Air is   1.0002926
 // IoR of Water is 1.33335  (at 20 deg C)
 // (n1-n2)/(n1+n2) = -0.1427199692

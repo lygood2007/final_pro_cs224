@@ -201,9 +201,7 @@ void FluidGPU::update(const float dt)
         addBreakingWaveParticles();
     }
 
-#ifdef DAMPEN_WAVES
     if(m_glw->m_useDampening) dampenWaves();
-#endif
 
     m_timeElapsed += dt;
     m_updateCount++;
@@ -1133,8 +1131,8 @@ void FluidGPU::drawParticles2() {
         //begin
         //drawings spray only
         //@NOTE these next two lines must come outside the glBegin/glEnd block
-        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(0.5);
+//        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+//        glPointSize(0.5);
         glColor4f(SPRAY_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);
@@ -1155,8 +1153,8 @@ void FluidGPU::drawParticles2() {
         glEnd();
 
         //now draw splash a different size and color
-        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(1.5);
+//        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+//        glPointSize(1.5);
         glColor4f(SPLASH_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);
@@ -1179,8 +1177,8 @@ void FluidGPU::drawParticles2() {
 
 
         //now draw foam a different size and color
-        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
-        glPointSize(4);
+//        glEnable(GL_PROGRAM_POINT_SIZE_EXT);
+//        glPointSize(2);
         glColor4f(FOAM_COLOR);
         glBegin(GL_POINTS);
 //        glEnable(GL_CULL_FACE);

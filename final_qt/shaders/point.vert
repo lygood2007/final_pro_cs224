@@ -11,9 +11,7 @@ void main()
 
          r = reflect(I,normal);
 
-
     gl_Position = ftransform();
+//    gl_PointSize = 64.0/gl_Position.w;
+//    gl_PointSize  = 64.0;
 }
-
-
-

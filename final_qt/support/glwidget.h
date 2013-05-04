@@ -25,7 +25,7 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
-#define USE_HEIGHTMAP
+//#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
 //#define USE_FBO
@@ -90,6 +90,8 @@ private:
     float m_delta;
 
     float m_timeStep;
+
+    GLuint m_waterNormalMap;
 
 
 public:

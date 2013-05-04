@@ -168,6 +168,8 @@ void GLWidget::initializeResources()
     loadCubeMap();
     cout << "  Loaded Skymap ->" << endl;
 
+    m_waterNormalMap = loadTexture("./resource/shallow_normal.jpg");
+
     createShaderPrograms();
     cout << "  Loaded Shaders ->" << endl;
 
@@ -307,6 +309,7 @@ void GLWidget::renderScene()
         //this is entirely awful but needed
         //this takes the correct rotation matrix from the camera and applies it to the
         //cube map so the fresnel shader works correctly
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
@@ -331,16 +334,21 @@ void GLWidget::renderScene()
 
         // Render the fluid with the fresnel shader bound for reflection and refraction
         m_shaderPrograms["fresnel"]->bind();
-        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", 0);
         m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_waterNormalMap);
+        m_shaderPrograms["fresnel"]->setUniformValue("NormalMap", 1);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
         renderFluid();
         glPopMatrix();
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE0);
         m_shaderPrograms["fresnel"]->release();
 
 
-//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this allows attenuation of the gl_points
         // Render the points with the point shader
         m_shaderPrograms["point"]->bind();
         m_shaderPrograms["point"]->setUniformValue("CubeMap", GL_TEXTURE0);
@@ -430,8 +438,8 @@ void GLWidget::renderParticles()
 {
     if(m_useParticles)
     {
-//        glEnable (GL_BLEND);
-//        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_DEPTH_TEST );
         m_fluid->drawParticles2();
         glDisable(GL_DEPTH_TEST );
