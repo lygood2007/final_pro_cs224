@@ -67,7 +67,7 @@
 // If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-20;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;

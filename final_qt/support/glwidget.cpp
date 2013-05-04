@@ -4,7 +4,6 @@
  ** Date: 04/10/2013
  ** Member: Scott, Hobarts, Yan Li
  **/
-
 #include "GL/glut.h"
 #include "glwidget.h"
 #include "CS123Algebra.h"
@@ -21,7 +20,6 @@
 //added by SH
 #include <QGLFramebufferObject>
 #include <QGLShaderProgram>
-
 // Declaration of Cuda functions
 extern "C"
 {
@@ -46,8 +44,18 @@ GLWidget::~GLWidget()
 {
     if( m_terrain )
         delete m_terrain;
+#ifdef RENDER_FLUID
     if( m_fluid )
         delete m_fluid;
+#endif
+    foreach( Box* b, m_boxes )
+    {
+        if( b )
+        {
+            delete b;
+            b = NULL;
+        }
+    }
 
     foreach (QGLShaderProgram *sp, m_shaderPrograms)
         delete sp;
@@ -55,6 +63,7 @@ GLWidget::~GLWidget()
         delete fbo;
     glDeleteLists(m_skybox, 1);
     const_cast<QGLContext *>(context())->deleteTexture(m_cubeMap);
+
 }
 
 void GLWidget::init()
@@ -72,7 +81,6 @@ void GLWidget::init()
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     //except these
     m_useAxis = false;
-
 
 #ifdef USE_HEIGHTMAP
     m_terrain = new HeightmapTerrain(); //added by hcreynol
@@ -386,8 +394,6 @@ void GLWidget::renderScene()
        renderFluid();
        renderParticles();
    }
-
-  // renderObjects();
 }
 
 /**
@@ -444,6 +450,7 @@ void GLWidget::renderFluid()
 **/
 void GLWidget::renderParticles()
 {
+#ifdef RENDER_FLUID
     if(m_useParticles)
     {
 //        glEnable (GL_BLEND);
@@ -452,6 +459,7 @@ void GLWidget::renderParticles()
         m_fluid->drawParticles2();
         glDisable(GL_DEPTH_TEST );
     }
+#endif
 }
 
 
@@ -1137,12 +1145,12 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
     {
         TriIndex curTri = temp[i];
         // Firstly check if the triangle is visible
-        int count = 0;
+        //int count = 0;
         int r[3]; int c[3];
         r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
         r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
         r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-        for( int m = 0; m < 3; m++ )
+      /*  for( int m = 0; m < 3; m++ )
         {
 #ifdef USE_GPU_FLUID
             if( tempDepth[m_fluid->getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
@@ -1151,11 +1159,11 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
             if( m_fluid->m_depthField[r[m]][c[m]] > EPSILON )
                 count++;
 #endif
-        }
-        if( count == 0 )
+        }*/
+        /*if( count == 0 )
             continue;
         else
-        {
+        {*/
 #ifdef USE_GPU_FLUID
             const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
                                       ,- halfDomain + r[0]*dx );
@@ -1185,7 +1193,7 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
                  pos = (p0 + p1 + p2)/3.f;
                  break;
              }
-        }
+        //}
     }
 
     if( indexRow != -1 && indexCol != -1 )
@@ -1225,7 +1233,7 @@ void GLWidget::updateObjects( float dt )
     {
         if( b )
         {
-            b->update( dt, m_fluid);
+            b->update( dt );
         }
     }
 }

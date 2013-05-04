@@ -82,7 +82,7 @@ FluidGPU::FluidGPU(Terrain *t , GLWidget *glw)
 FluidGPU::~FluidGPU()
 {
     // Release the heap
-    safeFreeArray1D( m_paintField );
+ /*   safeFreeArray1D( m_paintField );
     safeFreeArray1D( m_indices );
     safeFreeArray1D( m_velocityU );
     safeFreeArray1D( m_velocityW );
@@ -90,10 +90,10 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_sigmaField );
     safeFreeArray1D( m_gammaField );
     safeFreeArray1D( m_phiField );
-    safeFreeArray1D( m_psiField );
+    safeFreeArray1D( m_psiField );*/
     safeFreeArray1D( m_paintNormalField );
-    safeFreeArray1D( m_heightField );
-    safeFreeArray1D( m_depthField );
+    /*safeFreeArray1D( m_heightField );
+    safeFreeArray1D( m_depthField );*/
 
     if(m_glw->m_useParticles)
     {
@@ -559,7 +559,7 @@ void FluidGPU::saveToImage( FieldType type )
  */
 void FluidGPU::drawFluid( DrawMethod method ) const
 {
-    if( method == DRAW_POINTS )
+    if( method = DRAW_MESH_VBO )
     {
         // Not applicable
         /*glPushMatrix();
@@ -574,6 +574,39 @@ void FluidGPU::drawFluid( DrawMethod method ) const
         }
         glPopMatrix();
         glEnd();*/
+
+        glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
+        Vector3* vertBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
+
+        memcpy( vertBuffer, m_paintField, sizeof(Vector3)*(m_gridPaintSize)*(m_gridPaintSize));
+
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+
+         glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
+        glVertexPointer(3,GL_FLOAT,0,(char*)NULL);
+        glEnableClientState( GL_VERTEX_ARRAY );
+
+        glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
+        Vector3* normBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
+        memcpy( normBuffer, m_paintNormalField, sizeof(Vector3)*(m_gridPaintSize)*(m_gridPaintSize));
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+
+        glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
+        glNormalPointer(GL_FLOAT,0,(char*)NULL);
+        glEnableClientState( GL_NORMAL_ARRAY );
+
+        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
+
+        int indexSize;
+        indexSize = (m_gridPaintSize + 1)*(m_gridPaintSize- 1)*2;
+        glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
+
+        glDrawElements( GL_TRIANGLE_STRIP, indexSize, GL_UNSIGNED_INT, 0 );
+
+        glDisableClientState( GL_NORMAL_ARRAY );
+        glDisableClientState( GL_VERTEX_ARRAY );
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
     }
     else if ( method == DRAW_MESH_STRIP )
     {
@@ -639,40 +672,21 @@ void FluidGPU::drawFluid( DrawMethod method ) const
 //        }
 //        glEnd();
     }
-    else if( method = DRAW_MESH_VBO )
+    else if( method = DRAW_POINTS )
     {
-        glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
-        Vector3* vertBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
-
-        memcpy( vertBuffer, m_paintField, sizeof(Vector3)*(m_gridPaintSize)*(m_gridPaintSize));
-
-        glUnmapBuffer(GL_ARRAY_BUFFER);
-
-         glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
-        glVertexPointer(3,GL_FLOAT,0,(char*)NULL);
-        glEnableClientState( GL_VERTEX_ARRAY );
-
-        glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
-        Vector3* normBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
-        memcpy( normBuffer, m_paintNormalField, sizeof(Vector3)*(m_gridPaintSize)*(m_gridPaintSize));
-        glUnmapBuffer(GL_ARRAY_BUFFER);
-
-        glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
-        glNormalPointer(GL_FLOAT,0,(char*)NULL);
-        glEnableClientState( GL_NORMAL_ARRAY );
-
-        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer );
-
-        int indexSize;
-        indexSize = (m_gridPaintSize + 1)*(m_gridPaintSize- 1)*2;
-        glColor4f(m_color.r,m_color.g,m_color.b,m_color.a);
-
-        glDrawElements( GL_TRIANGLE_STRIP, indexSize, GL_UNSIGNED_INT, 0 );
-
-        glDisableClientState( GL_NORMAL_ARRAY );
-        glDisableClientState( GL_VERTEX_ARRAY );
-        glBindBuffer( GL_ARRAY_BUFFER, 0 );
-         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+         // Not applicable
+         /*glPushMatrix();
+         glBegin(GL_POINTS);
+         glColor4f( m_color.r,m_color.g, m_color.b, m_color.a );
+         for( int i = 0; i < m_gridPaintSize; i++ )
+         {
+             for( int j =0; j < m_gridPaintSize; j++ )
+             {
+                 glVertex3fv(m_paintField[getIndex1D(i,j,PAINT)].xyz);
+             }
+         }
+         glPopMatrix();
+         glEnd();*/
     }
     else
     {

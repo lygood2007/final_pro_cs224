@@ -10,15 +10,6 @@
 #include "CS123Algebra.h"
 #include "object_defs.h"
 
-
-#define JITTER_ORIGIN
-
-#define MAX_INIT_U 20
-#define MAX_INIT_W 20
-#define MAG_U 2.2
-#define MAG_W 2.2
-#define MIN_DENSITY 300
-
 class FluidGPU;
 
 class Object
@@ -59,7 +50,7 @@ public:
     /**
      * @brief update update the box's position
      */
-    void update( float dt, FluidGPU* heightField );
+    void update( float dt );
 
     inline float getDensity() const { return m_density; }
 
@@ -100,11 +91,6 @@ private:
      */
     void drawNormal() const;
     /**
-         *  Update the triangles' postion and norms (average position and normal)
-         *  The are used for buoyance computation
-         */
-    void updatePosAndNorm();
-    /**
      * @brief updatePosWithBoundaryCheck update the next position, avoiding moving out of boundary
      */
     void updatePosWithBoundaryCheck( float dt );
@@ -117,12 +103,14 @@ private:
      * @param fv the fluid velocity
      * @param the interpolated height
      */
-     void getInterpVelocityAndHeight( Vector3 pos,
+     void getInterpVelocityAndHeight( const Vector3& pos,
                                        Vector3& fv, float&h );
      /**
       * @brief computeOrigin compute the origin position of x and z
       */
      void computeOrigin();
+
+     Matrix4x4 GramSchmidt( Matrix4x4& matix );
 
 private:
 
@@ -134,10 +122,7 @@ private:
 
     float m_dragCoeff;
     float m_liftCoeff;
-
-    float m_angle[6];
-    Matrix4x4 m_rotMat[3];
-
+    Matrix4x4 m_rotMat;
     Colorf m_color;
 
     bool m_upwards;
@@ -154,10 +139,13 @@ private:
     float* m_curH;
     float* m_curU;
     float* m_curW;
+    float* m_curT;
 
     int m_gridSize;
     int m_uwidth;
     int m_wheight;
+
+    float m_h; // Multiplier for rotation
 
 protected:
 
@@ -183,7 +171,18 @@ protected:
      /**
       * Get the rotated position using m_angle which defines the angle of ration along x,y,z     *
       */
-     Vector3 getRotVec( Vector3 vec );
+     Vector3 getRotVec( const Vector3& vec );
+
+     /**
+          *  Update the triangles' postion and norms (average position and normal)
+          *  The are used for buoyance computation
+          */
+     void updatePosAndNorm();
+
+     /**
+      * @brief updateRotMat Update the next matrix
+      */
+     void updateRotMat( const Vector3& abc, float dt );
 
 protected:
 
