@@ -56,6 +56,7 @@ struct Tri{
     float area;
     Vector3 avgNorm;
     Vector3 avgPos;
+    Vector3 cenVec;
 };
 
 #endif // TYPES_H

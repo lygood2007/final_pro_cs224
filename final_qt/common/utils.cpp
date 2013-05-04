@@ -69,7 +69,7 @@
   * @param height The height of the grid
   * @return The result y value
   */
- float bilinearInterpReal( const float* vec, Vector3 pos, float origX, float origZ, float dx, const int width, const int height )
+ float bilinearInterpReal( const float* vec, const Vector3& pos, float origX, float origZ, float dx, const int width, const int height )
  {
      float x = pos.x - origX;
      float z = pos.z - origZ;

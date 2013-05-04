@@ -5,10 +5,144 @@
  ** Member: Scott, Hobarts, Yan Li
  **/
 
+#include "opencv/cv.h"
+#include "opencv/cxcore.h"
+using namespace cv;
 #include "object.h"
 #include <stdio.h>
 #include <iostream>
 #include "fluidGPU.h"
+
+/*********************************************************************************************/
+//The code of QR decomposition is from http://www.opencv.org.cn/index.php/QR%E5%88%86%E8%A7%A3
+/*********************************************************************************************/
+static void cvQR(CvMat *inputA,CvMat *q,CvMat *r)
+{
+/*    CvSize inputSize=cvGetSize(inputA);
+    int width=inputSize.width;
+    int height=inputSize.height;
+    cvSetIdentity(q);
+    cvCopy(inputA,r);
+    vector<CvMat **> matMem;
+    CvMat *tempH=cvCreateMat(height,height,CV_32FC1);
+    matMem.push_back(&tempH);
+    CvMat *v=cvCreateMat(height,1,CV_32FC1);
+    matMem.push_back(&v);
+    CvMat *tempCol=cvCreateMat(height,1,CV_32FC1);
+    matMem.push_back(&tempCol);
+    CvMat *tempCol2=cvCreateMat(height,1,CV_32FC1);
+    matMem.push_back(&tempCol2);
+    CvMat *iMat=cvCreateMat(height,height,CV_32FC1);
+    matMem.push_back(&iMat);
+    CvMat *transV=cvCreateMat(1,height,CV_32FC1);
+    matMem.push_back(&transV);
+
+    for (int i=0; i<width; i++)
+    {
+        float b[] = {0};
+        CvMat temp;
+        cvGetCol(r,&temp,i);							//get the i col
+        cvCopy(&temp,tempCol);							//copy the row,don't hurt the original column
+        cvGetSubRect(tempCol,&temp,cvRect(0,0,1,i));	//get the header
+        if (temp.rows == 0 || temp.cols == 0)
+            memcpy(temp.data.fl,b,sizeof(float));
+        else
+            cvZero(&temp);									//make it zero
+        float colNorm=cvNorm(tempCol);					//get the norm of the current column
+        cvZero(tempCol2);								//zero the e vector
+        float tempval=cvGet2D(r,i,i).val[0];
+        cvSet2D(tempCol2,i,0,cvScalar(tempval>0?-1:1*colNorm,0,0));	//set the new value
+        cvSub(tempCol,tempCol2,v);						//subtract the two vectors,get v
+
+        float val2=cvNorm(v);
+        if (val2==0)
+        {
+            continue;
+        }
+        val2*=val2;
+        val2=1/val2;
+        cvTranspose(v,transV);
+        cvMatMul(v,transV,tempH);						//
+        cvScale(tempH,tempH,2*val2);
+        cvSetIdentity(iMat);							//the identity matrix
+        cvSub(iMat,tempH,iMat);
+        cvCopy(iMat,tempH);								//get the H matrix
+        cvTranspose(tempH,tempH);						//transpose
+        cvMatMul(q,tempH,q);							//q=q.h
+        cvGetCol(r,&temp,i);							//get the col again
+        cvSet2D(&temp,i,0,cvScalar(colNorm,0,0));		//set the norm
+        cvGetSubRect(r,&temp,cvRect(i,i+1,1,height-i-1));
+        if (temp.rows == 0 || temp.cols == 0)
+            memcpy(temp.data.fl,b,sizeof(float));
+        else
+            cvZero(&temp);									//zero the submatrix
+    }
+
+    for (int j=0; j<matMem.size(); j++)
+    {
+        cvReleaseMat(matMem[j]);
+    }
+*/
+}
+
+static void testCVAndQR()
+{
+   /* CvMat* test = cvCreateMat( 3, 3, CV_32FC1 );
+    CvMat* Q = cvCreateMat( 3,3,CV_32FC1 );
+    CvMat* R = cvCreateMat( 3,3,CV_32FC1 );
+    cvSetReal2D(test,0,0,cos(1));
+    cvSetReal2D(test,0,1,-sin(1));
+    cvSetReal2D(test,0,2,0);
+    cvSetReal2D(test,1,0,sin(1));
+    cvSetReal2D(test,1,1,cos(1));
+    cvSetReal2D(test,1,2,0);
+    cvSetReal2D(test,2,0,0);
+    cvSetReal2D(test,2,1,0);
+    cvSetReal2D(test,2,2,1);
+
+    printf("The matrix:\n");
+    for( int i = 0; i < 3; i++ )
+    {
+        for( int j = 0; j < 3; j++ )
+        {
+            printf("%f ",cvGetReal2D(test,i,j));
+        }
+        printf("\n");
+    }
+    printf("\n");
+
+    cvQR( test, Q, R );
+    float det=  cvDet(Q);
+    printf("det:%f\n",det);
+
+    printf("The matrix Q:\n");
+    for( int i = 0; i < 3; i++ )
+    {
+        for( int j = 0; j < 3; j++ )
+        {
+            printf("%f ",cvGetReal2D(Q,i,j));
+        }
+        printf("\n");
+    }
+    printf("\n");*/
+}
+
+/*
+static void printMatrix4x4( Matrix4x4 mat )
+{
+    REAL* data = mat.data;
+    printf("Matrix:\n");
+    for( int i= 0; i < 4; i++ )
+    {
+        for( int j = 0; j < 4; j++ )
+        {
+            printf("%f ",data[i*4+j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+*/
 
 Object::Object()
 {
@@ -29,7 +163,23 @@ Object::Object()
     c1 = -WATER_DENSITY*m_dragCoeff*0.5;
     c2 = -WATER_DENSITY*m_liftCoeff*0.5;
     c3 = WATER_DENSITY*GRAVITY;
+    m_h = 1.f;
     memset( m_tessell, -1, 3*sizeof(int ) );
+
+    /**
+     * Test GramShmidt
+     */
+  /*  Matrix4x4 rot = Matrix4x4(cos(1),-sin(1),0,0,sin(1),cos(1),0,0,0,0,1,0,0,0,0,1);
+
+    printMatrix4x4( rot );
+    printMatrix4x4( GramSchmidt( rot ) );
+
+    Matrix4x4 t = Matrix4x4(1,2,3,4,2,3,4,1,3,4,1,2,4,1,2,3);
+
+    printMatrix4x4( t );
+    printMatrix4x4( GramSchmidt( t ) );
+
+    */
     computeOrigin();
 }
 
@@ -51,9 +201,16 @@ Object::Object(FluidGPU *fluid, Vector3 position, float dx, GLuint texID, float 
     c1 = -WATER_DENSITY*m_dragCoeff*0.5;
     c2 = -WATER_DENSITY*m_liftCoeff*0.5;
     c3 = WATER_DENSITY*GRAVITY;
+    m_h = 1.f;
     memset( m_tessell, -1, 3*sizeof(int ) );
     computeOrigin();
     initFluidInfo( fluid );
+
+    /**
+     * Test QR decomposition and QA
+     */
+
+   // testCVAndQR();
 }
 
 Object::~Object()
@@ -73,9 +230,7 @@ void Object::draw()
     glMatrixMode( GL_MODELVIEW );
      glPushMatrix();
     glTranslatef( m_position.x, m_position.y, m_position.z );
-    glRotatef( m_angle[4],0,0,1);
-    glRotatef( m_angle[5],0,1,0);
-    glRotatef( m_angle[6],1,0,0 );
+    glMultMatrixd(m_rotMat.getTranspose().data);
     glEnable(GL_TEXTURE_2D );
     glBindTexture( GL_TEXTURE_2D, m_texID );
      glBegin(GL_TRIANGLES);
@@ -100,15 +255,11 @@ void Object::draw()
         drawNormal();
 }
 
-void Object::update( float dt, FluidGPU* fluid )
+void Object::update( float dt )
 {
     /**
      * Compute the buoyance
      */
-
-  //  int buf;
-    //printf("%f\n",fluid->getFieldArray(VEL_U,buf)[750]);
-    //Vector3 decay = Vector3(1.f,1.f,1.f);
     Vector3 yUnit = Vector3(0.f,1.f,0.f );
     Vector3 buoyTotal = Vector3(0.f,0.f,0.f);
     Vector3 buoyAccTotal = Vector3(0.f,0.f,0.f);
@@ -116,6 +267,7 @@ void Object::update( float dt, FluidGPU* fluid )
     Vector3 liftAccTotal = Vector3(0.f,0.f,0.f);
     Vector3 dragTotal = Vector3(0.f,0.f,0.f);
     Vector3 dragAccTotal = Vector3(0.f,0.f,0.f);
+    Vector3 abc = Vector3(0.f,0.f,0.f);
     // Loop through all the triangles
     for( int i = 0; i < m_tris.size(); i++ )
     {
@@ -128,89 +280,67 @@ void Object::update( float dt, FluidGPU* fluid )
             continue;
 
         Vector3 relVelocity = m_velocity - fluidVelocity;
+        float l = relVelocity.length();
+        if( l <= 0.0001 )
+            return;
         float cos = m_tris[i].avgNorm.dot(relVelocity.getNormalized());
         float Aef;
 
         if( cos <= 0.001 )
             Aef = 0;
         else
-        {
-         // No w currently
             Aef =m_tris[i].area*cos;
-        }
-        float l = relVelocity.length();
+
         Vector3 drag = c1*l*relVelocity*Aef;
         Vector3 tmp1 = m_tris[i].avgNorm.cross( relVelocity);
         Vector3 lift;
-        if( tmp1.length() <= 0.00001)
-        {
+        if( tmp1.length() <= 0.0001)
             lift = Vector3::zero();
-        }
         else
         {
-        Vector3 tmp2 = tmp1.getNormalized();
-         lift = c2*l
-                *( relVelocity.cross( tmp2 ) )*Aef;
+            Vector3 tmp2 = tmp1.getNormalized();
+            lift = c2*l*( relVelocity.cross( tmp2 ) )*Aef;
         }
         float buoy = c3*m_tris[i].area*(h - pos.y )*m_tris[i].avgNorm.dot(yUnit);
+        Vector3 forceTri = (Vector3( 0.f, buoy, 0.f ) + drag + lift);
+        if( forceTri.length() > 0.0001)
+        {
+            forceTri = forceTri.getNormalized();
+
+            abc += m_tris[i].cenVec.cross(forceTri);
+        }
+
         buoyTotal += Vector3( 0.f, buoy, 0.f );
         dragTotal += drag;
         liftTotal += lift;
     }
+    bool skipRotUpdate = false;
+    if( abc.length() < 0.0001)
+        skipRotUpdate = true;
+    else
+        abc = abc.getNormalized();
     buoyAccTotal = buoyTotal*m_massInv;
     dragAccTotal = dragTotal*m_massInv;
     liftAccTotal = liftTotal*m_massInv;
-   //printf("Drag a: %f, %f, %f\n",dragAccTotal.x, dragAccTotal.y, dragAccTotal.z );
-  /* printf("Lift a: %f, %f, %f\n",liftAccTotal.x, liftAccTotal.y, liftAccTotal.z );
-    if( m_upwards &&fabs(m_lastBuoAcc.y) > fabs(GRAVITY) && fabs(buoyAccTotal.y) <= fabs(GRAVITY) )
-    {
-        // In this case, it means the object pass through the point where Buoyancy
-        // Equals GRAVITY
-        //m_decay = false;
-    }
-    if( m_decay )
-    {
-        // Decay faster for y direction, slower for x,z direction
-        //decay.x = 0.99f;
-        decay.y = m_density/WATER_DENSITY;
-        //decay.z = 0.99f;
-    }
-    m_velocity.x = m_velocity.x*decay.x;m_velocity.y = m_velocity.y*decay.y;m_velocity.z = m_velocity.z*decay.z;
-*/
-    m_velocity += 2*(buoyAccTotal*dt + Vector3(0.f,GRAVITY,0.f)*dt +dragAccTotal*dt +liftAccTotal*dt);
-    //m_velocity.y += 2*liftAccTotal.y*dt;
-    // Backup the buoyancy in this frame
-    /*m_lastBuoAcc = buoyAccTotal;
-    if( m_velocity.y < 0 )
-    {
-        m_decay = false;
-        m_upwards = false;
-    }
-    else
-        m_upwards = true;
-*/
+    Vector3 forceDir = (buoyAccTotal + Vector3(0.f,GRAVITY,0.f) +dragAccTotal +liftAccTotal);
+    printf("%f\n",liftAccTotal.x);
+    m_velocity += 2*(forceDir*dt);
     // Check if the next position is below terrain, if it is, we set the velocity to zero
     // Actually if one of the box's triangle is below terrain
     bool hitBottom = false;
-    int buff;
-    float* terrainHeight = fluid->getFieldArray( TERRAINH, buff );
-     float gridSize =fluid->getGridSize();
-     Vector3 next = m_position + dt*(m_velocity);
+    Vector3 next = m_position + dt*(m_velocity);
     for( int i = 0; i < m_tris.size(); i++ )
     {
-       // for( int j = 0; j < 3; j++ )
-     //   {
-            Vector3 tmpPos =  next + m_tris[i].verts[0];
-            float th = bilinearInterpReal( terrainHeight, tmpPos,
-                                           m_origX,m_origZ,m_dx,
-                                           gridSize, gridSize
-                                           );
-            if( tmpPos.y < th )
-            {
-                hitBottom = true;
-                break;
-            }
-     //   }
+        Vector3 tmpPos =  next + 0.33*(m_tris[i].verts[0]+m_tris[i].verts[1] + m_tris[i].verts[2]);
+        float th = bilinearInterpReal( m_curT, tmpPos,
+                                       m_origX,m_origZ,m_dx,
+                                       m_gridSize, m_gridSize
+                                       );
+        if( tmpPos.y < th )
+        {
+            hitBottom = true;
+            break;
+        }
     }
     if( hitBottom )
     {
@@ -219,11 +349,11 @@ void Object::update( float dt, FluidGPU* fluid )
         m_velocity.x = m_velocity.x*hitDecay;
         m_velocity.y = 0;
         m_velocity.z = m_velocity.z*hitDecay;
-
+        return;
     }
-
     updatePosWithBoundaryCheck(dt);
-
+    if( !skipRotUpdate )
+        updateRotMat( abc, dt );
     updatePosAndNorm();
 }
 
@@ -240,9 +370,7 @@ void Object::initPhysics()
         generateRotation();
 #else
     m_velocity = Vector3(0.f,0.f,0.f);
-    m_rotMat[0] = Matrix4x4::identity();
-    m_rotMat[1] = Matrix4x4::identity();
-    m_rotMat[2] = Matrix4x4::identity();
+    m_rotMat = Matrix4x4::identity();
 #endif
     computeTessel();
     computeMass();
@@ -258,6 +386,7 @@ void Object::initFluidInfo( FluidGPU* fluid )
     m_curH  = fluid->getFieldArray( HEIGHT, buff );
     m_curU  = fluid->getFieldArray( VEL_U, buff );
     m_curW  = fluid->getFieldArray( VEL_W, buff );
+    m_curT = fluid->getFieldArray( TERRAINH, buff );
 
     m_gridSize = fluid->getGridSize();
     m_uwidth = m_gridSize+1;
@@ -275,10 +404,8 @@ void Object::drawNormal() const
         glMatrixMode(GL_MODELVIEW);
 
         glPushMatrix();
-         glTranslatef( m_position.x, m_position.y, m_position.z );
-         glRotatef( m_angle[4],0,0,1);
-         glRotatef( m_angle[5],0,1,0);
-         glRotatef( m_angle[6],1,0,0 );
+        glTranslatef( m_position.x, m_position.y, m_position.z );
+        glMultMatrixd(m_rotMat.getTranspose().data);
         for( int i = 0; i < m_tris.size(); i++ )
         {
             for( int j = 0; j < 3; j++ )
@@ -299,6 +426,7 @@ void Object::drawNormal() const
 
 /**
      *  Update the triangles' postion and norms (average position and normal)
+     *  The avg position and norm and variables that are used for computation
      *  The are used for buoyance computation
      */
 void Object::updatePosAndNorm()
@@ -306,7 +434,17 @@ void Object::updatePosAndNorm()
     // Currently, we don't update the normals because no rotation is included
     for( int i = 0; i < m_tris.size(); i++ )
     {
-        m_tris[i].avgPos = (m_tris[i].verts[0] + m_tris[i].verts[1] + m_tris[i].verts[2])*0.33f + m_position;
+        Vector3 vert1 = getRotVec(m_tris[i].verts[0]);
+        Vector3 vert2 = getRotVec(m_tris[i].verts[1]);
+        Vector3 vert3 = getRotVec(m_tris[i].verts[2]);
+
+        Vector3 norm1 = getRotVec(m_tris[i].norms[0]);
+        Vector3 norm2 = getRotVec(m_tris[i].norms[1]);
+        Vector3 norm3 = getRotVec(m_tris[i].norms[2]);
+
+        m_tris[i].avgPos = (vert1 + vert2 + vert3)*0.33f + m_position;
+        m_tris[i].cenVec = (m_tris[i].avgPos - m_position).getNormalized();
+        m_tris[i].avgNorm = (norm1 + norm2 + norm3)*0.33f;
     }
 }
 
@@ -339,30 +477,14 @@ void Object::updatePosWithBoundaryCheck( float dt )
  * @param fv the fluid velocity
  * @param the interpolated height
  */
- void Object::getInterpVelocityAndHeight(/* const FluidGPU* fluid,*/ Vector3 pos,
+ void Object::getInterpVelocityAndHeight(/* const FluidGPU* fluid,*/ const Vector3& pos,
                                     Vector3& fv, float&h )
  {
-  /*   int buffLength;
-     // Get the field
-     float* hf = fluid->getFieldArray( HEIGHT, buffLength );
-     float* uf  =fluid->getFieldArray( VEL_U, buffLength );
-     float* wf  =fluid->getFieldArray( VEL_W, buffLength );
-*/
-  //   float a = wf[2];
-
      /**
       * Get the size. width and height are the size of the height field
       */
-   /*  int width = fluid->getGridSize();
-     int height = width;
-     // width of velocity u
-     int uwidth = fluid->getGridSize()+1;
-     // height of velocity v
-     int wheight = fluid->getGridSize()+1;
-*/
      float x = pos.x - m_origX;
      float z = pos.z - m_origZ;
-//     float dx = m_fluiddx
 
      if( x < 0 )
          x = 0.f;
@@ -431,9 +553,9 @@ void Object::updatePosWithBoundaryCheck( float dt )
      {
          c2 = (m_curH[(Y+1)*m_gridSize + X ] - m_curH[(Y-1)*m_gridSize+X])*0.5*m_dxInv;
      }
-    fv.y  = c1*fv.x + c2*fv.z;
+     fv.y  = c1*fv.x + c2*fv.z;
      fv.x *= MAG_U;
-    fv.z *= MAG_W;
+     fv.z *= MAG_W;
  }
 
 /**
@@ -445,47 +567,52 @@ void Object::computeOrigin()
     m_origZ = -m_domainSize/2.f;
 }
 
+/**
+ * @brief Object::generateRotation Generate the initial rotation
+ */
 void Object::generateRotation()
 {
+    float angles[3];
     float angle = 2*M_PI*(rand()/(float)RAND_MAX);
-    m_angle[0] = angle;
+    angles[0] = angle;
 
     angle = 2*M_PI*(rand()/(float)RAND_MAX);
-    m_angle[1] = angle;
+    angles[1] = angle;
     angle = 2*M_PI*(rand()/(float)RAND_MAX);
-    m_angle[2] = angle;
-    m_angle[3] = m_angle[2]/(2*M_PI)*360;
-    m_angle[4] = m_angle[1]/(2*M_PI)*360;
-    m_angle[5] = m_angle[0]/(2*M_PI)*360;
+    angles[2] = angle;
 
 
-    m_rotMat[0] = Matrix4x4::identity();
-    m_rotMat[1] = Matrix4x4::identity();
-    m_rotMat[2] = Matrix4x4::identity();
+    Matrix4x4 rotMat[3];
+
+    rotMat[0] = Matrix4x4::identity();
+    rotMat[1] = Matrix4x4::identity();
+    rotMat[2] = Matrix4x4::identity();
 
     // Rotation along x-axis
-    m_rotMat[0].data[5] = cos(m_angle[0]);
-    m_rotMat[0].data[6] = -sin(m_angle[0]);
-    m_rotMat[0].data[9] = sin(m_angle[0]);
-    m_rotMat[0].data[10] = cos(m_angle[0]);
+    rotMat[0].data[5] = cos(angles[0]);
+    rotMat[0].data[6] = -sin(angles[0]);
+    rotMat[0].data[9] = sin(angles[0]);
+    rotMat[0].data[10] = cos(angles[0]);
 
     // Rotation along y-axis
-    m_rotMat[1].data[0] = cos(m_angle[1]);
-    m_rotMat[1].data[2] = sin(m_angle[1]);
-    m_rotMat[1].data[8] = -sin(m_angle[1]);
-    m_rotMat[1].data[10] = cos(m_angle[1]);
+    rotMat[1].data[0] = cos(angles[1]);
+    rotMat[1].data[2] = sin(angles[1]);
+    rotMat[1].data[8] = -sin(angles[1]);
+    rotMat[1].data[10] = cos(angles[1]);
 
     // Rotation along z-axis
-    m_rotMat[2].data[0] = cos(m_angle[2]);
-    m_rotMat[2].data[1] = -sin(m_angle[2]);
-    m_rotMat[2].data[4] = sin(m_angle[2]);
-    m_rotMat[2].data[5] = cos(m_angle[2]);
+    rotMat[2].data[0] = cos(angles[2]);
+    rotMat[2].data[1] = -sin(angles[2]);
+    rotMat[2].data[4] = sin(angles[2]);
+    rotMat[2].data[5] = cos(angles[2]);
+
+    m_rotMat = rotMat[2]*rotMat[1]*rotMat[0];
 }
 
 /**
  * Get the rotated position using m_angle which defines the angle of ration along x,y,z     *
  */
-Vector3 Object::getRotVec( Vector3 vec )
+Vector3 Object::getRotVec( const Vector3& vec )
 {
     Vector4 tmp;
     tmp.x = vec.x;
@@ -493,12 +620,50 @@ Vector3 Object::getRotVec( Vector3 vec )
     tmp.z = vec.z;
     tmp.w  =1;
     Vector4 out;
-    m_rotMat[0].mulVec4( tmp, out );
-    m_rotMat[1].mulVec4( out, tmp );
-    m_rotMat[2].mulVec4( tmp, out );
+    m_rotMat.mulVec4(tmp,out);
     Vector3 out3;
     out3.x  = out.x;
     out3.y = out.y;
     out3.z = out.z;
     return out3;
+}
+
+Matrix4x4 Object::GramSchmidt( Matrix4x4& matrix )
+{
+    REAL* data = matrix.data;
+    Vector4 col1 = Vector4(data[0],data[4],data[8],data[12]);
+    Vector4 col2 = Vector4(data[1],data[5],data[9],data[13]);
+    Vector4 col3 = Vector4(data[2],data[6],data[10],data[14]);
+    Vector4 col4 = Vector4(data[3],data[7],data[11],data[15]);
+
+    col1 = col1.getNormalized();
+    col2 = col2 - col2.dot(col1)*col1;
+    col2 = col2.getNormalized();
+    col3 = col3 - col3.dot(col2)*col2 - col3.dot(col1)*col1;
+    col3 = col3.getNormalized();
+    col4 = col4 - col4.dot(col3)*col3 - col4.dot(col2)*col2 - col4.dot(col1)*col1;
+    col4 = col4.getNormalized();
+
+    return Matrix4x4( col1.data[0],col2.data[0],col3.data[0],col4.data[0],
+                      col1.data[1],col2.data[1],col3.data[1],col4.data[1],
+                      col1.data[2],col2.data[2],col3.data[2],col4.data[2],
+                      col1.data[3],col2.data[3],col3.data[3],col4.data[3]
+                      );
+}
+
+
+/**
+ * @brief updateRotMat Update the next matrix
+ */
+void Object::updateRotMat( const Vector3& abc, float dt )
+{
+    float a = abc.x;
+    float b = abc.y;
+    float c = abc.z;
+    Matrix4x4 M = Matrix4x4(0,-c,b,0,
+                            c,0,-a,0,
+                            -b,a,0,0,
+                            0,0,0,1);
+    Matrix4x4 S = (Matrix4x4::identity() + M*dt*m_h )*m_rotMat;
+    m_rotMat = GramSchmidt(S);
 }

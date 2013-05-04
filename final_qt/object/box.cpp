@@ -1,4 +1,3 @@
-
 /** box.cpp
  ** Brief: This is the source file of the class Box
  ** Project: large-scale fluids
@@ -318,8 +317,10 @@ void Box::buildTriangleList()
          }
      }
 
+     updatePosAndNorm();
+
      // Rotate
-     for( int i = 0; i < m_tris.size(); i++ )
+     /*for( int i = 0; i < m_tris.size(); i++ )
      {
          m_tris[i].verts[0] = getRotVec(m_tris[i].verts[0]);
          m_tris[i].verts[1] = getRotVec(m_tris[i].verts[1]);
@@ -328,9 +329,9 @@ void Box::buildTriangleList()
          m_tris[i].norms[0] = getRotVec(m_tris[i].norms[0]);
          m_tris[i].norms[1] = getRotVec(m_tris[i].norms[1]);
          m_tris[i].norms[2] = getRotVec(m_tris[i].norms[2]);
-         m_tris[i].avgNorm = m_tris[i].norms[0];
-         m_tris[i].avgPos = (m_tris[i].verts[0] + m_tris[i].verts[1] + m_tris[i].verts[2])/3.f + m_position;
-     }
+         m_tris[i].avgNorm = 0.33*(m_tris[i].norms[0] + m_tris[i].norms[1] + m_tris[i].norms[2]);
+         m_tris[i].avgPos = (m_tris[i].verts[0] + m_tris[i].verts[1] + m_tris[i].verts[2])*0.33f + m_position;
+     }*/
     //Check the top and bottom
 
      /**

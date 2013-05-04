@@ -34,7 +34,7 @@
   * @param max The upper bound
   * @return The random float number we get
   */
- float bilinearInterpReal( const float* vec, Vector3 pos, float origX, float origZ, float dx, const int width, const int height );
+ float bilinearInterpReal( const float* vec, const Vector3& pos, float origX, float origZ, float dx, const int width, const int height );
 
  /**
   * @brief doIntersectTriangles Check if the ray intersects the triangle
