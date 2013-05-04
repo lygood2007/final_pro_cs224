@@ -56,7 +56,8 @@ public:
 
     //Not the best idea but I'm placing these here in case I need them elsewhere
     bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis,
-        m_useSkybox, m_useParticles, m_useDampening;
+        m_useSkybox, m_useParticles, m_useDampening,
+        m_useParticleSources, m_useRectangularParticleSources;
 
 private:
     // Private variables

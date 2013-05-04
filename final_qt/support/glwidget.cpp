@@ -79,11 +79,12 @@ void GLWidget::init()
 
     //use everything
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
+    m_useParticleSources = m_useRectangularParticleSources = false;
     //except these
     m_useAxis = false; m_useDampening = false;
 
 #ifdef USE_HEIGHTMAP
-    m_terrain = new HeightmapTerrain(); //added by hcreynol
+    m_terrain = new HeightmapTerrain();
 #else
     m_terrain = new RandomTerrain();
 #endif
@@ -976,6 +977,16 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_Q:
     {
         m_fluid->resetFluid();
+        break;
+    }
+    case Qt::Key_K:
+    {
+        m_useParticleSources = !m_useParticleSources;
+        break;
+    }
+    case Qt::Key_L:
+    {
+        m_useRectangularParticleSources = !m_useRectangularParticleSources;
         break;
     }
     }

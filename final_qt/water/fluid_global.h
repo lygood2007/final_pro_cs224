@@ -46,7 +46,7 @@
 #define BREAKING_WAVE_VEL_MULTIPLIER 1.0f
 #define SPRAY_VEL_MULTIPLIER 2.0f
 #define FOAM_TTL 2.5f
-#define FOAM_TTL_VARIANCE_MULTIPLIER 4.0f
+#define FOAM_TTL_VARIANCE_MULTIPLIER 10.0f
 #define FOAM_GENERATION_PROBABILITY 0.2f
 
 #define NUM_DROPPING_PARTICLES 10000
@@ -57,8 +57,6 @@
 #define TOTAL_NUM_SPRAY_PARTICLES 240000
 #define TOTAL_NUM_SPLASH_PARTICLES 120000
 #define TOTAL_NUM_FOAM_PARTICLES 40000
-
-#define USE_PARTICLE_SOURCES //uncomment to use particle sources //TODO: make this a hot key
 
 //particle colors - @NOTE these awful colors are only temporary
 #define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
