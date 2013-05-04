@@ -52,13 +52,13 @@
 #define NUM_DROPPING_PARTICLES 10000
 #define PARTICLE_DROPPING_RADIUS 2.0
 #define PARTICLE_DROP_HEIGHT 60
-#define PARTICLE_DROP_RANGE 10
+#define PARTICLE_DROP_RANGE 5
 
-#define TOTAL_NUM_SPRAY_PARTICLES 50000
-#define TOTAL_NUM_SPLASH_PARTICLES 150000
-#define TOTAL_NUM_FOAM_PARTICLES 50000
+#define TOTAL_NUM_SPRAY_PARTICLES 240000
+#define TOTAL_NUM_SPLASH_PARTICLES 120000
+#define TOTAL_NUM_FOAM_PARTICLES 40000
 
-//#define USE_PARTICLE_SOURCES //uncomment to use particle sources //TODO: make this a hot key
+#define USE_PARTICLE_SOURCES //uncomment to use particle sources //TODO: make this a hot key
 
 //particle colors - @NOTE these awful colors are only temporary
 #define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
