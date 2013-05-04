@@ -791,8 +791,13 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
           //addObject( pos.z, -pos.x );
             if(intersectFluid( event->x(), event->y(), indexRow, indexCol,pos ))
             {
-                m_fluid->addDrop( indexCol, indexRow );
-//                m_fluid->addDroppingParticles( indexCol, indexRow );
+                if(event->button() == Qt::LeftButton){
+                    m_fluid->addDrop( indexCol, indexRow );
+                } else {
+#ifdef USE_GPU_FLUID
+                    m_fluid->addDroppingParticles( indexCol, indexRow );
+#endif
+                }
               // the coordinate is problematic
 //                addObject( pos.z, -pos.x );
             }

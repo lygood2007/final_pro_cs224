@@ -37,8 +37,7 @@ void inputSprayParticlesGPU( const float *particlePositions, const float *partic
 void inputFoamParticlesGPU( const float *particlePositions, const float *ttlArray );
 
 void checkBreakingWavesGPU( const float condition1, const float condition2, const float condition3,
-                            const float mdx, const float mdxInv, const float dt, const float halfDomain,
-                            const float heightChange, const float lambdaY, const int numParticlesToAdd );
+                            const float mdxInv, const float dt );
 void inputDepthGPU( const float* newDepthField );
 
 void clampFieldsGPU( const float velocityClamp );
@@ -279,10 +278,18 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
     int i = blockDim.y*blockIdx.y + threadIdx.y;
     int j = blockDim.x*blockIdx.x + threadIdx.x;
 
-    if( i>= cudaMax(posZ-radius,0) && i < cudaMin(posZ+radius+1,height)
-            && j >= cudaMax(posX-radius,0)&&j < cudaMin(posX+radius+1,width)
-            )
-    {
+//    if( i>= cudaMax(posZ-radius,0) && i < cudaMin(posZ+radius+1,height)
+//            && j >= cudaMax(posX-radius,0)&&j < cudaMin(posX+radius+1,width)
+//            )
+//    {
+//        float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+//        map2Dwrite( depthMap, i,j, newH, width );
+//    }
+
+    float iDistance = (float) (i - posZ);
+    float jDistance = (float) (j - posX);
+    float distance = sqrt((iDistance * iDistance) + (jDistance * jDistance));
+    if(distance <= (float) radius){
         float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
         map2Dwrite( depthMap, i,j, newH, width );
     }
@@ -981,7 +988,6 @@ __global__ void intersectParticleValuesCUDA( vec3* positionsMap, vec3* velocitie
                 map2Dwrite( depthMap, z, x, hxz + heightChange, width );
 
                 //update velocities
-                //TODO: check these! u and w might be swapped?
                 float uxz = map2Dread( velUMap, z, x, uwidth );
                 float wxz = map2Dread( velWMap, z, x, wwidth );
                 float term = hxz * dx * dx;
@@ -1029,7 +1035,6 @@ __global__ void intersectSprayParticleValuesCUDA( vec3* positionsMap, vec3* velo
                 map2Dwrite( depthMap, z, x, hxz + heightChange, width );
 
                 //update velocities
-                //TODO: check these! u and w might be swapped?
                 float uxz = map2Dread( velUMap, z, x, uwidth );
                 float wxz = map2Dread( velWMap, z, x, wwidth );
                 float term = hxz * dx * dx;
@@ -1045,16 +1050,12 @@ __global__ void intersectSprayParticleValuesCUDA( vec3* positionsMap, vec3* velo
 /**
  *  check for breaking waves
  */
-__global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, float* heightMap,
-                                        float* velUMap, float* velWMap, float* breakingWavesMap,
-                                        vec3* positionsMap, vec3* velocitiesMap,
+__global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, float* heightMap, float* breakingWavesMap,
                                         const int width, const int height,
                                         const int uwidth, const int uheight,
                                         const int wwidth, const int wheight,
                                         const float condition1, const float condition2, const float condition3,
-                                        const float mdx, const float mdxInv, const float dt, const float halfDomain,
-                                        const float heightChange, const float lambdaY,
-                                        const int numParticlesToAdd, const int totalNumParticles )
+                                        const float mdxInv, const float dt )
 {
     int i = blockDim.y*blockIdx.y +threadIdx.y;
     int j = blockDim.x*blockIdx.x +threadIdx.x;
@@ -1095,6 +1096,7 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //check condition 1: steepness
         if(etaGradientMagnitude <= condition1){
+            map2Dwrite( breakingWavesMap, i, j, 0.0f, width );
             return;
         }
 
@@ -1105,6 +1107,7 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //check condition 2: rising front
         if(depthChange <= condition2){
+            map2Dwrite( breakingWavesMap, i, j, 0.0f, width );
             return;
         }
 
@@ -1114,11 +1117,12 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //check condition 3: top of wave
         if(numerator * mdxInv * mdxInv >= condition3){
+            map2Dwrite( breakingWavesMap, i, j, 0.0f, width );
             return;
         }
 
-        //write some number of particles to initiate
-        map2Dwrite( breakingWavesMap, i, j, (float) numParticlesToAdd, width );
+        //write the depth change (used for vertical velocity of particles)
+        map2Dwrite( breakingWavesMap, i, j, depthChange, width );
     }
 }
 
@@ -1981,7 +1985,6 @@ void updateParticlesGPU( const float minHeight, const float dt, const float half
                                                     );
 
     //foam
-    //TODO: check this
     blocksPerGrid = (deviceNumFoamParticles + threadsPerBlock - 1) / threadsPerBlock;
     updateFoamValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
                                                     deviceFoamPositionsArray, deviceFoamTTLArray,
@@ -2065,28 +2068,21 @@ void inputFoamParticlesGPU( const float *particlePositions, const float *ttlArra
     checkCudaError( error );
 }
 
-//TODO: CHECK THIS
 void checkBreakingWavesGPU( const float condition1, const float condition2, const float condition3,
-                            const float mdx, const float mdxInv, const float dt, const float halfDomain,
-                            const float heightChange, const float lambdaY, const int numParticlesToAdd ){
+                            const float mdxInv, const float dt ){
     // iterate over grids, make above 0
     dim3 threadsPerBlock(blockSizeX,blockSizeY);
     int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
     int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
     dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
 
-    //TODO: for each grid position, check for breaking waves
     checkBreakingWavesCUDA<<<blocksPerGrid,threadsPerBlock>>>(
-                                                    deviceDepthMap, devicePrevDepthMap, deviceHeightMap,
-                                                    deviceVelocityUMap, deviceVelocityWMap, deviceBreakingWavesMap,
-                                                    deviceParticlePositionsArray, deviceParticleVelocitiesArray,
+                                                    deviceDepthMap, devicePrevDepthMap, deviceHeightMap, deviceBreakingWavesMap,
                                                     gridSize, gridSize,
                                                     uwidth, uheight,
                                                     wwidth, wheight,
                                                     condition1, condition2, condition3,
-                                                    mdx, mdxInv, dt, halfDomain,
-                                                    heightChange, lambdaY,
-                                                    numParticlesToAdd, deviceNumSplashParticles
+                                                    mdxInv, dt
                                                     );
     //update height field
     updateHeightCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,

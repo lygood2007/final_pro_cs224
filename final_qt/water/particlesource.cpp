@@ -1,42 +1,53 @@
 #include "particlesource.h"
 
 ParticleSource::ParticleSource(){
-    m_starting_corner = Vector3::zero();
-    m_ending_corner = Vector3(1, 1, 1);
+    m_center_position = Vector3::zero();
+    m_radius = DEFAULT_GENERATION_RADIUS;
+    m_vertical_range = DEFAULT_VERTICAL_RANGE;
     m_num_particles_per_timestep = DEFAULT_NUM_PARTICLES_PER_TIMESTEP;
 }
 
-ParticleSource::ParticleSource(Vector3 startingCorner, Vector3 endingCorner){
-    m_starting_corner = startingCorner;
-    m_ending_corner = endingCorner;
-    m_num_particles_per_timestep = DEFAULT_NUM_PARTICLES_PER_TIMESTEP;
-}
-
-ParticleSource::ParticleSource(Vector3 startingCorner, Vector3 endingCorner, int numParticlesPerTimestep){
-    m_starting_corner = startingCorner;
-    m_ending_corner = endingCorner;
+ParticleSource::ParticleSource(Vector3 centerPosition, float radius, float verticalRange, int numParticlesPerTimestep){
+    m_center_position = centerPosition;
+    m_radius = radius;
+    m_vertical_range = verticalRange;
     m_num_particles_per_timestep = numParticlesPerTimestep;
 }
 
-QVector<Particle*> ParticleSource::generateParticles(){
-    //volume of the particles
-    float Veff = C_DEPOSIT * (4 / 3) * M_PI *
-            SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+void ParticleSource::generateParticles(Vector3 **particlePositions, Vector3 **particleVelocities, int totalNumParticles){
+    Vector3 *currParticlePositions = (*particlePositions);
+    Vector3 *currParticleVelocities = (*particleVelocities);
 
-    QVector<Particle*> particles;
+    int currIndex = 0;
     for(int i = 0; i < m_num_particles_per_timestep; i++){
-        float randX = randomFloatGenerator(m_starting_corner.x, m_ending_corner.x);
-        float randY = randomFloatGenerator(m_starting_corner.y, m_ending_corner.y);
-        float randZ = randomFloatGenerator(m_starting_corner.z, m_ending_corner.z);
+        if(currIndex >= totalNumParticles){
+            break;
+        }
 
-        Vector3 position = Vector3(randX, randY, randZ);
+        //jitter particle positions
+        //angle and radius of the cylinder's circle
+        float angle = randomFloatGenerator(0.0f, 2.0f * M_PI);
+        float radius = randomFloatGenerator(0.0f, m_radius);
+
+        float randX = radius * cos(angle);
+        float randY = randomFloatGenerator(0.0f, m_vertical_range);
+        float randZ = radius * sin(angle);
+
+        Vector3 position = Vector3(m_center_position.x + randX, m_center_position.y + randY, m_center_position.z + randZ);
         Vector3 velocity = Vector3::zero();
-        Vector3 acceleration = Vector3(0, GRAVITY, 0);
 
-        //make new particle
-        Particle *newParticle = new Particle(SPLASH_PARTICLE_RADIUS, Veff, position, velocity, acceleration);
-        particles.append(newParticle);
+        //find new inactive particle
+        while(currIndex < totalNumParticles){
+            if(currParticlePositions[currIndex].y < TERRAIN_MIN_HEIGHT){
+                //set new particle as active
+                currParticlePositions[currIndex] = position;
+                currParticleVelocities[currIndex] = velocity;
+
+                currIndex++;
+                break;
+            }
+
+            currIndex++;
+        }
     }
-
-    return particles;
 }
