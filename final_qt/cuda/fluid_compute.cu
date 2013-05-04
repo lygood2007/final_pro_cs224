@@ -24,6 +24,7 @@ void initGridGPU( const int hostGridSize, const int hostGridPaintSize, const flo
 void copybackGPU(FieldType type, float* hostMap  );
 void destroyGPUmem();
 void addDropGPU(const int posX, const int posZ, const int radius, const float h );
+void addSideWaveGPU(const int sideIndex, const int sideLength, const float h );
 void advectGPU(const float dt);
 void updateFluidGPU( const float dt );
 bool findSupportDevice();
@@ -292,6 +293,46 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
     if(distance <= (float) radius){
         float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
         map2Dwrite( depthMap, i,j, newH, width );
+    }
+}
+
+/**
+ * Add drop to specified side
+ */
+__global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const int sideIndex,
+                             const float h, const int width, const int height )
+{
+    int i = blockDim.y*blockIdx.y + threadIdx.y;
+    int j = blockDim.x*blockIdx.x + threadIdx.x;
+
+    if(sideIndex == 1){
+        //side index 1: min i
+        if( i >= 0 && i < sideLength && j >= 0 && j < width )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
+    } else if(sideIndex == 2){
+        //side index 2: max i
+        if( i >= height - sideLength && i < height && j >= 0 && j < width )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
+    } else if(sideIndex == 3){
+        //side index 3: min j
+        if( i >= 0 && i < height && j >= 0 && j < sideLength )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
+    } else if(sideIndex == 4){
+        //side index 4: max j
+        if( i >= 0 && i < height && j >= width - sideLength && j < width )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
     }
 }
 
@@ -1693,6 +1734,27 @@ void addDropGPU(const int posX, const int posZ, const int radius, const float h 
     dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
     addDropCUDA<<<blocksPerGrid,threadsPerBlock>>>(
                                                    deviceDepthMap,posX,posZ,radius,h,gridSize,gridSize
+                                                   );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    updateHeightCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   deviceHeightMap,deviceDepthMap,deviceTerrainMap,
+                                                   gridSize,gridSize
+                                                   );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
+//TODO: CHECK THIS
+void addSideWaveGPU(const int sideIndex, const int sideLength, const float h )
+{
+    dim3 threadsPerBlock(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
+    addSideWaveCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   deviceDepthMap, sideLength, sideIndex, h, gridSize, gridSize
                                                    );
     error = cudaDeviceSynchronize();
     checkCudaError(error);

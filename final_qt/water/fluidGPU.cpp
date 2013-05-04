@@ -35,6 +35,7 @@ void initGridGPU( const int hostGridSize, const int hostGridPaintSize, const flo
 void copybackGPU(FieldType type, float* hostMap  );
 void destroyGPUmem();
 void addDropGPU(const int posX, const int posZ, const int radius, const float h );
+void addSideWaveGPU(const int sideIndex, const int sideLength, const float h );
 void advectGPU(const float dt);
 void updateFluidGPU( const float dt );
 bool findSupportDevice();
@@ -1309,7 +1310,6 @@ void FluidGPU::addBreakingWaveParticles(){
                     float randZ = randomFloatGenerator(-halfDx, halfDx);
 
                     Vector3 position = Vector3(posX + randX, m_heightField[index], posZ + randZ);
-
                     Vector3 velocity = Vector3(BREAKING_WAVE_VEL_MULTIPLIER * m_velocityU[uindex],
                                                BREAKING_WAVE_VEL_MULTIPLIER * LAMBDA_Y * depthChange,
                                                BREAKING_WAVE_VEL_MULTIPLIER * m_velocityW[windex]);

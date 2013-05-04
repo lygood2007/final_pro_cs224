@@ -25,7 +25,7 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
-//#define USE_HEIGHTMAP
+#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
 //#define USE_FBO
@@ -33,7 +33,7 @@
 
 // Colors to use when rendering
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
-#define TIME_STEP 0.03 //0.03 //is max for gridsize 256
+#define TIME_STEP 0.03 //0.03 //is max for gridsize 80
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/
