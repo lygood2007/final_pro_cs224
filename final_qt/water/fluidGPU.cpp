@@ -96,11 +96,6 @@ FluidGPU::~FluidGPU()
 //    safeFreeArray1D( m_paintNormalField ); //@TODO - this is causing the memory error
     safeFreeArray1D( m_heightField );
     safeFreeArray1D( m_depthField );
-    safeFreeArray1D( m_psiField );
-    safeFreeArray1D( m_paintNormalField );
-    safeFreeArray1D( m_heightField );
-    safeFreeArray1D( m_depthField );
-
 
     if(m_glw->m_useParticles)
     {
