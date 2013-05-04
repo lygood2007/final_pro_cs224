@@ -129,9 +129,6 @@ FluidGPU::~FluidGPU()
 void FluidGPU::draw() const
 {
     drawFluid( DRAW_MESH_VBO );
-#ifdef USE_PARTICLES
-    //  drawParticles();
-#endif
 
 //    if(m_glw->m_useParticles) drawParticles2(); //moved this call to glwidget for rendering separatly
 
@@ -195,10 +192,10 @@ void FluidGPU::update(const float dt)
         copybackGPU( BREAKING_WAVES, m_breakingWavesGrid);
         addBreakingWaveParticles();
 
-#ifdef USE_PARTICLE_SOURCES
-        //add from particle sources
-        updateParticleSources();
-#endif
+        if(m_glw->m_useParticleSources){
+            //add from particle sources
+            updateParticleSources();
+        }
     }
 
     if(m_glw->m_useDampening) dampenWaves();
@@ -397,9 +394,8 @@ void FluidGPU::init(const int gridSize, const float domainSize)
 
     if(m_glw->m_useParticles)
     {
-#ifdef USE_PARTICLE_SOURCES
+        //initialize particle sources
         initParticleSources();
-#endif
 
         //universal constants
         m_particle_acceleration = Vector3(0, GRAVITY, 0);
@@ -1111,18 +1107,22 @@ void FluidGPU::initParticleSources(){
     //long waterfall
     Vector3 centerPosition3 = Vector3(0, 0, halfDomain - 15.0f);
     centerPosition3.y = PARTICLE_DROP_HEIGHT;
-    ParticleSource *particleSource3 = new ParticleSource(centerPosition3, 10.0f, 1.0f, 100);
+    ParticleSource *particleSource3 = new ParticleSource(centerPosition3, 10.0f, 1.0f,
+                                                         -halfDomain + 1.0f, -halfDomain + 2.0f, PARTICLE_DROP_HEIGHT, 1.0f, -halfDomain, halfDomain,
+                                                         1000);
     m_particle_sources.append(particleSource3);
 }
 
 void FluidGPU::updateParticleSources(){
     //generate particles from each sources
 //    for(int i = 0; i < m_particle_sources.size(); i++){
-//        m_particle_sources[i]->generateParticles(&m_splash_positions, &m_splash_velocities, TOTAL_NUM_SPLASH_PARTICLES);
+//        m_particle_sources[i]->generateParticles(&m_splash_positions, &m_splash_velocities,
+//                                                 TOTAL_NUM_SPLASH_PARTICLES, !m_glw->m_useRectangularParticleSources);
 //    }
 //    inputParticlesGPU((float*) m_splash_positions, (float*) m_splash_velocities);
     for(int i = 0; i < m_particle_sources.size(); i++){
-        m_particle_sources[i]->generateParticles(&m_spray_positions, &m_spray_velocities, TOTAL_NUM_SPRAY_PARTICLES);
+        m_particle_sources[i]->generateParticles(&m_spray_positions, &m_spray_velocities,
+                                                 TOTAL_NUM_SPRAY_PARTICLES, !m_glw->m_useRectangularParticleSources);
     }
     inputSprayParticlesGPU((float*) m_spray_positions, (float*) m_spray_velocities);
 }

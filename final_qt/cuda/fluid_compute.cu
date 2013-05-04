@@ -1746,7 +1746,6 @@ void addDropGPU(const int posX, const int posZ, const int radius, const float h 
     checkCudaError(error);
 }
 
-//TODO: CHECK THIS
 void addSideWaveGPU(const int sideIndex, const int sideLength, const float h )
 {
     dim3 threadsPerBlock(blockSizeX,blockSizeY);
