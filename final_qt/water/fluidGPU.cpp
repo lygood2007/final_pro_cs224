@@ -93,7 +93,7 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_gammaField );
     safeFreeArray1D( m_phiField );
     safeFreeArray1D( m_psiField );
-    safeFreeArray1D( m_paintNormalField );
+    //safeFreeArray1D( m_paintNormalField ); //TODO: unclear why this causes a problem
     safeFreeArray1D( m_heightField );
     safeFreeArray1D( m_depthField );
 
@@ -1220,7 +1220,7 @@ void FluidGPU::addBreakingWaveParticles(){
                     float randZ = randomFloatGenerator(-halfDx, halfDx);
 
                     Vector3 position = Vector3(posX + randX, m_heightField[index], posZ + randZ);
-                    //TODO: wrong y component!
+
                     Vector3 velocity = Vector3(BREAKING_WAVE_VEL_MULTIPLIER * m_velocityU[uindex],
                                                BREAKING_WAVE_VEL_MULTIPLIER * LAMBDA_Y * depthChange,
                                                BREAKING_WAVE_VEL_MULTIPLIER * m_velocityW[windex]);
@@ -1299,6 +1299,13 @@ void FluidGPU::addNewFoamParticles(){
 
                 //determine where the particle is
                 Vector3 currPosition = m_splash_positions[p];
+
+                //disregard if outside of the grid
+                if(currPosition.x < -halfDomain || currPosition.x > halfDomain ||
+                        currPosition.z < -halfDomain || currPosition.z > halfDomain){
+                    continue;
+                }
+
                 float lenX = (currPosition.x + halfDomain) * m_dxInv;
                 float lenZ = (currPosition.z + halfDomain) * m_dxInv;
                 int i = (int) min(m_gridSize - 1, max(0.0, round(lenX)));

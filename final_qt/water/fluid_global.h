@@ -40,7 +40,7 @@
 #define ALPHA_MIN_SPLASH 0.45
 #define V_MIN_SPLASH 4
 #define L_MIN_SPLASH -4
-#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 10
+#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 4
 #define LAMBDA_Y 0.1
 
 #define BREAKING_WAVE_VEL_MULTIPLIER 1.0f
@@ -49,14 +49,13 @@
 #define FOAM_TTL_VARIANCE_MULTIPLIER 4.0f
 #define FOAM_GENERATION_PROBABILITY 0.2f
 
-
 #define NUM_DROPPING_PARTICLES 10000
 #define PARTICLE_DROPPING_RADIUS 2.0
 #define PARTICLE_DROP_HEIGHT 60
 #define PARTICLE_DROP_RANGE 10
 
 #define TOTAL_NUM_SPRAY_PARTICLES 50000
-#define TOTAL_NUM_SPLASH_PARTICLES 200000
+#define TOTAL_NUM_SPLASH_PARTICLES 150000
 #define TOTAL_NUM_FOAM_PARTICLES 50000
 
 //#define USE_PARTICLE_SOURCES //uncomment to use particle sources //TODO: make this a hot key
@@ -73,7 +72,7 @@
 // If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
-const float defaultHeight = TERRAIN_MAX_HEIGHT-15;
+const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;
