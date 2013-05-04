@@ -1365,6 +1365,16 @@ void FluidGPU::addBreakingWaveParticles(){
     }
 }
 
+/**
+ *This method creates a pulse wave that can be generate from any side
+    */
+
+void FluidGPU::createWave(int side)
+{
+
+}
+
+
 void FluidGPU::addNewFoamParticles(){
     if(m_glw->m_useParticles)
     {

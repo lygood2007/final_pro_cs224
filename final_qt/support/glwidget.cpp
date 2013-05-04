@@ -1066,6 +1066,26 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         m_useDampening = !m_useDampening;
         break;
     }
+    case Qt::Key_1:
+    {
+        m_fluid->createWave(1);
+        break;
+    }
+    case Qt::Key_2:
+    {
+        m_fluid->createWave(2);
+        break;
+    }
+    case Qt::Key_3:
+    {
+        m_fluid->createWave(3);
+        break;
+    }
+    case Qt::Key_4:
+    {
+        m_fluid->createWave(4);
+        break;
+    }
 
     }
 }
@@ -1100,8 +1120,13 @@ void GLWidget::paintText()
     renderText(10, 20, "FPS: " + QString::number((int) (m_prevFps)), m_font);
     renderText(10, 35, "Delta: " + QString::number((float) (m_delta)), m_font);
     renderText(10, 50, "S: Save screenshot", m_font);
-}
+    if(!m_animate) renderText(10, 65, "Rendering Off!", m_font);
+    if(m_useParticles) renderText(10, 80, "Particles On", m_font);
+    if(m_useFBO) renderText(10, 95, "FrameBufers On", m_font);
+    if(m_useDampening) renderText(10, 110, "Dampening On", m_font);
 
+
+}
 /**
  * Update the time variables
  **/
