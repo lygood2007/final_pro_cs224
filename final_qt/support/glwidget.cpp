@@ -357,19 +357,16 @@ void GLWidget::renderScene()
         m_shaderPrograms["fresnel"]->release();
 
 
-        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this allows attenuation of the gl_points
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this should allow us to change point size in the shader but it never quite worked
         // Render the spray with the point shader
-        m_shaderPrograms["point"]->bind();
-        m_shaderPrograms["point"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["point"]->setUniformValue("CurrColor", SEA_WATER);
+        m_shaderPrograms["spray"]->bind();
+        m_shaderPrograms["spray"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["spray"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
-//        renderParticles();
         renderSpray();
-//        renderSplash();
-//        renderFoam();
         glPopMatrix();
-        m_shaderPrograms["point"]->release();
+        m_shaderPrograms["spray"]->release();
 
         // Render the splash with the splash shader
         m_shaderPrograms["splash"]->bind();
@@ -377,10 +374,7 @@ void GLWidget::renderScene()
         m_shaderPrograms["splash"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
-//        renderParticles();
-//        renderSpray();
         renderSplash();
-//        renderFoam();
         glPopMatrix();
         m_shaderPrograms["splash"]->release();
 
@@ -391,9 +385,6 @@ void GLWidget::renderScene()
         m_shaderPrograms["foam"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
-//        renderParticles();
-//        renderSpray();
-//        renderSplash();
         renderFoam();
         glPopMatrix();
         m_shaderPrograms["foam"]->release();
@@ -699,7 +690,7 @@ void GLWidget::createShaderPrograms()
     m_shaderPrograms["fresnel"] = ResourceLoader::newShaderProgram(ctx, "shaders/f2.vert", "shaders/f2.frag");
     m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
     m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
-    m_shaderPrograms["point"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/point.frag");
+    m_shaderPrograms["spray"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/spray.frag");
     m_shaderPrograms["splash"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/splash.frag");
     m_shaderPrograms["foam"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/foam.frag");
 }
