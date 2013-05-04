@@ -57,6 +57,10 @@ void clampFieldsGPU( const float velocityClamp );
 void initDampeningFieldsGPU( const int sizeDampeningRegion, const float quadraticA, const float quadraticB, const float quadraticC );
 void dampenWavesGPU( const float hRest, const float dt, const float dxInv, const float lambdaUpdate, const float lambdaDecay );
 
+void resetGridGPU();
+void resetParticlesGPU(const float minHeight);
+void resetDampeningFieldsGPU();
+
 void glBindBuffer (GLenum target, GLuint buffer);
 void  glGenBuffers (GLsizei n, GLuint *buffers);
 void *glMapBuffer(	GLenum target,GLenum access);
@@ -1464,7 +1468,31 @@ void FluidGPU::addNewFoamParticles(){
 
 void FluidGPU::resetFluid()
 {
+    //reset grid, particles, dampening fields
+    resetGridGPU();
+    resetDampeningFieldsGPU();
+    if(m_glw->m_useParticles)
+    {
+        resetParticlesGPU(TERRAIN_MIN_HEIGHT);
+    }
 
+    copybackGPU(PAINT,(float*)m_paintField);
+    copybackGPU(DEPTH,m_depthField);
+    copybackGPU(HEIGHT,m_heightField);
+    copybackGPU(NORMAL, (float*)m_paintNormalField );
 
+    copybackGPU(SIGMA, m_sigmaField);
+    copybackGPU(GAMMA, m_gammaField);
+    copybackGPU(PHI, m_psiField);
+    copybackGPU(PSI, m_phiField);
 
+    if(m_glw->m_useParticles)
+    {
+        copybackGPU(PARTICLE_POSITIONS, (float*)m_splash_positions );
+        copybackGPU(PARTICLE_VELOCITIES, (float*)m_splash_velocities );
+        copybackGPU(SPRAY_POSITIONS, (float*) m_spray_positions);
+        copybackGPU(SPRAY_VELOCITIES, (float*) m_spray_velocities);
+        copybackGPU(FOAM_POSITIONS, (float*) m_foam_positions);
+        copybackGPU(FOAM_TTLS, (float*) m_foam_ttls);
+    }
 }
