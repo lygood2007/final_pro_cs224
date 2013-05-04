@@ -4,7 +4,6 @@
  ** Date: 04/10/2013
  ** Member: Scott, Hobarts, Yan Li
  **/
-
 #include "GL/glut.h"
 #include "glwidget.h"
 #include "CS123Algebra.h"
@@ -21,7 +20,6 @@
 //added by SH
 #include <QGLFramebufferObject>
 #include <QGLShaderProgram>
-
 // Declaration of Cuda functions
 extern "C"
 {
@@ -46,8 +44,18 @@ GLWidget::~GLWidget()
 {
     if( m_terrain )
         delete m_terrain;
+#ifdef RENDER_FLUID
     if( m_fluid )
         delete m_fluid;
+#endif
+    foreach( Box* b, m_boxes )
+    {
+        if( b )
+        {
+            delete b;
+            b = NULL;
+        }
+    }
 
     foreach (QGLShaderProgram *sp, m_shaderPrograms)
         delete sp;
@@ -55,6 +63,7 @@ GLWidget::~GLWidget()
         delete fbo;
     glDeleteLists(m_skybox, 1);
     const_cast<QGLContext *>(context())->deleteTexture(m_cubeMap);
+
 }
 
 void GLWidget::init()
@@ -72,7 +81,6 @@ void GLWidget::init()
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     //except these
     m_useAxis = false; m_useDampening = false;
-
 
 #ifdef USE_HEIGHTMAP
     m_terrain = new HeightmapTerrain(); //added by hcreynol
@@ -141,13 +149,15 @@ void GLWidget::initializeGL()
     // Light's color
     GLfloat ambientColor[] = { 0.3f, 0.3f, 0.3f, 1.0f };
     GLfloat diffuseColor[] = { 1.0f, 1.0f, 1.0, 1.0f };
-    GLfloat specularColor[] = { 0.5f, 0.5f, 0.5f, 1.0f };
+//    GLfloat specularColor[] = { 0.5f, 0.5f, 0.5f, 1.0f };
     GLfloat lightPosition[] = { 0.f, 0.f, 10.f, 1.0f };
     glLightfv(GL_LIGHT0, GL_AMBIENT, ambientColor);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseColor);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, specularColor);
+//    glLightfv(GL_LIGHT0, GL_SPECULAR, specularColor);
     glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     glEnable(GL_LIGHT0);
+
+    glEnable(GL_PROGRAM_POINT_SIZE_EXT); //so we can adjust particle sizes
 
     initializeResources();
 }
@@ -168,9 +178,8 @@ void GLWidget::initializeResources()
     loadCubeMap();
     cout << "  Loaded Skymap ->" << endl;
 
-    m_waterNormalMap = loadTexture("./resource/shallow_normal.jpg");
-
     createShaderPrograms();
+//    m_waterNormalMap = loadTexture("./resource/shallow_normal.jpg");
     cout << "  Loaded Shaders ->" << endl;
 
     createFramebufferObjects(width(), height());
@@ -336,28 +345,58 @@ void GLWidget::renderScene()
         m_shaderPrograms["fresnel"]->bind();
         m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", 0);
         m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_waterNormalMap);
-        m_shaderPrograms["fresnel"]->setUniformValue("NormalMap", 1);
+//        glActiveTexture(GL_TEXTURE1);
+//        glBindTexture(GL_TEXTURE_2D, m_waterNormalMap);
+//        m_shaderPrograms["fresnel"]->setUniformValue("NormalMap", 1);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
         renderFluid();
         glPopMatrix();
-        glBindTexture(GL_TEXTURE_2D, 0);
+//        glBindTexture(GL_TEXTURE_2D, 0);
         glActiveTexture(GL_TEXTURE0);
         m_shaderPrograms["fresnel"]->release();
 
 
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this allows attenuation of the gl_points
-        // Render the points with the point shader
+        // Render the spray with the point shader
         m_shaderPrograms["point"]->bind();
         m_shaderPrograms["point"]->setUniformValue("CubeMap", GL_TEXTURE0);
         m_shaderPrograms["point"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
-        renderParticles();
+//        renderParticles();
+        renderSpray();
+//        renderSplash();
+//        renderFoam();
         glPopMatrix();
         m_shaderPrograms["point"]->release();
+
+        // Render the splash with the splash shader
+        m_shaderPrograms["splash"]->bind();
+        m_shaderPrograms["splash"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["splash"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+//        renderParticles();
+//        renderSpray();
+        renderSplash();
+//        renderFoam();
+        glPopMatrix();
+        m_shaderPrograms["splash"]->release();
+
+
+        // Render the foam with the foam shader
+        m_shaderPrograms["foam"]->bind();
+        m_shaderPrograms["foam"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["foam"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+//        renderParticles();
+//        renderSpray();
+//        renderSplash();
+        renderFoam();
+        glPopMatrix();
+        m_shaderPrograms["foam"]->release();
 
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
@@ -378,8 +417,6 @@ void GLWidget::renderScene()
        renderFluid();
        renderParticles();
    }
-
-  // renderObjects();
 }
 
 /**
@@ -432,20 +469,73 @@ void GLWidget::renderFluid()
 }
 
 /**
-    Render just the particles
+    Render all the particles
 **/
 void GLWidget::renderParticles()
+{
+#ifdef RENDER_FLUID
+    if(m_useParticles)
+    {
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
+        glEnable(GL_DEPTH_TEST );
+//        m_fluid->drawParticles2();
+        m_fluid->drawSpray();
+        m_fluid->drawSplash();
+        m_fluid->drawFoam();
+        glDisable(GL_DEPTH_TEST );
+    }
+}
+
+/**
+    Render just spray particles
+**/
+void GLWidget::renderSpray()
 {
     if(m_useParticles)
     {
         glEnable (GL_BLEND);
         glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
         glEnable(GL_DEPTH_TEST );
-        m_fluid->drawParticles2();
+        m_fluid->drawSpray();
+        glDisable(GL_DEPTH_TEST );
+    }
+#endif
+}
+
+/**
+    Render just splash particles
+**/
+void GLWidget::renderSplash()
+{
+    if(m_useParticles)
+    {
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
+        glEnable(GL_DEPTH_TEST );
+        m_fluid->drawSplash();
         glDisable(GL_DEPTH_TEST );
     }
 }
 
+/**
+    Render just foam particles
+**/
+void GLWidget::renderFoam()
+{
+    if(m_useParticles)
+    {
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
+        glEnable(GL_DEPTH_TEST );
+        m_fluid->drawFoam();
+        glDisable(GL_DEPTH_TEST );
+    }
+}
 
 
 /**
@@ -610,6 +700,8 @@ void GLWidget::createShaderPrograms()
     m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
     m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
     m_shaderPrograms["point"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/point.frag");
+    m_shaderPrograms["splash"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/splash.frag");
+    m_shaderPrograms["foam"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/foam.frag");
 }
 
 /**
@@ -1140,12 +1232,12 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
     {
         TriIndex curTri = temp[i];
         // Firstly check if the triangle is visible
-        int count = 0;
+        //int count = 0;
         int r[3]; int c[3];
         r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
         r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
         r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-        for( int m = 0; m < 3; m++ )
+      /*  for( int m = 0; m < 3; m++ )
         {
 #ifdef USE_GPU_FLUID
             if( tempDepth[m_fluid->getIndex1D(r[m],c[m],DEPTH)] > EPSILON )
@@ -1154,11 +1246,11 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
             if( m_fluid->m_depthField[r[m]][c[m]] > EPSILON )
                 count++;
 #endif
-        }
-        if( count == 0 )
+        }*/
+        /*if( count == 0 )
             continue;
         else
-        {
+        {*/
 #ifdef USE_GPU_FLUID
             const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
                                       ,- halfDomain + r[0]*dx );
@@ -1188,7 +1280,7 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
                  pos = (p0 + p1 + p2)/3.f;
                  break;
              }
-        }
+        //}
     }
 
     if( indexRow != -1 && indexCol != -1 )
@@ -1228,7 +1320,7 @@ void GLWidget::updateObjects( float dt )
     {
         if( b )
         {
-            b->update( dt, m_fluid);
+            b->update( dt );
         }
     }
 }

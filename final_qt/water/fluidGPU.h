@@ -34,7 +34,10 @@ public:
     void draw() const; //the name says it all - draw some fluid
 
     void drawParticles2(); //moved to public for rendering reasons
-
+    //spltting the particles out into three methods for different shaders
+    void drawSpray();
+    void drawSplash();
+    void drawFoam();
 
     /**
      * Update the simulation at each time step

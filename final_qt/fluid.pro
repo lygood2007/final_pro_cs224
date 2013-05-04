@@ -46,7 +46,8 @@ SOURCES += \
     water/particle.cpp \
     water/particlesource.cpp \
     object/box.cpp \
-    object/object.cpp
+    object/object.cpp \
+    object/sphere.cpp
 
 HEADERS  += \
     camera/camera.h \
@@ -74,7 +75,8 @@ HEADERS  += \
     water/particlesource.h \
     object/box.h \
     object/object.h \
-    object/object_defs.h
+    object/object_defs.h \
+    object/sphere.h
 
 OTHER_FILES += cuda/fluid_compute.cu \
     cuda/test.cu \
@@ -90,7 +92,11 @@ OTHER_FILES += cuda/fluid_compute.cu \
     shaders/f2.frag \
     shaders/f2.vert \
     shaders/point.frag \
-    shaders/point.vert
+    shaders/point.vert \
+    shaders/splash.vert \
+    shaders/splash.frag \
+    shaders/foam.vert \
+    shaders/foam.frag
 
 CUDA_SOURCES += cuda/test.cu cuda/fluid_compute.cu
 
@@ -108,16 +114,19 @@ CUDA_ARCH = sm_21
 # flags for the cuda compiler, in particular, verbosity about what ptx assembly is doing
 NVCC_FLAGS = --compiler-options -fno-strict-aliasing -use_fast_math --ptxas-options=-v
 
+CV_DIR = /contrib/projects/OpenCV2.2/install
+
 #include paths for cuda
 INCLUDEPATH += $$CUDA_DIR/include \
                 $$CUDA_SDK/common/inc \
-                $$CUDA_SDK/../shared/inc
-
+                $$CUDA_SDK/../shared/inc \
+                $$CV_DIR/include
 #libs
 LIBS += -L$$CUDA_DIR/lib \
         -L$$CUDA_SDK/lib \
         -L$$CUDA_SDK/common/lib/linux \
-        -L$$CUDA_SDK/../shared/lib
+        -L$$CUDA_SDK/../shared/lib \
+        -L$$CV_DIR/lib
 
 LIBS += -lcudart -lcutil_i386
 CUDA_INC = $$join(INCLUDEPATH, ' -I', '-I', ' ')
@@ -138,4 +147,4 @@ FORMS    += \
 
 #unix|win32: LIBS += -lGLU -lglut
 
-unix:!macx:!symbian: LIBS += -lGLU -lglut
+unix:!macx:!symbian: LIBS += -lGLU -lglut -lcxcore -lcv -lhighgui -lcvaux
