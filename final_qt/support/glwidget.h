@@ -25,7 +25,7 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
-//#define USE_HEIGHTMAP
+#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
 //#define USE_FBO
@@ -33,7 +33,7 @@
 
 // Colors to use when rendering
 #define SEA_WATER 0.0f,0.42f,0.58f,0.9f
-#define TIME_STEP 0.035
+#define TIME_STEP 0.03 //0.03 //is max for gridsize 80
 /**
     Uncomment this if you don't want to use CUDA to compute
 **/
@@ -57,7 +57,8 @@ public:
 
     //Not the best idea but I'm placing these here in case I need them elsewhere
     bool m_useShaders, m_useFBO, m_useSimpleCube, m_useAxis,
-        m_useSkybox, m_useParticles, m_useDampening;
+        m_useSkybox, m_useParticles, m_useDampening,
+        m_useParticleSources, m_useRectangularParticleSources;
 
 private:
     // Private variables
@@ -128,6 +129,10 @@ public:
     /** Placeing all visible geometry rendering in one method*/
     void renderFluid();
     void renderParticles();
+    /** So we can render the particles separately for shading purposes*/
+    void renderSpray();
+    void renderSplash();
+    void renderFoam();
 
     /** Updates the current OpenGL state to avoid object distortion when the window is resized. */
     void resizeGL(int w, int h);
@@ -192,6 +197,11 @@ public:
      * @param dt the time step
      */
     void updateObjects( float dt );
+
+    /**
+     * @brief resetObjects Delete the objects
+     */
+    void resetObjects();
 
 private slots:
     /** Callback function, will be called whenever the timer ticks*/

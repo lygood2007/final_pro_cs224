@@ -1110,8 +1110,8 @@ void FluidCPU::checkForBreakingWaves(){
             }
 
             //generate splash particles
-            int numParticles = (int) round(condition1 * BREAKING_WAVE_NUM_SPLASH_PARTICLES);
-            generateSplashParticles(i, j, numParticles);
+            //int numParticles = (int) round(condition1 * BREAKING_WAVE_NUM_SPLASH_PARTICLES);
+            //generateSplashParticles(i, j, numParticles);
         }
     }
 }

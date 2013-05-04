@@ -82,11 +82,12 @@ void GLWidget::init()
 
     //use everything
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
+    m_useParticleSources = m_useRectangularParticleSources = false;
     //except these
     m_useAxis = false; m_useDampening = false;
 
 #ifdef USE_HEIGHTMAP
-    m_terrain = new HeightmapTerrain(); //added by hcreynol
+    m_terrain = new HeightmapTerrain();
 #else
     m_terrain = new RandomTerrain();
 #endif
@@ -116,7 +117,7 @@ void GLWidget::init()
 
 #ifdef RENDER_FLUID
 #ifdef USE_GPU_FLUID
-        m_fluid = new FluidGPU(m_terrain, this); //I also passed a pointer to glwidget so can control things easier via bool's
+        m_fluid = new FluidGPU(m_terrain, this); //I also passed a pointer to glwidget so can control things easier via bool's;
 #else
      m_fluid =  new FluidCPU(m_terrain);
 #endif
@@ -152,13 +153,15 @@ void GLWidget::initializeGL()
     // Light's color
     GLfloat ambientColor[] = { 0.3f, 0.3f, 0.3f, 1.0f };
     GLfloat diffuseColor[] = { 1.0f, 1.0f, 1.0, 1.0f };
-    GLfloat specularColor[] = { 0.5f, 0.5f, 0.5f, 1.0f };
+//    GLfloat specularColor[] = { 0.5f, 0.5f, 0.5f, 1.0f };
     GLfloat lightPosition[] = { 0.f, 0.f, 10.f, 1.0f };
     glLightfv(GL_LIGHT0, GL_AMBIENT, ambientColor);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseColor);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, specularColor);
+//    glLightfv(GL_LIGHT0, GL_SPECULAR, specularColor);
     glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     glEnable(GL_LIGHT0);
+
+    glEnable(GL_PROGRAM_POINT_SIZE_EXT); //so we can adjust particle sizes
 
     initializeResources();
 }
@@ -179,9 +182,8 @@ void GLWidget::initializeResources()
     loadCubeMap();
     cout << "  Loaded Skymap ->" << endl;
 
-    m_waterNormalMap = loadTexture("./resource/shallow_normal.jpg");
-
     createShaderPrograms();
+//    m_waterNormalMap = loadTexture("./resource/shallow_normal.jpg");
     cout << "  Loaded Shaders ->" << endl;
 
     createFramebufferObjects(width(), height());
@@ -345,28 +347,49 @@ void GLWidget::renderScene()
         m_shaderPrograms["fresnel"]->bind();
         m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", 0);
         m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_waterNormalMap);
-        m_shaderPrograms["fresnel"]->setUniformValue("NormalMap", 1);
+//        glActiveTexture(GL_TEXTURE1);
+//        glBindTexture(GL_TEXTURE_2D, m_waterNormalMap);
+//        m_shaderPrograms["fresnel"]->setUniformValue("NormalMap", 1);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
         renderFluid();
         glPopMatrix();
-        glBindTexture(GL_TEXTURE_2D, 0);
+//        glBindTexture(GL_TEXTURE_2D, 0);
         glActiveTexture(GL_TEXTURE0);
         m_shaderPrograms["fresnel"]->release();
 
 
-        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this allows attenuation of the gl_points
-        // Render the points with the point shader
-        m_shaderPrograms["point"]->bind();
-        m_shaderPrograms["point"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["point"]->setUniformValue("CurrColor", SEA_WATER);
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this should allow us to change point size in the shader but it never quite worked
+        // Render the spray with the point shader
+        m_shaderPrograms["spray"]->bind();
+        m_shaderPrograms["spray"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["spray"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
-        renderParticles();
+        renderSpray();
         glPopMatrix();
-        m_shaderPrograms["point"]->release();
+        m_shaderPrograms["spray"]->release();
+
+        // Render the splash with the splash shader
+        m_shaderPrograms["splash"]->bind();
+        m_shaderPrograms["splash"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["splash"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderSplash();
+        glPopMatrix();
+        m_shaderPrograms["splash"]->release();
+
+
+        // Render the foam with the foam shader
+        m_shaderPrograms["foam"]->bind();
+        m_shaderPrograms["foam"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["foam"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderFoam();
+        glPopMatrix();
+        m_shaderPrograms["foam"]->release();
 
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
@@ -439,7 +462,7 @@ void GLWidget::renderFluid()
 }
 
 /**
-    Render just the particles
+    Render all the particles
 **/
 void GLWidget::renderParticles()
 {
@@ -448,11 +471,63 @@ void GLWidget::renderParticles()
     {
         glEnable (GL_BLEND);
         glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
         glEnable(GL_DEPTH_TEST );
-        m_fluid->drawParticles2();
+//        m_fluid->drawParticles2();
+        m_fluid->drawSpray();
+        m_fluid->drawSplash();
+        m_fluid->drawFoam();
+        glDisable(GL_DEPTH_TEST );
+    }
+}
+
+/**
+    Render just spray particles
+**/
+void GLWidget::renderSpray()
+{
+    if(m_useParticles)
+    {
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
+        glEnable(GL_DEPTH_TEST );
+        m_fluid->drawSpray();
         glDisable(GL_DEPTH_TEST );
     }
 #endif
+}
+
+/**
+    Render just splash particles
+**/
+void GLWidget::renderSplash()
+{
+    if(m_useParticles)
+    {
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
+        glEnable(GL_DEPTH_TEST );
+        m_fluid->drawSplash();
+        glDisable(GL_DEPTH_TEST );
+    }
+}
+
+/**
+    Render just foam particles
+**/
+void GLWidget::renderFoam()
+{
+    if(m_useParticles)
+    {
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //        glBlendFunc(GL_ONE,GL_ONE);
+        glEnable(GL_DEPTH_TEST );
+        m_fluid->drawFoam();
+        glDisable(GL_DEPTH_TEST );
+    }
 }
 
 void GLWidget::resizeGL(int w, int h)
@@ -514,7 +589,9 @@ void GLWidget::createShaderPrograms()
     m_shaderPrograms["fresnel"] = ResourceLoader::newShaderProgram(ctx, "shaders/f2.vert", "shaders/f2.frag");
     m_shaderPrograms["brightpass"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/brightpass.frag");
     m_shaderPrograms["blur"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/blur.frag");
-    m_shaderPrograms["point"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/point.frag");
+    m_shaderPrograms["spray"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/spray.frag");
+    m_shaderPrograms["splash"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/splash.frag");
+    m_shaderPrograms["foam"] = ResourceLoader::newFragShaderProgram(ctx, "shaders/foam.frag");
 }
 
 /**
@@ -883,7 +960,43 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         m_useDampening = !m_useDampening;
         break;
     }
-
+    case Qt::Key_1:
+    {
+        m_fluid->createWave(1);
+        break;
+    }
+    case Qt::Key_2:
+    {
+        m_fluid->createWave(2);
+        break;
+    }
+    case Qt::Key_3:
+    {
+        m_fluid->createWave(3);
+        break;
+    }
+    case Qt::Key_4:
+    {
+        m_fluid->createWave(4);
+        break;
+    }
+    case Qt::Key_Q:
+    {
+        m_fluid->resetFluid();
+        // Reset the objects
+        resetObjects();
+        break;
+    }
+    case Qt::Key_K:
+    {
+        m_useParticleSources = !m_useParticleSources;
+        break;
+    }
+    case Qt::Key_L:
+    {
+        m_useRectangularParticleSources = !m_useRectangularParticleSources;
+        break;
+    }
     }
 }
 
@@ -917,8 +1030,13 @@ void GLWidget::paintText()
     renderText(10, 20, "FPS: " + QString::number((int) (m_prevFps)), m_font);
     renderText(10, 35, "Delta: " + QString::number((float) (m_delta)), m_font);
     renderText(10, 50, "S: Save screenshot", m_font);
-}
+    if(!m_animate) renderText(10, 65, "Rendering Off!", m_font);
+    if(m_useParticles) renderText(10, 80, "Particles On", m_font);
+    if(m_useFBO) renderText(10, 95, "FrameBufers On", m_font);
+    if(m_useDampening) renderText(10, 110, "Dampening On", m_font);
 
+
+}
 /**
  * Update the time variables
  **/
@@ -1078,6 +1196,23 @@ void GLWidget::updateObjects( float dt )
             o->update( dt, m_fluid );
         }
     }
+}
+
+/**
+ * @brief resetObjects Delete the objects
+ */
+void GLWidget::resetObjects()
+{
+
+    foreach( Object*o, m_objects )
+    {
+        if( o )
+        {
+            delete o;
+            o = NULL;
+        }
+    }
+    m_objects.clear();
 }
 
 void GLWidget::tick()

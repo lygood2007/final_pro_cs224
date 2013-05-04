@@ -169,7 +169,9 @@ void Object::update( float dt, FluidGPU* fluid )
     dragAccTotal = dragTotal*m_massInv;
     liftAccTotal = liftTotal*m_massInv;
     Vector3 forceDir = (buoyAccTotal + Vector3(0.f,GRAVITY,0.f) +dragAccTotal +liftAccTotal);
+
   //  printf("%f\n",buoyAccTotal.x);
+
     m_velocity += 2*(forceDir*dt);
 
     // Check if the next position is below terrain, if it is, we set the velocity to zero

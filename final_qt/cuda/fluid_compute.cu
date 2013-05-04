@@ -24,6 +24,7 @@ void initGridGPU( const int hostGridSize, const int hostGridPaintSize, const flo
 void copybackGPU(FieldType type, float* hostMap  );
 void destroyGPUmem();
 void addDropGPU(const int posX, const int posZ, const int radius, const float h );
+void addSideWaveGPU(const int sideIndex, const int sideLength, const float h );
 void advectGPU(const float dt);
 void updateFluidGPU( const float dt );
 bool findSupportDevice();
@@ -44,6 +45,10 @@ void clampFieldsGPU( const float velocityClamp );
 
 void initDampeningFieldsGPU( const int sizeDampeningRegion, const float quadraticA, const float quadraticB, const float quadraticC );
 void dampenWavesGPU( const float hRest, const float dt, const float dxInv, const float lambdaUpdate, const float lambdaDecay );
+
+void resetGridGPU();
+void resetParticlesGPU(const float minHeight);
+void resetDampeningFieldsGPU();
 }
 
 __host__ __device__ inline float cudaMax( float a, float b )
@@ -292,6 +297,46 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
     if(distance <= (float) radius){
         float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
         map2Dwrite( depthMap, i,j, newH, width );
+    }
+}
+
+/**
+ * Add drop to specified side
+ */
+__global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const int sideIndex,
+                             const float h, const int width, const int height )
+{
+    int i = blockDim.y*blockIdx.y + threadIdx.y;
+    int j = blockDim.x*blockIdx.x + threadIdx.x;
+
+    if(sideIndex == 1){
+        //side index 1: min i
+        if( i >= 0 && i < sideLength && j >= 0 && j < width )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
+    } else if(sideIndex == 2){
+        //side index 2: max i
+        if( i >= height - sideLength && i < height && j >= 0 && j < width )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
+    } else if(sideIndex == 3){
+        //side index 3: min j
+        if( i >= 0 && i < height && j >= 0 && j < sideLength )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
+    } else if(sideIndex == 4){
+        //side index 4: max j
+        if( i >= 0 && i < height && j >= width - sideLength && j < width )
+        {
+            float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+            map2Dwrite( depthMap, i,j, newH, width );
+        }
     }
 }
 
@@ -1071,6 +1116,12 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
         float etaJInc = map2Dread( heightMap, i, j + 1, width );
         float etaJDec = map2Dread( heightMap, i, j - 1, width );
 
+        //additional eta terms (added by us, makes breaking waves nicer)
+        float etaIIncJInc = map2Dread( heightMap, i + 1, j + 1, width );
+        float etaIIncJDec = map2Dread( heightMap, i + 1, j - 1, width );
+        float etaIDecJInc = map2Dread( heightMap, i - 1, j + 1, width );
+        float etaIDecJDec = map2Dread( heightMap, i - 1, j - 1, width );
+
         //terms for first condition
         float firstTerm = etaIInc - eta;
         float secondTerm = etaIDec - eta;
@@ -1113,7 +1164,9 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //compute numerator for third condition
         //float numerator = etaIInc + etaIDec + etaJInc + etaJDec - (4 * eta);
-        float numerator = firstTerm + secondTerm + thirdTerm + fourthTerm;
+        //float numerator = firstTerm + secondTerm + thirdTerm + fourthTerm;
+        float numerator = etaIInc + etaIDec + etaJInc + etaJDec +
+                etaIIncJInc + etaIIncJDec + etaIDecJInc + etaIDecJDec - (8 * eta);
 
         //check condition 3: top of wave
         if(numerator * mdxInv * mdxInv >= condition3){
@@ -1143,7 +1196,7 @@ __global__ void initBreakingWavesCUDA( float* breakingWavesMap, const int width,
 /**
  *  clamp the depth (min 0)
  */
-__global__ void clampDepthCUDA( float* depthMap, const int width, const int height )
+__global__ void clampDepthCUDA( float* depthMap, float* terrainMap, const int width, const int height )
 {
     int i = blockDim.y*blockIdx.y +threadIdx.y;
     int j = blockDim.x*blockIdx.x +threadIdx.x;
@@ -1151,6 +1204,8 @@ __global__ void clampDepthCUDA( float* depthMap, const int width, const int heig
     if( i >= 0 && i < height && j >= 0 && j < width )
     {
         float depth = cudaMax(0.f, map2Dread( depthMap, i, j, width ));
+        float height = map2Dread( terrainMap, i,j, width );
+        depth = cudaMin( depth, maxHeight - height );
         map2Dwrite( depthMap, i, j, depth, width );
     }
 }
@@ -1697,6 +1752,26 @@ void addDropGPU(const int posX, const int posZ, const int radius, const float h 
     checkCudaError(error);
 }
 
+void addSideWaveGPU(const int sideIndex, const int sideLength, const float h )
+{
+    dim3 threadsPerBlock(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
+    addSideWaveCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   deviceDepthMap, sideLength, sideIndex, h, gridSize, gridSize
+                                                   );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    updateHeightCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   deviceHeightMap,deviceDepthMap,deviceTerrainMap,
+                                                   gridSize,gridSize
+                                                   );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
 /**
  * @brief destroyCUDAmem Destroy the cuda memory
  */
@@ -2103,7 +2178,7 @@ void clampFieldsGPU( const float velocityClamp ){
     dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
     //clamp depth, min value is 0
     clampDepthCUDA<<<blocksPerGrid,threadsPerBlock>>>(
-                                                   deviceDepthMap, gridSize, gridSize
+                                                   deviceDepthMap, deviceTerrainMap, gridSize, gridSize
                                                    );
     //update height field
     updateHeightCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,
@@ -2211,6 +2286,168 @@ void inputDepthGPU( const float* newDepthField ){
     //update height field
     updateHeightCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,
                                  gridSize, gridSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
+// TODO: CHECK THIS
+void resetGridGPU(){
+    // initialize the depth map
+    dim3 threadsPerBlock(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
+    initDepthCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   deviceDepthMap,deviceTerrainMap,gridSize,gridSize
+                                                   );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+    // Copy the depth field to initialize the next depth map
+    cudaMemcpy(deviceNextDepthMap,deviceDepthMap,gridSize*gridSize*sizeof(float), cudaMemcpyDeviceToDevice );
+
+    // copy to initialize the previous depth map
+    cudaMemcpy(devicePrevDepthMap, deviceDepthMap, gridSize * gridSize * sizeof(float), cudaMemcpyDeviceToDevice);
+
+    //initialize breaking waves map
+    initBreakingWavesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceBreakingWavesMap, gridSize, gridSize
+                                                    );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    blockPerGridX = (gridPaintSize + blockSizeX - 1)/(blockSizeX);
+    blockPerGridY = (gridPaintSize+ blockSizeY - 1)/(blockSizeY);
+    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    // Initialize the normal map
+    initPaintNormalCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   devicePaintNormalMap,gridPaintSize,gridPaintSize
+                                                   );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    // Initialize velocity U map
+    blockPerGridX = (uwidth + blockSizeX - 1)/(blockSizeX);
+    blockPerGridY = (uheight + blockSizeY - 1)/(blockSizeY);
+    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    initFieldCUDA<<<blocksPerGrid, threadsPerBlock>>>(deviceVelocityUMap, uwidth, uheight );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+    // Copy the velocity U map to initialize next velocity U map
+    cudaMemcpy(deviceNextVelocityUMap,deviceVelocityUMap,(uwidth)*uheight*sizeof(float), cudaMemcpyDeviceToDevice );
+
+    // Initialize velocityW
+    blockPerGridX = (wwidth + blockSizeX - 1)/(blockSizeX);
+    blockPerGridY = (wheight + blockSizeY - 1)/(blockSizeY);
+    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    initFieldCUDA<<<blocksPerGrid, threadsPerBlock>>>(deviceVelocityWMap, wwidth, wheight );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+    // Copy the velocity W map to initialize next velocity W map
+    cudaMemcpy(deviceNextVelocityWMap,deviceVelocityWMap,(wwidth)*wheight*sizeof(float), cudaMemcpyDeviceToDevice );
+
+    updateHeightCUDA<<<blocksPerGrid,threadsPerBlock>>>(
+                                                   deviceHeightMap,deviceDepthMap,deviceTerrainMap,
+                                                   gridSize,gridSize
+                                                   );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    blockPerGridX = (gridPaintSize + blockSizeX - 1)/(blockSizeX);
+    blockPerGridY = (gridPaintSize+ blockSizeY - 1)/(blockSizeY);
+    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+    if( gridPaintSize == gridSize )
+    {
+
+        updatePaintCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, deviceDepthMap,
+                                                            halfDomain, mapdx, gridPaintSize);
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
+
+    }
+    else if( gridPaintSize == gridSize + 2 )
+    {
+        updatePaintBoundCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, deviceDepthMap,
+                                                            halfDomain, mapdx, gridPaintSize);
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
+    }
+    else
+    {
+        assert(0);
+    }
+}
+
+// TODO: CHECK THIS
+void resetParticlesGPU(const float minHeight){
+    //set up the iterator properties
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (deviceNumSplashParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //splash
+    //initialize positions
+    initParticlePositionsCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceParticlePositionsArray,
+                                                    minHeight, deviceNumSplashParticles
+                                                    );
+
+    //initialize velocities
+    initParticleVelocitiesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceParticleVelocitiesArray,
+                                                    deviceNumSplashParticles
+                                                    );
+
+    //initialize splash to foam
+    initSplashToFoamCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSplashToFoamArray,
+                                                    deviceNumSplashParticles
+                                                    );
+
+    //spray
+    blocksPerGrid = (deviceNumSprayParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //initialize positions
+    initParticlePositionsCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSprayPositionsArray,
+                                                    minHeight, deviceNumSprayParticles
+                                                    );
+
+    //initialize velocities
+    initParticleVelocitiesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSprayVelocitiesArray,
+                                                    deviceNumSprayParticles
+                                                    );
+
+    //foam
+    blocksPerGrid = (deviceNumFoamParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //initialize positions
+    initParticlePositionsCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceFoamPositionsArray,
+                                                    minHeight, deviceNumFoamParticles
+                                                    );
+
+    //initialize foam TTL
+    initFoamTTLCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceFoamTTLArray,
+                                                    deviceNumFoamParticles
+                                                    );
+
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+}
+
+// TODO: CHECK THIS
+void resetDampeningFieldsGPU(){
+    //fill arrays
+    dim3 threadsPerBlock(blockSizeX,blockSizeY);
+    int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
+    int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
+    dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
+
+    //NOTE: sigma and gamma never change, don't need to be reset
+
+    //fill phi and psi
+    initPhiPsiCUDA<<<blocksPerGrid, threadsPerBlock>>>( devicePhiMap, devicePsiMap, gridSize, gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 }
