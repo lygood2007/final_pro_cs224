@@ -39,6 +39,8 @@ public:
     void drawSplash();
     void drawFoam();
 
+    void createWave(int side);
+
     /**
      * Update the simulation at each time step
     **/

@@ -98,7 +98,6 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_heightField );
     safeFreeArray1D( m_depthField );
 
-
     if(m_glw->m_useParticles)
     {
         safeFreeArray1D( m_spray_positions );
@@ -1365,6 +1364,16 @@ void FluidGPU::addBreakingWaveParticles(){
         copybackGPU(HEIGHT, m_heightField );
     }
 }
+
+/**
+ *This method creates a pulse wave that can be generate from any side
+    */
+
+void FluidGPU::createWave(int side)
+{
+
+}
+
 
 void FluidGPU::addNewFoamParticles(){
     if(m_glw->m_useParticles)
