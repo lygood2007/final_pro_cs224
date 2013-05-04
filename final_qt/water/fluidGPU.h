@@ -41,6 +41,8 @@ public:
 
     void createWave(int side);
 
+    void resetFluid();
+
     /**
      * Update the simulation at each time step
     **/

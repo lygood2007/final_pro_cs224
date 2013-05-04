@@ -1456,3 +1456,15 @@ void FluidGPU::addNewFoamParticles(){
         inputFoamParticlesGPU((float*)m_foam_positions, m_foam_ttls);
     }
 }
+
+/**
+ * @brief FluidGPU::resetFluid
+ * this resets the fluid and particles to their intial state, just in case we need that for the demo
+ */
+
+void FluidGPU::resetFluid()
+{
+
+
+
+}

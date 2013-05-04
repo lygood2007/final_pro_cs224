@@ -20,9 +20,9 @@
 // (n1-n2)/(n1+n2) = -0.1427199692
 
 const float Eta = 0.143;         // Ratio of indices of refraction
-const float EtaR = 0.5;
-const float EtaG = 0.75;
-const float EtaB = 1.0;
+const float EtaR = 0.75;
+const float EtaG = 0.85;
+const float EtaB = 0.9;
 
 const float FresnelPower = 5.0;
 

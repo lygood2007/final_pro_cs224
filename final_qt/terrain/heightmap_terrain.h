@@ -10,7 +10,7 @@
 #include "terrain.h"
 #include <QFile>
 
-#define HEIGHTMAP_FILENAME "./resource/h_map_8.jpg"
+#define HEIGHTMAP_FILENAME "./resource/h_map_7.jpg"
 
 class HeightmapTerrain : public Terrain
 {
