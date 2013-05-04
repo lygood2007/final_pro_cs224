@@ -1071,6 +1071,12 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
         float etaJInc = map2Dread( heightMap, i, j + 1, width );
         float etaJDec = map2Dread( heightMap, i, j - 1, width );
 
+        //additional eta terms (added by us, makes breaking waves nicer)
+        float etaIIncJInc = map2Dread( heightMap, i + 1, j + 1, width );
+        float etaIIncJDec = map2Dread( heightMap, i + 1, j - 1, width );
+        float etaIDecJInc = map2Dread( heightMap, i - 1, j + 1, width );
+        float etaIDecJDec = map2Dread( heightMap, i - 1, j - 1, width );
+
         //terms for first condition
         float firstTerm = etaIInc - eta;
         float secondTerm = etaIDec - eta;
@@ -1113,7 +1119,9 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //compute numerator for third condition
         //float numerator = etaIInc + etaIDec + etaJInc + etaJDec - (4 * eta);
-        float numerator = firstTerm + secondTerm + thirdTerm + fourthTerm;
+        //float numerator = firstTerm + secondTerm + thirdTerm + fourthTerm;
+        float numerator = etaIInc + etaIDec + etaJInc + etaJDec +
+                etaIIncJInc + etaIIncJDec + etaIDecJInc + etaIDecJDec - (8 * eta);
 
         //check condition 3: top of wave
         if(numerator * mdxInv * mdxInv >= condition3){
