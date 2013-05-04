@@ -219,6 +219,8 @@ public:
 
     void addBreakingWaveParticles();
 
+    void addNewFoamParticles();
+
 private:
 
 // Variables
@@ -272,16 +274,19 @@ private:
     /**
      * second attempt at particles
      */
-    Vector3 *m_spray_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_spray_positions; // positions of particles, y < TERRAIN_MIN_HEIGHT is inactive
     Vector3 *m_spray_velocities; // velocities of particles
     int m_last_active_spray_index; // index of last active spray particle
 
-    Vector3 *m_splash_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_splash_positions; // positions of particles, y < TERRAIN_MIN_HEIGHT is inactive
     Vector3 *m_splash_velocities; // velocities of particles
     int m_last_active_splash_index; // index of last active splash particle
 
-    Vector3 *m_foam_positions; // positions of particles, y = -1 is inactive
+    Vector3 *m_foam_positions; // positions of particles, y < TERRAIN_MIN_HEIGHT is inactive
+    float *m_foam_ttls; // time-to-live of foam particles
     int m_last_active_foam_index; // index of last active foam particle
+
+    float *m_splash_to_foam_array; // array of the particles turning into foam
 
     Vector3 m_particle_acceleration; // acceleration of particles (same for all)
     float m_VeffSplash, m_VeffSpray, m_splashHeightChange, m_sprayHeightChange; //to pre-calc

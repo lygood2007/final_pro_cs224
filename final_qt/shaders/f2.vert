@@ -11,10 +11,15 @@ varying vec3  Reflect;
 varying vec3  Refract;
 varying float Ratio;
 
+uniform sampler2D NormalMap;
+
 void main()
 {
 
     vec3 vertex  = (gl_ModelViewMatrix * gl_Vertex).xyz;
+    // Extract the normal from the normal map
+    vec3 normal = normalize(texture2D(NormalMap, gl_TexCoord[0].st).rgb * 2.0 - 1.0);
+
     vec3 n = normalize(gl_NormalMatrix * gl_Normal);
     vec3 i = normalize(vertex);
 

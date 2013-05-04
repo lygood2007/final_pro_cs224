@@ -9,7 +9,7 @@
 #ifndef FLUID_GLOBAL_H
 #define FLUID_GLOBAL_H
 
-#define TERRAIN_BOUND 60
+#define TERRAIN_BOUND 80
 #define TERRAIN_BOTTOM_BOUND 0
 #define TERRAIN_MIN_HEIGHT 0
 #define TERRAIN_MAX_HEIGHT 40
@@ -33,32 +33,38 @@
 #define INIT_PHI_PSI 0.0f
 #define CLAMP_ALPHA 0.5f
 
-//#define USE_PARTICLES
 #define C_DEPOSIT 1
 #define SPRAY_PARTICLE_RADIUS 0.05
-#define SPLASH_PARTICLE_RADIUS 0.1
+#define SPLASH_PARTICLE_RADIUS 0.15
 #define FOAM_PARTICLE_RADIUS 0.25
 #define ALPHA_MIN_SPLASH 0.45
 #define V_MIN_SPLASH 4
 #define L_MIN_SPLASH -4
-#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 2
+#define BREAKING_WAVE_NUM_SPLASH_PARTICLES 10
 #define LAMBDA_Y 0.1
-#define BREAKING_WAVE_VEL_MULTIPLIER 2.0f
+
+#define BREAKING_WAVE_VEL_MULTIPLIER 1.0f
+#define SPRAY_VEL_MULTIPLIER 2.0f
+#define FOAM_TTL 2.5f
+#define FOAM_TTL_VARIANCE_MULTIPLIER 4.0f
+#define FOAM_GENERATION_PROBABILITY 0.2f
+
 
 #define NUM_DROPPING_PARTICLES 10000
 #define PARTICLE_DROPPING_RADIUS 2.0
 #define PARTICLE_DROP_HEIGHT 60
-#define PARTICLE_DROP_RANGE 20
+#define PARTICLE_DROP_RANGE 10
 
-//#define USE_PARTICLES_2 //no longer needed - SH
 #define TOTAL_NUM_SPRAY_PARTICLES 50000
-#define TOTAL_NUM_SPLASH_PARTICLES 100000
-#define TOTAL_NUM_FOAM_PARTICLES 5000
+#define TOTAL_NUM_SPLASH_PARTICLES 200000
+#define TOTAL_NUM_FOAM_PARTICLES 50000
+
+//#define USE_PARTICLE_SOURCES //uncomment to use particle sources //TODO: make this a hot key
 
 //particle colors - @NOTE these awful colors are only temporary
 #define SPRAY_COLOR 1.0f,0.f,0.f,0.9f
-#define SPLASH_COLOR 0.0f,0.42f,0.58f,1.0f //1.0f,0.f,1.0f,0.9f
-#define FOAM_COLOR 1.0f,1.0f,0.0f,0.9f
+#define SPLASH_COLOR 1.0f,1.0f,1.0f,1.0f //1.0f,0.f,1.0f,0.9f
+#define FOAM_COLOR 0.0f,1.0f,0.0f,0.9f
 
 #define OBJECT_ORIGIN_HEIGHT TERRAIN_MAX_HEIGHT
 #define WATER_DENSITY 1000
@@ -67,7 +73,11 @@
 // If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
 
+<<<<<<< HEAD
 const float defaultHeight = TERRAIN_MAX_HEIGHT-20;
+=======
+const float defaultHeight = TERRAIN_MAX_HEIGHT-15;
+>>>>>>> 8a3784efd37600fe67a746b98e14b4900f5e342c
 const float defaultU = 0.f;
 const float defaultW = 0.f;
 const float maxHeight = TERRAIN_MAX_HEIGHT+10;
@@ -88,6 +98,11 @@ enum FieldType
     HEIGHT,
     PARTICLE_POSITIONS,
     PARTICLE_VELOCITIES,
+    SPRAY_POSITIONS,
+    SPRAY_VELOCITIES,
+    FOAM_POSITIONS,
+    FOAM_TTLS,
+    SPLASH_TO_FOAM,
     PAINT,
     BREAKING_WAVES
 };

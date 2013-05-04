@@ -5,29 +5,32 @@
 #include "types.h"
 #include "terrain.h"
 #include "glwidget.h"
-#include "particle.h"
 
+#define DEFAULT_GENERATION_RADIUS 1.0f
+#define DEFAULT_VERTICAL_RANGE 1.0f
 #define DEFAULT_NUM_PARTICLES_PER_TIMESTEP 10
 
 class ParticleSource
 {
 public:
     ParticleSource();
-    ParticleSource(Vector3 startingCorner, Vector3 endingCorner);
-    ParticleSource(Vector3 startingCorner, Vector3 endingCorner, int numParticlesPerTimestep);
+    ParticleSource(Vector3 centerPosition, float radius, float verticalRange, int numParticlesPerTimestep);
 
-    inline Vector3 getStartingCorner(){ return m_starting_corner; }
-    inline Vector3 getEndingCorner(){ return m_ending_corner; }
+    inline Vector3 getCenterPosition(){ return m_center_position; }
+    inline float getRadius(){ return m_radius; }
+    inline float getVerticalRange(){ return m_vertical_range; }
     inline int getNumParticlesPerTimestep(){ return m_num_particles_per_timestep; }
-    inline void setStartingCorner(Vector3 startingCorner){ m_starting_corner = startingCorner; }
-    inline void setEndingCorner(Vector3 endingCorner){ m_ending_corner = endingCorner; }
+    inline void setCenterPosition(Vector3 centerPosition){ m_center_position = centerPosition; }
+    inline void setRadius(float radius){ m_radius = radius; }
+    inline void setVerticalRange(float verticalRange){ m_vertical_range = verticalRange; }
     inline void setNumParticlesPerTimestep(int numParticlesPerTimestep){ m_num_particles_per_timestep = numParticlesPerTimestep; }
 
-    QVector<Particle*> generateParticles();
+    void generateParticles(Vector3 **particlePositions, Vector3 **particleVelocities, int totalNumParticles);
 
 private:
-    Vector3 m_starting_corner;
-    Vector3 m_ending_corner;
+    Vector3 m_center_position;
+    float m_radius;
+    float m_vertical_range;
     int m_num_particles_per_timestep;
 };
 

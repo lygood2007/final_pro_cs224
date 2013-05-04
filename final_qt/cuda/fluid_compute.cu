@@ -28,14 +28,16 @@ void advectGPU(const float dt);
 void updateFluidGPU( const float dt );
 bool findSupportDevice();
 
-void initParticlesGPU(const int numParticles);
-void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
-void intersectParticlesGPU( const float halfDomain, const float mdx, const float mdxInv, const float Veff, const float heightChange );
+void initParticlesGPU(const float minHeight, const int numSplashParticles, const int numSprayParticles, const int numFoamParticles);
+void updateParticlesGPU( const float minHeight, const float dt, const float halfDomain, const float mdxInv, const float accX, const float accY, const float accZ );
+void intersectParticlesGPU( const float minHeight, const float halfDomain, const float mdx, const float mdxInv,
+                            const float splashVeff, const float splashHeightChange, const float sprayVeff, const float sprayHeightChange );
 void inputParticlesGPU(const float *particlePositions, const float *particleVelocities );
+void inputSprayParticlesGPU( const float *particlePositions, const float *particleVelocities );
+void inputFoamParticlesGPU( const float *particlePositions, const float *ttlArray );
 
 void checkBreakingWavesGPU( const float condition1, const float condition2, const float condition3,
-                            const float mdx, const float mdxInv, const float dt, const float halfDomain,
-                            const float heightChange, const float lambdaY, const int numParticlesToAdd );
+                            const float mdxInv, const float dt );
 void inputDepthGPU( const float* newDepthField );
 
 void clampFieldsGPU( const float velocityClamp );
@@ -91,10 +93,18 @@ float* deviceNextVelocityUMap; // Temp buffer for storing next velocity U map
 float* deviceNextVelocityWMap; // Temp buffer for storing next velocity W map
 
 //particle data structures
-vec3* deviceParticlePositionsArray; // particle positions array
-vec3* deviceParticleVelocitiesArray; // particle velocities array
+vec3* deviceParticlePositionsArray; // particle positions array (splash)
+vec3* deviceParticleVelocitiesArray; // particle velocities array (splash)
+vec3* deviceSprayPositionsArray; // spray positions array
+vec3* deviceSprayVelocitiesArray; // spray velocities array
+vec3* deviceFoamPositionsArray; // foam positions array
+float* deviceFoamTTLArray; // foam time-to-live array
+float* deviceSplashToFoamArray; // array to alert the user to turn splash into foam
 float* deviceBreakingWavesMap; // map of grid cells that are breaking, number of particles to instantiate
-int deviceNumParticles; // number of particles
+
+int deviceNumSplashParticles; // number of splash particles
+int deviceNumSprayParticles; // number of spray particles
+int deviceNumFoamParticles; // number of foam particles
 
 //dampening waves data structures
 float* deviceSigmaMap;
@@ -129,26 +139,6 @@ float mapdx;
 float mapdxInv;
 // halfDomain
 float halfDomain;
-
-// Forward decaration
-
-//particles forward declarations
-void initParticlesGPU(const int numParticles);
-void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ );
-void intersectParticlesGPU( const float halfDomain, const float mdx, const float mdxInv, const float Veff, const float heightChange );
-void inputParticlesGPU( const float *particlePositions, const float *particleVelocities );
-
-void checkBreakingWavesGPU( const float condition1, const float condition2, const float condition3,
-                            const float mdx, const float mdxInv, const float dt, const float halfDomain,
-                            const float heightChange, const float lambdaY, const int numParticlesToAdd );
-void inputDepthGPU( const float* newDepthField );
-
-//stabilize forward declarations
-void clampFieldsGPU( const float velocityClamp );
-
-//dampening waves forward declarations
-void initDampeningFieldsGPU( const int sizeDampeningRegion, const float quadraticA, const float quadraticB, const float quadraticC );
-void dampenWavesGPU( const float hRest, const float dt, const float dxInv, const float lambdaUpdate, const float lambdaDecay );
 
 void checkInitializedDeviceField( float* device, int width, int height )
 {
@@ -288,10 +278,18 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
     int i = blockDim.y*blockIdx.y + threadIdx.y;
     int j = blockDim.x*blockIdx.x + threadIdx.x;
 
-    if( i>= cudaMax(posZ-radius,0) && i < cudaMin(posZ+radius+1,height)
-            && j >= cudaMax(posX-radius,0)&&j < cudaMin(posX+radius+1,width)
-            )
-    {
+//    if( i>= cudaMax(posZ-radius,0) && i < cudaMin(posZ+radius+1,height)
+//            && j >= cudaMax(posX-radius,0)&&j < cudaMin(posX+radius+1,width)
+//            )
+//    {
+//        float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
+//        map2Dwrite( depthMap, i,j, newH, width );
+//    }
+
+    float iDistance = (float) (i - posZ);
+    float jDistance = (float) (j - posX);
+    float distance = sqrt((iDistance * iDistance) + (jDistance * jDistance));
+    if(distance <= (float) radius){
         float newH = cudaMin(map2Dread(depthMap,i,j,width)+h,maxHeight );
         map2Dwrite( depthMap, i,j, newH, width );
     }
@@ -847,13 +845,13 @@ __global__ void addDropCUDA( float* depthMap, const int posX, const int posZ, co
 /**
  * Initialize the particle positions field
  **/
-__global__ void initParticlePositionsCUDA( vec3* positionsMap, int numParticles )
+__global__ void initParticlePositionsCUDA( vec3* positionsMap, float minHeight, int numParticles )
 {
     //index of current vector
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if( i >= 0 && i < numParticles ){
         positionsMap[i].x = 0;
-        positionsMap[i].y = -1;
+        positionsMap[i].y = minHeight - 1;
         positionsMap[i].z = 0;
     }
 }
@@ -873,15 +871,39 @@ __global__ void initParticleVelocitiesCUDA( vec3* velocitiesMap, int numParticle
 }
 
 /**
+ * Initialize the foam TTL field
+ **/
+__global__ void initFoamTTLCUDA( float* foamTTLMap, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        foamTTLMap[i] = 0;
+    }
+}
+
+/**
+ * Initialize the splash to foam field
+ **/
+__global__ void initSplashToFoamCUDA( float* splashToFoamMap, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        splashToFoamMap[i] = -1;
+    }
+}
+
+/**
  * Update the particle positions and velocities fields
  **/
-__global__ void updateParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMap, float accX, float accY, float accZ, float dt, int numParticles )
+__global__ void updateParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMap, float minHeight, float accX, float accY, float accZ, float dt, int numParticles )
 {
     //index of current vector
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if( i >= 0 && i < numParticles ){
         //check if particle is active
-        if(positionsMap[i].y >= 0){
+        if(positionsMap[i].y >= minHeight){
             //update position vector
             positionsMap[i].x = positionsMap[i].x +
                     (velocitiesMap[i].x * dt) +
@@ -902,21 +924,56 @@ __global__ void updateParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMa
 }
 
 /**
- * Intersect the particles with the height and depth fields
+ * Update the foam particle fields
  **/
-__global__ void intersectParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMap,
+__global__ void updateFoamValuesCUDA( vec3* positionsMap, float* ttlsMap,
+                                      float* heightMap, float* velUMap, float* velWMap,
+                                      float width, float height, float uwidth, float uheight, float wwidth, float wheight,
+                                      float minHeight, float dt, float halfDomain, float mdxInv, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        //check if particle is active
+        if(ttlsMap[i] > 0){
+            //take away a timestep
+            ttlsMap[i] -= dt;
+
+            //find grid positions x and z
+            float lenX = (positionsMap[i].x + halfDomain) * mdxInv;
+            float lenZ = (positionsMap[i].z + halfDomain) * mdxInv;
+            int x = (int) cudaMin(width - 1, cudaMax(0.0, round(lenX)));
+            int z = (int) cudaMin(height - 1, cudaMax(0.0, round(lenZ)));
+
+            //get the velocities and height
+            float hxz = map2Dread( heightMap, z, x, width );
+            float uxz = map2Dread( velUMap, z, x, uwidth );
+            float wxz = map2Dread( velWMap, z, x, wwidth );
+            positionsMap[i].x += 1.0f * uxz * dt;
+            positionsMap[i].y = hxz;
+            positionsMap[i].z += 1.0f * wxz * dt;
+        } else {
+            positionsMap[i].y = minHeight - 1;
+        }
+    }
+}
+
+/**
+ * Intersect the particles with the height and depth fields (splash, splash to foam)
+ **/
+__global__ void intersectParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMap, float* splashToFoamMap,
                                           float* heightMap, float* depthMap, float* velUMap, float* velWMap,
                                           const int width, const int height,
                                           const int uwidth, const int uheight,
                                           const int wwidth, const int wwheight,
-                                          const float halfDomain, const float dx, const float mdxInv,
+                                          float minHeight, const float halfDomain, const float dx, const float mdxInv,
                                           float heightChange, const float Veff, int numParticles )
 {
     //index of current vector
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if( i >= 0 && i < numParticles ){
         //check if particle is active
-        if(positionsMap[i].y >= 0){
+        if(positionsMap[i].y >= minHeight){
             //find grid positions x and z
             float lenX = (positionsMap[i].x + halfDomain) * mdxInv;
             float lenZ = (positionsMap[i].z + halfDomain) * mdxInv;
@@ -929,17 +986,62 @@ __global__ void intersectParticleValuesCUDA( vec3* positionsMap, vec3* velocitie
                 //update height
                 float hxz = map2Dread( depthMap, z, x, width );
                 map2Dwrite( depthMap, z, x, hxz + heightChange, width );
-//                map2Dwrite( depthMap, z, x, hxz + (1.5 * heightChange), width );
 
                 //update velocities
-                //TODO: check these! u and w might be swapped?
                 float uxz = map2Dread( velUMap, z, x, uwidth );
                 float wxz = map2Dread( velWMap, z, x, wwidth );
                 float term = hxz * dx * dx;
                 map2Dwrite( velUMap, z, x, ((uxz * term) + (velocitiesMap[i].z * Veff)) / (term + Veff), uwidth );
                 map2Dwrite( velWMap, z, x, ((wxz * term) + (velocitiesMap[i].x * Veff)) / (term + Veff), wwidth );
 
-                positionsMap[i].y = -1;
+                positionsMap[i].y = minHeight - 1;
+                splashToFoamMap[i] = 1;
+            } else {
+                splashToFoamMap[i] = -1;
+            }
+        } else {
+            splashToFoamMap[i] = -1;
+        }
+    }
+}
+
+/**
+ * Intersect the particles with the height and depth fields (spray, no splash to foam)
+ **/
+__global__ void intersectSprayParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMap,
+                                          float* heightMap, float* depthMap, float* velUMap, float* velWMap,
+                                          const int width, const int height,
+                                          const int uwidth, const int uheight,
+                                          const int wwidth, const int wwheight,
+                                          float minHeight, const float halfDomain, const float dx, const float mdxInv,
+                                          float heightChange, const float Veff, int numParticles )
+{
+    //index of current vector
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if( i >= 0 && i < numParticles ){
+        //check if particle is active
+        if(positionsMap[i].y >= minHeight){
+            //find grid positions x and z
+            float lenX = (positionsMap[i].x + halfDomain) * mdxInv;
+            float lenZ = (positionsMap[i].z + halfDomain) * mdxInv;
+            int x = (int) cudaMin(width - 1, cudaMax(0.0, round(lenX)));
+            int z = (int) cudaMin(height - 1, cudaMax(0.0, round(lenZ)));
+
+            //check if position y < heightMap
+            float eta = map2Dread( heightMap, z, x, width );
+            if(eta >= positionsMap[i].y){
+                //update height
+                float hxz = map2Dread( depthMap, z, x, width );
+                map2Dwrite( depthMap, z, x, hxz + heightChange, width );
+
+                //update velocities
+                float uxz = map2Dread( velUMap, z, x, uwidth );
+                float wxz = map2Dread( velWMap, z, x, wwidth );
+                float term = hxz * dx * dx;
+                map2Dwrite( velUMap, z, x, ((uxz * term) + (velocitiesMap[i].z * Veff)) / (term + Veff), uwidth );
+                map2Dwrite( velWMap, z, x, ((wxz * term) + (velocitiesMap[i].x * Veff)) / (term + Veff), wwidth );
+
+                positionsMap[i].y = minHeight - 1;
             }
         }
     }
@@ -948,16 +1050,12 @@ __global__ void intersectParticleValuesCUDA( vec3* positionsMap, vec3* velocitie
 /**
  *  check for breaking waves
  */
-__global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, float* heightMap,
-                                        float* velUMap, float* velWMap, float* breakingWavesMap,
-                                        vec3* positionsMap, vec3* velocitiesMap,
+__global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, float* heightMap, float* breakingWavesMap,
                                         const int width, const int height,
                                         const int uwidth, const int uheight,
                                         const int wwidth, const int wheight,
                                         const float condition1, const float condition2, const float condition3,
-                                        const float mdx, const float mdxInv, const float dt, const float halfDomain,
-                                        const float heightChange, const float lambdaY,
-                                        const int numParticlesToAdd, const int totalNumParticles )
+                                        const float mdxInv, const float dt )
 {
     int i = blockDim.y*blockIdx.y +threadIdx.y;
     int j = blockDim.x*blockIdx.x +threadIdx.x;
@@ -998,6 +1096,7 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //check condition 1: steepness
         if(etaGradientMagnitude <= condition1){
+            map2Dwrite( breakingWavesMap, i, j, 0.0f, width );
             return;
         }
 
@@ -1008,6 +1107,7 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //check condition 2: rising front
         if(depthChange <= condition2){
+            map2Dwrite( breakingWavesMap, i, j, 0.0f, width );
             return;
         }
 
@@ -1017,11 +1117,12 @@ __global__ void checkBreakingWavesCUDA( float* depthMap, float* prevDepthMap, fl
 
         //check condition 3: top of wave
         if(numerator * mdxInv * mdxInv >= condition3){
+            map2Dwrite( breakingWavesMap, i, j, 0.0f, width );
             return;
         }
 
-        //write some number of particles to initiate
-        map2Dwrite( breakingWavesMap, i, j, (float) numParticlesToAdd, width );
+        //write the depth change (used for vertical velocity of particles)
+        map2Dwrite( breakingWavesMap, i, j, depthChange, width );
     }
 }
 
@@ -1615,6 +1716,12 @@ void destroyGPUmem()
 
     cudaFree( deviceParticlePositionsArray );
     cudaFree( deviceParticleVelocitiesArray );
+    cudaFree( deviceSprayPositionsArray );
+    cudaFree( deviceSprayVelocitiesArray );
+    cudaFree( deviceFoamPositionsArray );
+    cudaFree( deviceFoamTTLArray );
+    cudaFree( deviceSplashToFoamArray );
+
     cudaFree( deviceBreakingWavesMap );
 
     cudaThreadExit();
@@ -1652,12 +1759,37 @@ void copybackGPU(FieldType type, float* hostMap  )
     }
     case PARTICLE_POSITIONS:
     {
-        error = cudaMemcpy( hostMap, deviceParticlePositionsArray, deviceNumParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
+        error = cudaMemcpy( hostMap, deviceParticlePositionsArray, deviceNumSplashParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
         break;
     }
     case PARTICLE_VELOCITIES:
     {
-        error = cudaMemcpy( hostMap, deviceParticleVelocitiesArray, deviceNumParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
+        error = cudaMemcpy( hostMap, deviceParticleVelocitiesArray, deviceNumSplashParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case SPRAY_POSITIONS:
+    {
+        error = cudaMemcpy( hostMap, deviceSprayPositionsArray, deviceNumSprayParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case SPRAY_VELOCITIES:
+    {
+        error = cudaMemcpy( hostMap, deviceSprayVelocitiesArray, deviceNumSprayParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case FOAM_POSITIONS:
+    {
+        error = cudaMemcpy( hostMap, deviceFoamPositionsArray, deviceNumFoamParticles * sizeof(vec3), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case FOAM_TTLS:
+    {
+        error = cudaMemcpy( hostMap, deviceFoamTTLArray, deviceNumFoamParticles * sizeof(float), cudaMemcpyDeviceToHost);
+        break;
+    }
+    case SPLASH_TO_FOAM:
+    {
+        error = cudaMemcpy( hostMap, deviceSplashToFoamArray, deviceNumSplashParticles * sizeof(float), cudaMemcpyDeviceToHost);
         break;
     }
     case SIGMA:
@@ -1734,49 +1866,131 @@ bool findSupportDevice()
        }
 }
 
-void initParticlesGPU(const int numParticles){
-    deviceNumParticles = numParticles;
+void initParticlesGPU(const float minHeight, const int numSplashParticles, const int numSprayParticles, const int numFoamParticles){
+    deviceNumSplashParticles = numSplashParticles;
+    deviceNumSprayParticles = numSprayParticles;
+    deviceNumFoamParticles = numFoamParticles;
 
     //malloc the arrays
-    error = cudaMalloc(&deviceParticlePositionsArray,  deviceNumParticles * sizeof(vec3));
+    //splash
+    error = cudaMalloc(&deviceParticlePositionsArray,  deviceNumSplashParticles * sizeof(vec3));
     checkCudaError( error );
     check1DNotNull( deviceParticlePositionsArray );
 
-    error = cudaMalloc(&deviceParticleVelocitiesArray,  deviceNumParticles * sizeof(vec3));
+    error = cudaMalloc(&deviceParticleVelocitiesArray,  deviceNumSplashParticles * sizeof(vec3));
     checkCudaError( error );
     check1DNotNull( deviceParticleVelocitiesArray );
 
+    //spray
+    error = cudaMalloc(&deviceSprayPositionsArray,  deviceNumSprayParticles * sizeof(vec3));
+    checkCudaError( error );
+    check1DNotNull( deviceSprayPositionsArray );
+
+    error = cudaMalloc(&deviceSprayVelocitiesArray,  deviceNumSprayParticles * sizeof(vec3));
+    checkCudaError( error );
+    check1DNotNull( deviceSprayVelocitiesArray );
+
+    //foam
+    error = cudaMalloc(&deviceFoamPositionsArray,  deviceNumFoamParticles * sizeof(vec3));
+    checkCudaError( error );
+    check1DNotNull( deviceFoamPositionsArray );
+
+    error = cudaMalloc(&deviceFoamTTLArray,  deviceNumFoamParticles * sizeof(float));
+    checkCudaError( error );
+    check1DNotNull( deviceFoamTTLArray );
+
+    //splash to foam array
+    error = cudaMalloc(&deviceSplashToFoamArray,  deviceNumSplashParticles * sizeof(float));
+    checkCudaError( error );
+    check1DNotNull( deviceSplashToFoamArray );
+
     //set up the iterator properties
     int threadsPerBlock = 256;
-    int blocksPerGrid = (deviceNumParticles + threadsPerBlock - 1) / threadsPerBlock;
+    int blocksPerGrid = (deviceNumSplashParticles + threadsPerBlock - 1) / threadsPerBlock;
 
+    //splash
     //initialize positions
     initParticlePositionsCUDA<<<blocksPerGrid, threadsPerBlock>>>(
                                                     deviceParticlePositionsArray,
-                                                    deviceNumParticles
+                                                    minHeight, deviceNumSplashParticles
                                                     );
 
     //initialize velocities
     initParticleVelocitiesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
                                                     deviceParticleVelocitiesArray,
-                                                    deviceNumParticles
+                                                    deviceNumSplashParticles
+                                                    );
+
+    //initialize splash to foam
+    initSplashToFoamCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSplashToFoamArray,
+                                                    deviceNumSplashParticles
+                                                    );
+
+    //spray
+    blocksPerGrid = (deviceNumSprayParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //initialize positions
+    initParticlePositionsCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSprayPositionsArray,
+                                                    minHeight, deviceNumSprayParticles
+                                                    );
+
+    //initialize velocities
+    initParticleVelocitiesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSprayVelocitiesArray,
+                                                    deviceNumSprayParticles
+                                                    );
+
+    //foam
+    blocksPerGrid = (deviceNumFoamParticles + threadsPerBlock - 1) / threadsPerBlock;
+
+    //initialize positions
+    initParticlePositionsCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceFoamPositionsArray,
+                                                    minHeight, deviceNumFoamParticles
+                                                    );
+
+    //initialize foam TTL
+    initFoamTTLCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceFoamTTLArray,
+                                                    deviceNumFoamParticles
                                                     );
 
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 }
 
-void updateParticlesGPU( const float dt, const float accX, const float accY, const float accZ ){
+void updateParticlesGPU( const float minHeight, const float dt, const float halfDomain, const float mdxInv, const float accX, const float accY, const float accZ ){
     //set up the iterator properties
     int threadsPerBlock = 256;
-    int blocksPerGrid = (deviceNumParticles + threadsPerBlock - 1) / threadsPerBlock;
+    int blocksPerGrid = (deviceNumSplashParticles + threadsPerBlock - 1) / threadsPerBlock;
 
+    //splash
     //update positions and velocities
     updateParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
                                                     deviceParticlePositionsArray,
                                                     deviceParticleVelocitiesArray,
-                                                    accX, accY, accZ, dt,
-                                                    deviceNumParticles
+                                                    minHeight, accX, accY, accZ, dt,
+                                                    deviceNumSplashParticles
+                                                    );
+
+    //spray
+    blocksPerGrid = (deviceNumSprayParticles + threadsPerBlock - 1) / threadsPerBlock;
+    updateParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSprayPositionsArray,
+                                                    deviceSprayVelocitiesArray,
+                                                    minHeight, accX, accY, accZ, dt,
+                                                    deviceNumSprayParticles
+                                                    );
+
+    //foam
+    blocksPerGrid = (deviceNumFoamParticles + threadsPerBlock - 1) / threadsPerBlock;
+    updateFoamValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceFoamPositionsArray, deviceFoamTTLArray,
+                                                    deviceHeightMap, deviceVelocityUMap, deviceVelocityWMap,
+                                                    gridSize, gridSize, uwidth, uheight, wwidth, wheight,
+                                                    minHeight, dt, halfDomain, mdxInv, deviceNumFoamParticles
                                                     );
 
     //error check
@@ -1784,19 +1998,32 @@ void updateParticlesGPU( const float dt, const float accX, const float accY, con
     checkCudaError(error);
 }
 
-void intersectParticlesGPU( const float halfDomain, const float mdx, const float mdxInv, const float Veff, const float heightChange ){
+void intersectParticlesGPU( const float minHeight, const float halfDomain, const float mdx, const float mdxInv,
+                            const float splashVeff, const float splashHeightChange, const float sprayVeff, const float sprayHeightChange ){
     //set up the iterator properties
     int threadsPerBlock = 256;
-    int blocksPerGrid = (deviceNumParticles + threadsPerBlock - 1) / threadsPerBlock;
+    int blocksPerGrid = (deviceNumSplashParticles + threadsPerBlock - 1) / threadsPerBlock;
 
+    //splash
     //intersect particles and velocities
     intersectParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
                                                     deviceParticlePositionsArray, deviceParticleVelocitiesArray,
+                                                    deviceSplashToFoamArray,
                                                     deviceHeightMap, deviceDepthMap, deviceVelocityUMap, deviceVelocityWMap,
                                                     gridSize, gridSize,
                                                     uwidth, uheight,
                                                     wwidth, wheight,
-                                                    halfDomain, mdx, mdxInv, heightChange, Veff, deviceNumParticles
+                                                    minHeight, halfDomain, mdx, mdxInv, splashHeightChange, splashVeff, deviceNumSplashParticles
+                                                    );
+    //spray
+    blocksPerGrid = (deviceNumSprayParticles + threadsPerBlock - 1) / threadsPerBlock;
+    intersectSprayParticleValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
+                                                    deviceSprayPositionsArray, deviceSprayVelocitiesArray,
+                                                    deviceHeightMap, deviceDepthMap, deviceVelocityUMap, deviceVelocityWMap,
+                                                    gridSize, gridSize,
+                                                    uwidth, uheight,
+                                                    wwidth, wheight,
+                                                    minHeight, halfDomain, mdx, mdxInv, sprayHeightChange, sprayVeff, deviceNumSplashParticles
                                                     );
 
     //set up grid iterator
@@ -1816,35 +2043,46 @@ void intersectParticlesGPU( const float halfDomain, const float mdx, const float
 
 void inputParticlesGPU( const float *particlePositions, const float *particleVelocities ){
     //copy over
-    error = cudaMemcpy( deviceParticlePositionsArray, particlePositions, deviceNumParticles * sizeof(vec3), cudaMemcpyHostToDevice );
+    error = cudaMemcpy( deviceParticlePositionsArray, particlePositions, deviceNumSplashParticles * sizeof(vec3), cudaMemcpyHostToDevice );
     checkCudaError( error );
 
-    error = cudaMemcpy( deviceParticleVelocitiesArray, particleVelocities, deviceNumParticles * sizeof(vec3), cudaMemcpyHostToDevice );
+    error = cudaMemcpy( deviceParticleVelocitiesArray, particleVelocities, deviceNumSplashParticles * sizeof(vec3), cudaMemcpyHostToDevice );
     checkCudaError( error );
 }
 
-//TODO: CHECK THIS
+void inputSprayParticlesGPU( const float *particlePositions, const float *particleVelocities ){
+    //copy over
+    error = cudaMemcpy( deviceSprayPositionsArray, particlePositions, deviceNumSprayParticles * sizeof(vec3), cudaMemcpyHostToDevice );
+    checkCudaError( error );
+
+    error = cudaMemcpy( deviceSprayVelocitiesArray, particleVelocities, deviceNumSprayParticles * sizeof(vec3), cudaMemcpyHostToDevice );
+    checkCudaError( error );
+}
+
+void inputFoamParticlesGPU( const float *particlePositions, const float *ttlArray ){
+    //copy over
+    error = cudaMemcpy( deviceFoamPositionsArray, particlePositions, deviceNumFoamParticles * sizeof(vec3), cudaMemcpyHostToDevice );
+    checkCudaError( error );
+
+    error = cudaMemcpy( deviceFoamTTLArray, ttlArray, deviceNumFoamParticles * sizeof(float), cudaMemcpyHostToDevice );
+    checkCudaError( error );
+}
+
 void checkBreakingWavesGPU( const float condition1, const float condition2, const float condition3,
-                            const float mdx, const float mdxInv, const float dt, const float halfDomain,
-                            const float heightChange, const float lambdaY, const int numParticlesToAdd ){
+                            const float mdxInv, const float dt ){
     // iterate over grids, make above 0
     dim3 threadsPerBlock(blockSizeX,blockSizeY);
     int blockPerGridX = (gridSize + blockSizeX - 1)/(blockSizeX);
     int blockPerGridY = (gridSize + blockSizeY - 1)/(blockSizeY);
     dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
 
-    //TODO: for each grid position, check for breaking waves
     checkBreakingWavesCUDA<<<blocksPerGrid,threadsPerBlock>>>(
-                                                    deviceDepthMap, devicePrevDepthMap, deviceHeightMap,
-                                                    deviceVelocityUMap, deviceVelocityWMap, deviceBreakingWavesMap,
-                                                    deviceParticlePositionsArray, deviceParticleVelocitiesArray,
+                                                    deviceDepthMap, devicePrevDepthMap, deviceHeightMap, deviceBreakingWavesMap,
                                                     gridSize, gridSize,
                                                     uwidth, uheight,
                                                     wwidth, wheight,
                                                     condition1, condition2, condition3,
-                                                    mdx, mdxInv, dt, halfDomain,
-                                                    heightChange, lambdaY,
-                                                    numParticlesToAdd, deviceNumParticles
+                                                    mdxInv, dt
                                                     );
     //update height field
     updateHeightCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,

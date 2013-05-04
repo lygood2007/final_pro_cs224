@@ -80,7 +80,7 @@ void GLWidget::init()
     //use everything
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     //except these
-    m_useAxis = false;
+    m_useAxis = false; m_useDampening = false;
 
 #ifdef USE_HEIGHTMAP
     m_terrain = new HeightmapTerrain(); //added by hcreynol
@@ -175,6 +175,8 @@ void GLWidget::initializeResources()
     m_skybox = ResourceLoader::loadSkybox();
     loadCubeMap();
     cout << "  Loaded Skymap ->" << endl;
+
+    m_waterNormalMap = loadTexture("./resource/shallow_normal.jpg");
 
     createShaderPrograms();
     cout << "  Loaded Shaders ->" << endl;
@@ -315,6 +317,7 @@ void GLWidget::renderScene()
         //this is entirely awful but needed
         //this takes the correct rotation matrix from the camera and applies it to the
         //cube map so the fresnel shader works correctly
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
@@ -328,6 +331,7 @@ void GLWidget::renderScene()
         double matrix[16];
         glGetDoublev(GL_MODELVIEW_MATRIX, matrix);
         glPopMatrix();
+        //some of this could maybe be simplified but this spells it out correctly at least
         Matrix4x4 temp = Matrix4x4(matrix);
         Matrix4x4 tempT = temp.getTranspose();
         Matrix4x4 tempI = tempT.getInverse();
@@ -338,47 +342,35 @@ void GLWidget::renderScene()
 
         // Render the fluid with the fresnel shader bound for reflection and refraction
         m_shaderPrograms["fresnel"]->bind();
-        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", 0);
         m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_waterNormalMap);
+        m_shaderPrograms["fresnel"]->setUniformValue("NormalMap", 1);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
         renderFluid();
         glPopMatrix();
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE0);
         m_shaderPrograms["fresnel"]->release();
+
+
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this allows attenuation of the gl_points
+        // Render the points with the point shader
+        m_shaderPrograms["point"]->bind();
+        m_shaderPrograms["point"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["point"]->setUniformValue("CurrColor", SEA_WATER);
+        glPushMatrix();
+        glTranslatef(0.f,1.25f,0.f);
+        renderParticles();
+        glPopMatrix();
+        m_shaderPrograms["point"]->release();
 
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
 
-
-//        m_shaderPrograms["brightpass"]->bind();
-//        renderFluid();
-//        m_shaderPrograms["brightpass"]->release();
-
-//        float scales[] = {4.f,8.f};
-//        for (int i = 0; i < 2; ++i)
-//        {
-//            // Render the blurred brightpass filter result to fbo 1
-//           renderBlur(WIN_W / scales[i], WIN_H / scales[i]);
-
-//            // Enable alpha blending and render the texture to the screen
-//            renderFluid();
-//        }
-
-
-//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-//        // Render the points with the point shader
-//        m_shaderPrograms["point"]->bind();
-//        m_shaderPrograms["point"]->setUniformValue("windowSize", WIN_H, WIN_W);
-//        glPushMatrix();
-//        glTranslatef(0.f,1.25f,0.f);
-//        renderFluid();
-//        glPopMatrix();
-//        m_shaderPrograms["point"]->release();
-
-
         glPopMatrix();
-
-        renderParticles();
 
 
         }
@@ -453,8 +445,8 @@ void GLWidget::renderParticles()
 #ifdef RENDER_FLUID
     if(m_useParticles)
     {
-//        glEnable (GL_BLEND);
-//        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_DEPTH_TEST );
         m_fluid->drawParticles2();
         glDisable(GL_DEPTH_TEST );
@@ -807,10 +799,15 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
           //addObject( pos.z, -pos.x );
             if(intersectFluid( event->x(), event->y(), indexRow, indexCol,pos ))
             {
-                m_fluid->addDrop( indexCol, indexRow );
-//                m_fluid->addDroppingParticles( indexCol, indexRow );
+                if(event->button() == Qt::LeftButton){
+                    m_fluid->addDrop( indexCol, indexRow );
+                } else {
+#ifdef USE_GPU_FLUID
+                    m_fluid->addDroppingParticles( indexCol, indexRow );
+#endif
+                }
               // the coordinate is problematic
-               // addObject( pos.z, -pos.x );
+//                addObject( pos.z, -pos.x );
             }
         }
 #endif
@@ -953,12 +950,12 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         m_useParticles = !m_useParticles;
         break;
     }
-    case Qt::Key_O:
+    case Qt::Key_O: //add an object
     {
          addObject( 0, 0 );
         break;
     }
-    case Qt::Key_U:
+    case Qt::Key_U: //make all ojects denser
     {
         foreach( Box* b, m_boxes )
         {
@@ -969,7 +966,7 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
         break;
     }
-    case Qt::Key_I:
+    case Qt::Key_I: //reduce all object density
     {
         foreach( Box* b, m_boxes )
         {
@@ -980,6 +977,12 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         }
         break;
     }
+    case Qt::Key_D:
+    {
+        m_useDampening = !m_useDampening;
+        break;
+    }
+
     }
 }
 
