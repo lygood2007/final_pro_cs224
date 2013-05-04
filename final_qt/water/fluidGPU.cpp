@@ -84,7 +84,7 @@ FluidGPU::FluidGPU(Terrain *t , GLWidget *glw)
 FluidGPU::~FluidGPU()
 {
     // Release the heap
- /*   safeFreeArray1D( m_paintField );
+    safeFreeArray1D( m_paintField );
     safeFreeArray1D( m_indices );
     safeFreeArray1D( m_velocityU );
     safeFreeArray1D( m_velocityW );
@@ -92,10 +92,10 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_sigmaField );
     safeFreeArray1D( m_gammaField );
     safeFreeArray1D( m_phiField );
-    safeFreeArray1D( m_psiField );*/
+    safeFreeArray1D( m_psiField );
     safeFreeArray1D( m_paintNormalField );
-    /*safeFreeArray1D( m_heightField );
-    safeFreeArray1D( m_depthField );*/
+    safeFreeArray1D( m_heightField );
+    safeFreeArray1D( m_depthField );
 
     if(m_glw->m_useParticles)
     {
@@ -213,13 +213,20 @@ void FluidGPU::update(const float dt)
 
 }
 
-void FluidGPU::addDrop(const int posX, const int posZ)
+void FluidGPU::addDrop(const int posX, const int posZ, int radius, float h )
 {
-    // Fixed size
-    int radius = m_gridSize/25;
-    if( radius < 1 )
-        radius = 1;
-    float h = m_domainSize/15;
+
+    if( radius < 0 )
+    {
+        // Fixed size
+        radius = m_gridSize/25;
+        if( radius < 1 )
+            radius = 1;
+    }
+    if( h < 0 )
+    {
+        h = m_domainSize/20;
+    }
 
     addDropGPU( posX, posZ, radius, h );
     //copybackGPU(DEPTH,m_depthField);

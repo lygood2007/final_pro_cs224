@@ -39,6 +39,11 @@ protected:
      */
     virtual void computeMass();
 
+    /**
+     * @brief computeBoundingRadius Compute the bounding radius
+     */
+    virtual void computeBoundingRadius();
+
 private:
 
     float m_radius;

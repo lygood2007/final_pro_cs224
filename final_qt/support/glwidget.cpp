@@ -12,6 +12,7 @@
 #include "fluidGPU.h"
 #include "utils.h"
 #include "terrain.h"
+#include "sphere.h"
 #include "box.h"
 #include "random_terrain.h"
 #include "heightmap_terrain.h"
@@ -48,12 +49,14 @@ GLWidget::~GLWidget()
     if( m_fluid )
         delete m_fluid;
 #endif
-    foreach( Box* b, m_boxes )
+
+    // Delete Objects
+    foreach( Object* o, m_objects )
     {
-        if( b )
+        if( o )
         {
-            delete b;
-            b = NULL;
+            delete o;
+            o = NULL;
         }
     }
 
@@ -271,12 +274,10 @@ void GLWidget::paintGL()
  */
 void GLWidget::renderObjects()
 {
-    for( int i  = 0; i < m_boxes.size(); i++ )
+    for( int i = 0; i < m_objects.size(); i++ )
     {
-        if( m_boxes[i] )
-        {
-            m_boxes[i]->draw();
-        }
+        if( m_objects[i])
+            m_objects[i]->draw();
     }
 }
 
@@ -454,111 +455,6 @@ void GLWidget::renderParticles()
 #endif
 }
 
-
-
-/**
-  Renders the scene.  May be called multiple times by paintGL() if necessary.
-**/
-/*
-void GLWidget::renderScene()
-{
-
-
-#ifdef USE_SKYBOX
-   renderSkybox();//@NOTE - This must go first!!
-#endif
-#ifdef DRAW_TERRAIN
-  m_terrain->draw();
-#endif
-
-
-   if(false) // make true to draw some axis'
-   {
-       static GLUquadric * quad = gluNewQuadric();
-       glColor3f(0, 0, 1);
-       gluCylinder(quad, 1, 1, 10, 10, 10); // Z
-       glPushMatrix();
-       glRotatef(90, 0, 1, 0);
-       glColor3f(1, 0, 0);
-       gluCylinder(quad, 1, 1, 10, 10, 10); // X
-       glPopMatrix();
-       glPushMatrix();
-       glRotatef(-90, 1, 0, 0);
-       glColor3f(0, 1, 0);
-       gluCylinder(quad, 1, 1, 10, 10, 10); // Y
-       glPopMatrix();
-    }
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    // Enable depth testing
-
-//    glEnable(GL_DEPTH_TEST);
-////     Enable culling (back) faces for rendering the fluid and terrain
-//    glEnable(GL_CULL_FACE);
-
-#ifdef USE_SKYBOX
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMap);
-
-    // Render the fluid with the refraction shader bound
-   glActiveTexture(GL_TEXTURE0);
-    m_shaderPrograms["refract"]->bind();
-    m_shaderPrograms["refract"]->setUniformValue("CubeMap", GL_TEXTURE0);
-    glPushMatrix();
-    glTranslatef(-1.25f, 0.f, 0.f);
-   renderFluid();
-   glPopMatrix();
-    m_shaderPrograms["refract"]->release();
-
-    if(true) //true for perfect reflection, false for fresnel
-    {
-      //  Render the fluid with the reflection shader bound
-       m_shaderPrograms["reflect"]->bind();
-        m_shaderPrograms["reflect"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["reflect"]->setUniformValue("CurrColor", SEA_WATER);
-        glPushMatrix();
-        glTranslatef(0.f,1.25f,0.f);
-        renderFluid();
-        glPopMatrix();
-        m_shaderPrograms["reflect"]->release();
-    }
-    else
-    {
-        // Render the fluid with the fresnel shader bound for reflection and refraction
-        m_shaderPrograms["fresnel"]->bind();
-        m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", GL_TEXTURE0);
-        m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
-        m_shaderPrograms["fresnel"]->setUniformValue("rS", 0.143f);
-        m_shaderPrograms["fresnel"]->setUniformValue("eta", 0.77f,0.78f,0.8f);
-        glPushMatrix();
-        glTranslatef(0.f,1.25f,0.f);
-        renderFluid();
-        glPopMatrix();
-        m_shaderPrograms["fresnel"]->release();
-    }
-
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    glDisable(GL_TEXTURE_CUBE_MAP);
-
-#else
-    renderFluid();
-#endif
-
-
-#ifdef USE_SKYBOX
-//    glPopMatrix();
-//    m_shaderPrograms["reflect"]->release();
-//    m_shaderPrograms["fresnel"]->release();
-//     Disable culling, depth testing and cube maps
-//    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-//    glDisable(GL_TEXTURE_CUBE_MAP);
-#endif
-//    glDisable(GL_CULL_FACE);
-//    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-}
-
-*/
 void GLWidget::resizeGL(int w, int h)
 {
     if (w < 1) w = 1;
@@ -604,6 +500,7 @@ void GLWidget::loadCubeMap()
 void GLWidget::loadObjectTexMap()
 {
    m_boxTexID = loadTexture("resource/box_tex.jpg");
+   m_sphereTexID = loadTexture("resource/rock_tex.jpg");
 }
 
 /**
@@ -795,8 +692,6 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
             int indexRow;
             int indexCol;
             Vector3 pos;
-          //intersectFluid( event->x(), event->y(), event);
-          //addObject( pos.z, -pos.x );
             if(intersectFluid( event->x(), event->y(), indexRow, indexCol,pos ))
             {
                 if(event->button() == Qt::LeftButton){
@@ -806,8 +701,6 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
                     m_fluid->addDroppingParticles( indexCol, indexRow );
 #endif
                 }
-              // the coordinate is problematic
-//                addObject( pos.z, -pos.x );
             }
         }
 #endif
@@ -897,15 +790,18 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
             m_fluid->enableNormal();
         }
 #endif
-        for( int i = 0; i < m_boxes.size(); i++ )
+        for( int i = 0; i < m_objects.size(); i++ )
         {
-            if( m_boxes[i]->isRenderingNormal() )
+            if( m_objects[i] )
             {
-                m_boxes[i]->disableNormal();
-            }
-            else
-            {
-                m_boxes[i]->enableNormal();
+                if( m_objects[i]->isRenderingNormal() )
+                {
+                    m_objects[i]->disableNormal();
+                }
+                else
+                {
+                    m_objects[i]->enableNormal();
+                }
             }
         }
         break;
@@ -950,29 +846,34 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         m_useParticles = !m_useParticles;
         break;
     }
-    case Qt::Key_O: //add an object
+    case Qt::Key_O: //add an box
     {
-         addObject( 0, 0 );
+        addObject( 0, 0, BOX );
         break;
     }
-    case Qt::Key_U: //make all ojects denser
+    case Qt::Key_Y:
     {
-        foreach( Box* b, m_boxes )
+        addObject( 0, 0, SPHERE );
+        break;
+    }
+    case Qt::Key_U: //make the boxes heavier
+    {
+        foreach( Object* o, m_objects)
         {
-            if( b )
+            if( dynamic_cast<Box*>( o ) )
             {
-                b->setDensity(b->getDensity()+50);
+                o->setDensity(o->getDensity()+50);
             }
         }
         break;
     }
     case Qt::Key_I: //reduce all object density
     {
-        foreach( Box* b, m_boxes )
+        foreach( Object* o, m_objects)
         {
-            if( b )
+            if( dynamic_cast<Box*>( o ) )
             {
-                b->setDensity(b->getDensity()-50);
+                o->setDensity(o->getDensity()-50);
             }
         }
         break;
@@ -1028,87 +929,6 @@ void GLWidget::timeUpdate()
     m_fps = 1000.f /  (time-m_prevTime);
     m_prevTime = time;
 }
-
-/**
- * @brief intersectFluid Check if the ray shooting from position (x, y)  intersects the fluid
- * @param x, The x position in screen space
- * @param y, The y position in screen space
- * @return Return if it is intersected
- */
-/*
-void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
-{
-    Vector4 eyePos = m_camera.getEyePos();
-    Vector4 pFilmCam;
-    Matrix4x4 invViewTransMat = m_camera.getInvViewTransMatrix();
-    pFilmCam.x = ((REAL)(2*x))/width() - 1;
-    pFilmCam.y = 1- ((REAL)(2*y))/height();
-    pFilmCam.z = -1;
-    pFilmCam.w = 1;
-
-    Vector4 pFilmWorld = invViewTransMat*pFilmCam;
-    Vector4 d = pFilmWorld - eyePos;
-    d = d.getNormalized();
-    Vector3 dir3 = Vector3(d.x,d.y,d.z);
-    Vector3 eye3 = Vector3(eyePos.x,eyePos.y,eyePos.z);
-    float halfDomain = m_fluid->m_domainSize/2;
-    float dx = m_fluid->m_dx;
-
-    const QVector<TriIndex>& temp = m_fluid->m_triangles;
-
-#ifdef USE_GPU_FLUID
-    const float* tempHeight = m_fluid->m_heightField;
-    const float* tempDepth = m_fluid->m_depthField;
-#else
-    const QVector<QVector<float> >& tempHeight = m_fluid->m_terrainHeightField;
-    const QVector<QVector<float> >& tempDepth = m_fluid->m_depthField;
-#endif
-    int indexRow = -1;
-    int indexCol = -1;
-    const int gridSize = m_fluid->m_gridSize;
-
-    for( int i = 0; i < temp.size(); i++ )
-    {
-        TriIndex curTri = temp[i];
-        // Firstly check if the triangle is visible
-        int count = 0;
-        int r[3]; int c[3];
-        r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
-        r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
-        r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-
-#ifdef USE_GPU_FLUID
-            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
-                                      ,- halfDomain + r[0]*dx );
-            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[m_fluid->getIndex1D(r[1],c[1],HEIGHT)]
-                                       ,- halfDomain + r[1]*dx );
-            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[m_fluid->getIndex1D(r[2],c[2],HEIGHT)]
-                                      ,- halfDomain + r[2]*dx );
-#else
-            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[r[0]][c[0]] + tempDepth[r[0]][c[0]],
-                                      - halfDomain + r[0]*dx );
-            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[r[1]][c[1]] + tempDepth[r[1]][c[1]],
-                                      - halfDomain + r[1]*dx );
-            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[r[2]][c[2]] + tempDepth[r[2]][c[2]],
-                                      - halfDomain + r[2]*dx );
-#endif
-             if( doIntersectTriangles( eye3, dir3, p0, p1, p2 ) )
-             {
-                 indexRow =  gridSize - c[0];
-                 indexCol = r[0];
-                 break;
-             }
-    }
-
-    if( indexRow != -1 && indexCol != -1 )
-    {
-        if(event->button() == Qt::LeftButton){
-            m_fluid->addDrop( indexCol, indexRow );
-        } else if(event->button() == Qt::MiddleButton){
-            m_fluid->addDroppingParticles(indexCol, indexRow);
-        }
-    }
-}*/
 
 /**
  * @brief intersectFluid Check if the ray shooting from position (x, y)  intersects the fluid
@@ -1210,20 +1030,39 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
 }
 
 /**
- * @brief addObject Drop objects from the air
+ * @brief addObject Drop a object from the air with object's type specified by type
  * @param x The x position
  * @param z The z position
+ * @param type The object's type
  * @param Height The height
  */
-void GLWidget::addObject( const float x, const float z, const float y )
+void GLWidget::addObject( const float x, const float z, const ObjectType type, const float y )
 {
-    const float length = 3.f;
-    const float height = 3.f;
-    const float width = 3.f;
-    Box* newBox = new Box( m_fluid, Vector3(x,y,z), length,
-                           height, width, m_terrain->getdx(), m_boxTexID );
-    newBox->initPhysics();
-    m_boxes.push_back( newBox );
+    switch( type )
+    {
+    case BOX:
+    {
+        const float length = 3.f;
+        const float height = 3.f;
+        const float width = 3.f;
+
+        Object* newBox = new Box( m_fluid, Vector3(x,y,z), length, height, width, m_terrain->getdx(), m_boxTexID );
+        newBox->initPhysics();
+        m_objects.push_back( newBox );
+        break;
+    }
+    case SPHERE:
+    {
+        const float radius = 2.f;
+        Object* newSphere= new Sphere( m_fluid, Vector3(x,y,z), radius, m_terrain->getdx(), m_sphereTexID );
+        newSphere->initPhysics();
+        m_objects.push_back( newSphere );
+        break;
+    }
+    default:
+        assert(0);
+        break;
+    }
 }
 
 /**
@@ -1232,11 +1071,11 @@ void GLWidget::addObject( const float x, const float z, const float y )
  */
 void GLWidget::updateObjects( float dt )
 {
-    foreach( Box* b, m_boxes )
+    foreach( Object* o, m_objects )
     {
-        if( b )
+        if( o )
         {
-            b->update( dt );
+            o->update( dt, m_fluid );
         }
     }
 }

@@ -45,8 +45,10 @@ public:
      * @brief addDrop Add the drop to specified region
      * @param posX The x position
      * @param posZ The z position
+     * @param radius The radius of the drop
+     * @param h The height increased
      */
-    void addDrop( const int posX, const int posZ );
+    void addDrop( const int posX, const int posZ, int radius = -1, float h = -1 );
 
     /**
      * @brief drop particles on a small area

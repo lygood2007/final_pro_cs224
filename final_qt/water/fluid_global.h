@@ -72,15 +72,10 @@
 
 // If you don't want to render the volumn, comment this
 #define RENDER_VOLUME
-
-<<<<<<< HEAD
-const float defaultHeight = TERRAIN_MAX_HEIGHT-20;
-=======
-const float defaultHeight = TERRAIN_MAX_HEIGHT-15;
->>>>>>> 8a3784efd37600fe67a746b98e14b4900f5e342c
+const float defaultHeight = TERRAIN_MAX_HEIGHT-10;
 const float defaultU = 0.f;
 const float defaultW = 0.f;
-const float maxHeight = TERRAIN_MAX_HEIGHT+10;
+const float maxHeight = TERRAIN_MAX_HEIGHT;
 
 enum FieldType
 {

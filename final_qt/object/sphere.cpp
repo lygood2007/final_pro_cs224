@@ -62,118 +62,141 @@ void Sphere::computeTessel()
  */
 void Sphere::buildTriangleList()
 {
- /*   float theta = 0;
+    float theta = 0;
     float phi = M_PI/m_tessell[0];
     float unitTheta = 2*M_PI/m_tessell[1];
 
     Tri tri;
     // push top points to the triangle list
-    for( int i = 0; i < m_parameter2; i++ )
+    for( int i = 0; i < m_tessell[1]; i++ )
     {
         theta = 2*M_PI-unitTheta*i;
-        tri.p1.position = vec3<float>( 0, 0.5, 0 );
-        tri.p1.normal = vec3<float>( 0, 1, 0 );
-        tri.p1.u = (2*M_PI - theta)/(2*M_PI); tri.p1.v = 1;
-        tri.p2.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+        tri.verts[0]= Vector3( 0, 0.5, 0 );
+        tri.norms[0] = Vector3( 0, 1, 0 );
+        tri.uvs[0].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[0].y = 1;
+
+        tri.verts[1] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                        m_radius*cos(phi), m_radius*sin(phi)*sin(theta));
-        tri.p2.normal = vec3<float>( sin(phi)*cos(theta) ,
+        tri.norms[1] = Vector3( sin(phi)*cos(theta) ,
                                      cos(phi), sin(phi)*sin(theta));
-        tri.p2.u = (2*M_PI - theta)/(2*M_PI); tri.p2.v = 1 - phi/M_PI;
+        tri.uvs[1].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[1].y = 1 - phi/M_PI;
 
         theta = 2*M_PI-unitTheta*(i+1);
-        tri.p3.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+        tri.verts[2] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                        m_radius*cos(phi), m_radius*sin(phi)*sin(theta));
-        tri.p3.normal = vec3<float>( sin(phi)*cos(theta) ,
+        tri.norms[2] = Vector3( sin(phi)*cos(theta) ,
                                      cos(phi), sin(phi)*sin(theta));
-        tri.p3.u = (2*M_PI - theta)/(2*M_PI); tri.p3.v = 1 - phi/M_PI;
-        m_triangles.push_back(tri);
+        tri.uvs[2].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[2].y = 1 - phi/M_PI;
+
+        Vector3 v01 = tri.verts[1] - tri.verts[0];
+        Vector3 v02 = tri.verts[2] - tri.verts[0];
+        tri.area = fabs(v01.cross(v02).length())/2.f;
+        tri.avgNorm = 0.33f*(tri.norms[0] + tri.norms[1] + tri.norms[2]);
+        tri.avgPos = (tri.verts[0] + tri.verts[1] + tri.verts[2])*0.33f+ m_position;
+
+        m_tris.push_back(tri);
     }
 
     // push bottom points to the triangle list
     phi = M_PI - phi;
-    for( int i = 0; i < m_parameter2; i++ )
+    for( int i = 0; i < m_tessell[1]; i++ )
     {
         theta = unitTheta*i;
-        tri.p1.position = vec3<float>( 0,-0.5, 0 );
-        tri.p1.normal = vec3<float>( 0, -1, 0 );
-        tri.p1.u = (2*M_PI - theta)/(2*M_PI); tri.p1.v = 0;
-        tri.p2.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+        tri.verts[0] = Vector3( 0,-0.5, 0 );
+        tri.norms[0] = Vector3( 0, -1, 0 );
+        tri.uvs[0].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[0].y = 0;
+        tri.verts[1] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                        m_radius*cos(phi), m_radius*sin(phi)*sin(theta));
-        tri.p2.normal = vec3<float>( sin(phi)*cos(theta) ,
+        tri.norms[1] = Vector3( sin(phi)*cos(theta) ,
                                      cos(phi),sin(phi)*sin(theta));
-        tri.p2.u = (2*M_PI - theta)/(2*M_PI); tri.p2.v = 1 - phi/M_PI;
+        tri.uvs[1].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[1].y = 1 - phi/M_PI;
         theta = unitTheta*(i+1);
 
-        tri.p3.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+        tri.verts[2] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                        m_radius*cos(phi), m_radius*sin(phi)*sin(theta));
-        tri.p3.normal = vec3<float>( sin(phi)*cos(theta) ,
+        tri.norms[2] = Vector3( sin(phi)*cos(theta) ,
                                      cos(phi), sin(phi)*sin(theta));
-        tri.p3.u = (2*M_PI - theta)/(2*M_PI); tri.p3.v = 1 - phi/M_PI;
-        m_triangles.push_back(tri);
+        tri.uvs[2].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[2].y = 1 - phi/M_PI;
+
+        Vector3 v01 = tri.verts[1] - tri.verts[0];
+        Vector3 v02 = tri.verts[2] - tri.verts[0];
+        tri.area = fabs(v01.cross(v02).length())/2.f;
+        tri.avgNorm = 0.33f*(tri.norms[0] + tri.norms[1] + tri.norms[2]);
+        tri.avgPos = (tri.verts[0] + tri.verts[1] + tri.verts[2])*0.33f+ m_position;
+
+
+        m_tris.push_back(tri);
     }
 
     // push side points to the triangle list
-    for( int i = 1; i < m_parameter1-1; i++ )
+    for( int i = 1; i <m_tessell[0]-1; i++ )
     {
-        for( int j = 0; j < m_parameter2; j++ )
+        for( int j = 0; j < m_tessell[1]; j++ )
         {
             for( int m = 0; m < 2; m++ )
             {
                 if( m == 0)
                 {
-                    phi = (M_PI/m_parameter1)*i;
+                    phi = (M_PI/m_tessell[0])*i;
                     theta = 2*M_PI-unitTheta*j;
-                    tri.p1.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+                    tri.verts[0] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                                    m_radius*cos(phi), m_radius*sin(phi)*sin(theta) );
-                    tri.p1.normal = vec3<float>( sin(phi)*cos( theta ),
+                    tri.norms[0] = Vector3( sin(phi)*cos( theta ),
                                                  cos(phi), sin( phi )*sin( theta ) );
-                    tri.p1.u = (2*M_PI - theta)/(2*M_PI); tri.p1.v = 1-phi/M_PI;
+                    tri.uvs[0].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[0].y = 1-phi/M_PI;
 
-                    phi = (M_PI/m_parameter1)*(i+1);
+                    phi = (M_PI/m_tessell[0])*(i+1);
                     theta = 2*M_PI-unitTheta*(j);
-                    tri.p2.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+                    tri.verts[1] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                                    m_radius*cos(phi), m_radius*sin(phi)*sin(theta) );
-                    tri.p2.normal = vec3<float>( sin(phi)*cos( theta ),
+                    tri.norms[1] = Vector3( sin(phi)*cos( theta ),
                                                  cos(phi), sin( phi )*sin( theta ) );
-                    tri.p2.u = (2*M_PI - theta)/(2*M_PI); tri.p2.v = 1-phi/M_PI;
-                    phi = (M_PI/m_parameter1)*(i+1);
+                    tri.uvs[1].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[1].y = 1-phi/M_PI;
+                    phi = (M_PI/m_tessell[0])*(i+1);
                     theta = 2*M_PI-unitTheta*(j+1);
 
-                    tri.p3.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+                    tri.verts[2] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                                    m_radius*cos(phi), m_radius*sin(phi)*sin(theta) );
-                    tri.p3.normal = vec3<float>( sin(phi)*cos( theta ),
+                    tri.norms[2] = Vector3( sin(phi)*cos( theta ),
                                                  cos(phi), sin( phi )*sin( theta ) );
-                    tri.p3.u = (2*M_PI - theta)/(2*M_PI); tri.p3.v = 1-phi/M_PI;
+                    tri.uvs[2].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[2].y = 1-phi/M_PI;
                 }
                 else
                 {
-                    phi = (M_PI/m_parameter1)*i;
+                    phi = (M_PI/m_tessell[0])*i;
                     theta = 2*M_PI-unitTheta*j;
-                    tri.p1.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+                    tri.verts[0] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                                    m_radius*cos(phi), m_radius*sin(phi)*sin(theta) );
-                    tri.p1.normal = vec3<float>( sin(phi)*cos( theta ),
+                    tri.norms[0] = Vector3( sin(phi)*cos( theta ),
                                                  cos(phi), sin( phi )*sin( theta ) );
-                    tri.p1.u = (2*M_PI - theta)/(2*M_PI); tri.p1.v = 1-phi/M_PI;
-                    phi = (M_PI/m_parameter1)*(i+1);
+                    tri.uvs[0].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[0].y = 1-phi/M_PI;
+                    phi = (M_PI/m_tessell[0])*(i+1);
                     theta = 2*M_PI-unitTheta*(j+1);
-                    tri.p2.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+                    tri.verts[1] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                                    m_radius*cos(phi), m_radius*sin(phi)*sin(theta) );
-                    tri.p2.normal = vec3<float>( sin(phi)*cos( theta ),
+                    tri.norms[1] = Vector3( sin(phi)*cos( theta ),
                                                  cos(phi), sin( phi )*sin( theta ) );
-                    tri.p2.u = (2*M_PI - theta)/(2*M_PI); tri.p2.v = 1-phi/M_PI;
-                    phi = (M_PI/m_parameter1)*i;
+                    tri.uvs[1].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[1].y = 1-phi/M_PI;
+                    phi = (M_PI/m_tessell[0])*i;
                     theta = 2*M_PI-unitTheta*(j+1);
 
-                    tri.p3.position = vec3<float>( m_radius*sin(phi)*cos(theta) ,
+                    tri.verts[2] = Vector3( m_radius*sin(phi)*cos(theta) ,
                                                    m_radius*cos(phi), m_radius*sin(phi)*sin(theta) );
-                    tri.p3.normal = vec3<float>( sin(phi)*cos( theta ),
+                    tri.norms[2] = Vector3( sin(phi)*cos( theta ),
                                                  cos(phi), sin( phi )*sin( theta ) );
-                    tri.p3.u = (2*M_PI - theta)/(2*M_PI); tri.p3.v = 1-phi/M_PI;
+                    tri.uvs[2].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[2].y = 1-phi/M_PI;
+
                 }
-                m_triangles.push_back(tri);
+                Vector3 v01 = tri.verts[1] - tri.verts[0];
+                Vector3 v02 = tri.verts[2] - tri.verts[0];
+                tri.area = fabs(v01.cross(v02).length())/2.f;
+                tri.avgNorm = 0.33f*(tri.norms[0] + tri.norms[1] + tri.norms[2]);
+                tri.avgPos = (tri.verts[0] + tri.verts[1] + tri.verts[2])*0.33f+ m_position;
+                m_tris.push_back(tri);
             }
         }
-    }*/
+    }
+    updatePosAndNorm();
 }
 
 /**
@@ -181,5 +204,14 @@ void Sphere::buildTriangleList()
  */
 void Sphere::computeMass()
 {
-    m_mass = 4.f/3.f*M_PI*m_radius*m_radius*m_radius;
+    m_mass = 4.f/3.f*M_PI*m_radius*m_radius*m_radius*m_density;
+    m_massInv = 1/m_mass;
+}
+
+/**
+ * @brief computeBoundingRadius Compute the bounding radius
+ */
+void Sphere::computeBoundingRadius()
+{
+    m_boundingRadius = m_radius;
 }

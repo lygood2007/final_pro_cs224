@@ -17,7 +17,7 @@
 #include "camera.h"
 #include "fluid_global.h"
 #include "resourceloader.h"
-
+#include "object_defs.h"
 // We fix the size
 #define WIN_W 1000.0
 #define WIN_H 700.0
@@ -45,7 +45,8 @@ class QGLFramebufferObject;
 class Terrain;
 class FluidCPU;
 class FluidGPU;
-class Box;
+class Object;
+
 class GLWidget : public QGLWidget
 {
     Q_OBJECT
@@ -64,8 +65,10 @@ private:
     QTimer m_timer; // The timer variable
     OrbitCamera m_camera; // Camera
     Terrain* m_terrain;
-    QList<Box*> m_boxes;
+    QList<Object*> m_objects;
     GLuint m_boxTexID;
+    GLuint m_sphereTexID;
+
 #ifdef USE_GPU_FLUID
     FluidGPU* m_fluid;
 #else
@@ -176,12 +179,13 @@ public:
     void renderBlur(int width, int height);
 
     /**
-     * @brief addObject Drop objects from the air
+     * @brief addObject Drop a object from the air with object's type specified by type
      * @param x The x position
      * @param z The z position
+     * @param type The object's type
      * @param Height The height
      */
-    void addObject( const float x, const float z, const float y = OBJECT_ORIGIN_HEIGHT );
+    void addObject( const float x, const float z, const ObjectType type, const float y = OBJECT_ORIGIN_HEIGHT );
 
     /**
      * @brief updateObjects Update the objects' positions

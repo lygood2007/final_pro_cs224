@@ -50,7 +50,7 @@ public:
     /**
      * @brief update update the box's position
      */
-    void update( float dt );
+    void update( float dt, FluidGPU* fluid );
 
     inline float getDensity() const { return m_density; }
 
@@ -124,12 +124,7 @@ private:
     float m_liftCoeff;
     Matrix4x4 m_rotMat;
     Colorf m_color;
-
-    bool m_upwards;
-    bool m_decay;
     float m_w;
-
-    Vector3 m_lastBuoAcc;
 
     // Only for speeding up
     float c1;
@@ -147,6 +142,12 @@ private:
 
     float m_h; // Multiplier for rotation
 
+    /**
+     * m_firstHit two hack when hit surface, we generate the splash
+     */
+    bool m_firstHit;
+    Vector3 m_lastForce;
+
 protected:
 
     /**
@@ -162,6 +163,11 @@ protected:
      * @brief computeMass Compute the mass of the object
      */
     virtual void computeMass() = 0;
+
+    /**
+     * @brief computeBoundingRadius Compute the bounding radius
+     */
+    virtual void computeBoundingRadius() = 0;
 
     /**
      * @brief generate the rotation randomly
@@ -201,7 +207,7 @@ protected:
     float m_massInv;
 
     float m_density;
-
+    float m_boundingRadius;
 };
 
 #endif // SHAPE_H
