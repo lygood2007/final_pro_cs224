@@ -12,6 +12,7 @@
 #include "fluidGPU.h"
 #include "utils.h"
 #include "terrain.h"
+#include "sphere.h"
 #include "box.h"
 #include "random_terrain.h"
 #include "heightmap_terrain.h"
@@ -20,6 +21,11 @@
 //added by SH
 #include <QGLFramebufferObject>
 #include <QGLShaderProgram>
+#include <fstream>
+#include <sstream>
+#include <boost/foreach.hpp>
+#include <boost/tokenizer.hpp>
+
 // Declaration of Cuda functions
 extern "C"
 {
@@ -48,12 +54,14 @@ GLWidget::~GLWidget()
     if( m_fluid )
         delete m_fluid;
 #endif
-    foreach( Box* b, m_boxes )
+
+    // Delete Objects
+    foreach( Object* o, m_objects )
     {
-        if( b )
+        if( o )
         {
-            delete b;
-            b = NULL;
+            delete o;
+            o = NULL;
         }
     }
 
@@ -77,17 +85,20 @@ void GLWidget::init()
     // The game loop is implemented using a timer
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
+    initConfig();
     //use everything
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     m_useParticleSources = m_useRectangularParticleSources = false;
     //except these
     m_useAxis = false; m_useDampening = false;
 
-#ifdef USE_HEIGHTMAP
-    m_terrain = new HeightmapTerrain();
-#else
-    m_terrain = new RandomTerrain();
-#endif
+    if( m_useHeightMap )
+    {
+        m_terrain = new HeightmapTerrain(m_heightMapFileName.c_str());
+    }
+    else
+        m_terrain = new RandomTerrain();
+
 
     // Start a timer that will try to get 100 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
@@ -97,9 +108,6 @@ void GLWidget::init()
     m_mouseRightDown = false;
     m_drawFrame = false;
     m_animate = false;
-
-    m_timeStep = TIME_STEP;
-
     // Center the mouse, which is explained more in mouseMoveEvent() below.
     // This needs to be done here because the mouse may be initially outside
     // the fullscreen window and will not automatically receive mouse move
@@ -114,7 +122,7 @@ void GLWidget::init()
 
 #ifdef RENDER_FLUID
 #ifdef USE_GPU_FLUID
-        m_fluid = new FluidGPU(m_terrain, this); //I also passed a pointer to glwidget so can control things easier via bool's
+        m_fluid = new FluidGPU(m_terrain, this); //I also passed a pointer to glwidget so can control things easier via bool's;
 #else
      m_fluid =  new FluidCPU(m_terrain);
 #endif
@@ -273,12 +281,10 @@ void GLWidget::paintGL()
  */
 void GLWidget::renderObjects()
 {
-    for( int i  = 0; i < m_boxes.size(); i++ )
+    for( int i = 0; i < m_objects.size(); i++ )
     {
-        if( m_boxes[i] )
-        {
-            m_boxes[i]->draw();
-        }
+        if( m_objects[i])
+            m_objects[i]->draw();
     }
 }
 
@@ -574,6 +580,7 @@ void GLWidget::loadCubeMap()
 void GLWidget::loadObjectTexMap()
 {
    m_boxTexID = loadTexture("resource/box_tex.jpg");
+   m_sphereTexID = loadTexture("resource/rock_tex.jpg");
 }
 
 /**
@@ -767,8 +774,6 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
             int indexRow;
             int indexCol;
             Vector3 pos;
-          //intersectFluid( event->x(), event->y(), event);
-          //addObject( pos.z, -pos.x );
             if(intersectFluid( event->x(), event->y(), indexRow, indexCol,pos ))
             {
                 if(event->button() == Qt::LeftButton){
@@ -778,8 +783,6 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
                     m_fluid->addDroppingParticles( indexCol, indexRow );
 #endif
                 }
-              // the coordinate is problematic
-//                addObject( pos.z, -pos.x );
             }
         }
 #endif
@@ -869,15 +872,18 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
             m_fluid->enableNormal();
         }
 #endif
-        for( int i = 0; i < m_boxes.size(); i++ )
+        for( int i = 0; i < m_objects.size(); i++ )
         {
-            if( m_boxes[i]->isRenderingNormal() )
+            if( m_objects[i] )
             {
-                m_boxes[i]->disableNormal();
-            }
-            else
-            {
-                m_boxes[i]->enableNormal();
+                if( m_objects[i]->isRenderingNormal() )
+                {
+                    m_objects[i]->disableNormal();
+                }
+                else
+                {
+                    m_objects[i]->enableNormal();
+                }
             }
         }
         break;
@@ -922,29 +928,34 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
         m_useParticles = !m_useParticles;
         break;
     }
-    case Qt::Key_O: //add an object
+    case Qt::Key_O: //add an box
     {
-         addObject( 0, 0 );
+        addObject( 0, 0, BOX );
         break;
     }
-    case Qt::Key_U: //make all ojects denser
+    case Qt::Key_Y:
     {
-        foreach( Box* b, m_boxes )
+        addObject( 0, 0, SPHERE );
+        break;
+    }
+    case Qt::Key_U: //make the boxes heavier
+    {
+        foreach( Object* o, m_objects)
         {
-            if( b )
+            if( dynamic_cast<Box*>( o ) )
             {
-                b->setDensity(b->getDensity()+50);
+                o->setDensity(o->getDensity()+50);
             }
         }
         break;
     }
     case Qt::Key_I: //reduce all object density
     {
-        foreach( Box* b, m_boxes )
+        foreach( Object* o, m_objects)
         {
-            if( b )
+            if( dynamic_cast<Box*>( o ) )
             {
-                b->setDensity(b->getDensity()-50);
+                o->setDensity(o->getDensity()-50);
             }
         }
         break;
@@ -977,6 +988,8 @@ void GLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_Q:
     {
         m_fluid->resetFluid();
+        // Reset the objects
+        resetObjects();
         break;
     }
     case Qt::Key_K:
@@ -1039,87 +1052,6 @@ void GLWidget::timeUpdate()
     m_fps = 1000.f /  (time-m_prevTime);
     m_prevTime = time;
 }
-
-/**
- * @brief intersectFluid Check if the ray shooting from position (x, y)  intersects the fluid
- * @param x, The x position in screen space
- * @param y, The y position in screen space
- * @return Return if it is intersected
- */
-/*
-void GLWidget::intersectFluid(const int x, const int y, QMouseEvent *event)
-{
-    Vector4 eyePos = m_camera.getEyePos();
-    Vector4 pFilmCam;
-    Matrix4x4 invViewTransMat = m_camera.getInvViewTransMatrix();
-    pFilmCam.x = ((REAL)(2*x))/width() - 1;
-    pFilmCam.y = 1- ((REAL)(2*y))/height();
-    pFilmCam.z = -1;
-    pFilmCam.w = 1;
-
-    Vector4 pFilmWorld = invViewTransMat*pFilmCam;
-    Vector4 d = pFilmWorld - eyePos;
-    d = d.getNormalized();
-    Vector3 dir3 = Vector3(d.x,d.y,d.z);
-    Vector3 eye3 = Vector3(eyePos.x,eyePos.y,eyePos.z);
-    float halfDomain = m_fluid->m_domainSize/2;
-    float dx = m_fluid->m_dx;
-
-    const QVector<TriIndex>& temp = m_fluid->m_triangles;
-
-#ifdef USE_GPU_FLUID
-    const float* tempHeight = m_fluid->m_heightField;
-    const float* tempDepth = m_fluid->m_depthField;
-#else
-    const QVector<QVector<float> >& tempHeight = m_fluid->m_terrainHeightField;
-    const QVector<QVector<float> >& tempDepth = m_fluid->m_depthField;
-#endif
-    int indexRow = -1;
-    int indexCol = -1;
-    const int gridSize = m_fluid->m_gridSize;
-
-    for( int i = 0; i < temp.size(); i++ )
-    {
-        TriIndex curTri = temp[i];
-        // Firstly check if the triangle is visible
-        int count = 0;
-        int r[3]; int c[3];
-        r[0] = curTri.a2D.indRow; c[0] = curTri.a2D.indCol;
-        r[1] = curTri.b2D.indRow; c[1] = curTri.b2D.indCol;
-        r[2] = curTri.c2D.indRow; c[2] = curTri.c2D.indCol;
-
-#ifdef USE_GPU_FLUID
-            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[m_fluid->getIndex1D(r[0],c[0],HEIGHT)]
-                                      ,- halfDomain + r[0]*dx );
-            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[m_fluid->getIndex1D(r[1],c[1],HEIGHT)]
-                                       ,- halfDomain + r[1]*dx );
-            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[m_fluid->getIndex1D(r[2],c[2],HEIGHT)]
-                                      ,- halfDomain + r[2]*dx );
-#else
-            const Vector3 p0 = Vector3(-halfDomain + c[0]*dx, tempHeight[r[0]][c[0]] + tempDepth[r[0]][c[0]],
-                                      - halfDomain + r[0]*dx );
-            const Vector3 p1 = Vector3(-halfDomain + c[1]*dx, tempHeight[r[1]][c[1]] + tempDepth[r[1]][c[1]],
-                                      - halfDomain + r[1]*dx );
-            const Vector3 p2 = Vector3(-halfDomain + c[2]*dx, tempHeight[r[2]][c[2]] + tempDepth[r[2]][c[2]],
-                                      - halfDomain + r[2]*dx );
-#endif
-             if( doIntersectTriangles( eye3, dir3, p0, p1, p2 ) )
-             {
-                 indexRow =  gridSize - c[0];
-                 indexCol = r[0];
-                 break;
-             }
-    }
-
-    if( indexRow != -1 && indexCol != -1 )
-    {
-        if(event->button() == Qt::LeftButton){
-            m_fluid->addDrop( indexCol, indexRow );
-        } else if(event->button() == Qt::MiddleButton){
-            m_fluid->addDroppingParticles(indexCol, indexRow);
-        }
-    }
-}*/
 
 /**
  * @brief intersectFluid Check if the ray shooting from position (x, y)  intersects the fluid
@@ -1221,20 +1153,39 @@ bool GLWidget::intersectFluid( const int x, const int y, int& indexRow, int& ind
 }
 
 /**
- * @brief addObject Drop objects from the air
+ * @brief addObject Drop a object from the air with object's type specified by type
  * @param x The x position
  * @param z The z position
+ * @param type The object's type
  * @param Height The height
  */
-void GLWidget::addObject( const float x, const float z, const float y )
+void GLWidget::addObject( const float x, const float z, const ObjectType type, const float y )
 {
-    const float length = 3.f;
-    const float height = 3.f;
-    const float width = 3.f;
-    Box* newBox = new Box( m_fluid, Vector3(x,y,z), length,
-                           height, width, m_terrain->getdx(), m_boxTexID );
-    newBox->initPhysics();
-    m_boxes.push_back( newBox );
+    switch( type )
+    {
+    case BOX:
+    {
+        const float length = 3.f;
+        const float height = 3.f;
+        const float width = 3.f;
+
+        Object* newBox = new Box( m_fluid, Vector3(x,y,z), length, height, width, m_terrain->getdx(), m_boxTexID );
+        newBox->initPhysics();
+        m_objects.push_back( newBox );
+        break;
+    }
+    case SPHERE:
+    {
+        const float radius = 2.f;
+        Object* newSphere= new Sphere( m_fluid, Vector3(x,y,z), radius, m_terrain->getdx(), m_sphereTexID );
+        newSphere->initPhysics();
+        m_objects.push_back( newSphere );
+        break;
+    }
+    default:
+        assert(0);
+        break;
+    }
 }
 
 /**
@@ -1243,14 +1194,130 @@ void GLWidget::addObject( const float x, const float z, const float y )
  */
 void GLWidget::updateObjects( float dt )
 {
-    foreach( Box* b, m_boxes )
+    foreach( Object* o, m_objects )
     {
-        if( b )
+        if( o )
         {
-            b->update( dt );
+            o->update( dt, m_fluid );
         }
     }
 }
+
+/**
+ * @brief resetObjects Delete the objects
+ */
+void GLWidget::resetObjects()
+{
+
+    foreach( Object*o, m_objects )
+    {
+        if( o )
+        {
+            delete o;
+            o = NULL;
+        }
+    }
+    m_objects.clear();
+}
+
+/**
+ * @brief loadConfig load the configuration from configure file
+ * @return True if it load successfully
+ */
+ bool GLWidget::loadConfig( std::string fileName )
+ {
+    ifstream inFile;
+    inFile.open( fileName.c_str() );
+    if( !inFile.is_open() )
+    {
+        printf("Cannot find the configuration file:" CONFIG );
+        return false;
+    }
+    string line;
+    std::getline( inFile, line );
+    std::cout<<line;
+    bool correctHeader =!line.compare("#FLUID#");
+    // Firstly check the header
+    if( !correctHeader )
+    {
+        printf("Wrong type\n");
+        inFile.close();
+        return false;
+    }
+    while( !inFile.eof() )
+    {
+        std::string subLine;
+        std::getline( inFile, subLine );
+        boost::char_separator<char> sep("\t :");
+        boost::tokenizer< boost::char_separator<char> > tokens(subLine, sep);
+        vector<string> texts;
+        BOOST_FOREACH (const std::string& t, tokens) {
+            texts.push_back(t);
+        }
+        if( texts.size() <= 0 )
+            continue;
+        else
+        {
+            if( texts[0] == "#USE_HEIGHTMAP#" )
+            {
+                if( texts.size() != 3 )
+                {
+                    printf("Bad file\n");
+                    return false;
+                }
+                else
+                {
+                    if( texts[1] == "1")
+                    {
+                        m_useHeightMap = true;
+                        m_heightMapFileName = texts[2];
+                    }
+                    else if( texts[1] == "0" )
+                    {
+                        m_useHeightMap = false;
+                    }
+                    else
+                    {
+                        printf("Bad file\n");
+                        return false;
+                    }
+                }
+            }
+            else if( texts[0] == "#TIME_STEP#")
+            {
+                if( texts.size() != 2 )
+                {
+                    printf("Bad file\n");
+                    return false;
+                }
+                else
+                {
+                    std::stringstream ss;
+                    ss<<texts[1];
+                    ss>>m_timeStep;
+                }
+            }
+            else
+            {
+                // Add more tokens
+            }
+        }
+    }
+    inFile.close();
+    return true;
+ }
+
+ /**
+  * @brief initConfig Init the configuration
+  */
+ void GLWidget::initConfig()
+ {
+     if( !loadConfig(CONFIG) )
+     {
+         m_timeStep = TIME_STEP;
+         m_useHeightMap = false;
+     }
+ }
 
 void GLWidget::tick()
 {

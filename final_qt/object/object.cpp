@@ -4,145 +4,14 @@
  ** Date: 04/10/2013
  ** Member: Scott, Hobarts, Yan Li
  **/
-
+/*
 #include "opencv/cv.h"
 #include "opencv/cxcore.h"
-using namespace cv;
+using namespace cv;*/
 #include "object.h"
 #include <stdio.h>
 #include <iostream>
 #include "fluidGPU.h"
-
-/*********************************************************************************************/
-//The code of QR decomposition is from http://www.opencv.org.cn/index.php/QR%E5%88%86%E8%A7%A3
-/*********************************************************************************************/
-static void cvQR(CvMat *inputA,CvMat *q,CvMat *r)
-{
-/*    CvSize inputSize=cvGetSize(inputA);
-    int width=inputSize.width;
-    int height=inputSize.height;
-    cvSetIdentity(q);
-    cvCopy(inputA,r);
-    vector<CvMat **> matMem;
-    CvMat *tempH=cvCreateMat(height,height,CV_32FC1);
-    matMem.push_back(&tempH);
-    CvMat *v=cvCreateMat(height,1,CV_32FC1);
-    matMem.push_back(&v);
-    CvMat *tempCol=cvCreateMat(height,1,CV_32FC1);
-    matMem.push_back(&tempCol);
-    CvMat *tempCol2=cvCreateMat(height,1,CV_32FC1);
-    matMem.push_back(&tempCol2);
-    CvMat *iMat=cvCreateMat(height,height,CV_32FC1);
-    matMem.push_back(&iMat);
-    CvMat *transV=cvCreateMat(1,height,CV_32FC1);
-    matMem.push_back(&transV);
-
-    for (int i=0; i<width; i++)
-    {
-        float b[] = {0};
-        CvMat temp;
-        cvGetCol(r,&temp,i);							//get the i col
-        cvCopy(&temp,tempCol);							//copy the row,don't hurt the original column
-        cvGetSubRect(tempCol,&temp,cvRect(0,0,1,i));	//get the header
-        if (temp.rows == 0 || temp.cols == 0)
-            memcpy(temp.data.fl,b,sizeof(float));
-        else
-            cvZero(&temp);									//make it zero
-        float colNorm=cvNorm(tempCol);					//get the norm of the current column
-        cvZero(tempCol2);								//zero the e vector
-        float tempval=cvGet2D(r,i,i).val[0];
-        cvSet2D(tempCol2,i,0,cvScalar(tempval>0?-1:1*colNorm,0,0));	//set the new value
-        cvSub(tempCol,tempCol2,v);						//subtract the two vectors,get v
-
-        float val2=cvNorm(v);
-        if (val2==0)
-        {
-            continue;
-        }
-        val2*=val2;
-        val2=1/val2;
-        cvTranspose(v,transV);
-        cvMatMul(v,transV,tempH);						//
-        cvScale(tempH,tempH,2*val2);
-        cvSetIdentity(iMat);							//the identity matrix
-        cvSub(iMat,tempH,iMat);
-        cvCopy(iMat,tempH);								//get the H matrix
-        cvTranspose(tempH,tempH);						//transpose
-        cvMatMul(q,tempH,q);							//q=q.h
-        cvGetCol(r,&temp,i);							//get the col again
-        cvSet2D(&temp,i,0,cvScalar(colNorm,0,0));		//set the norm
-        cvGetSubRect(r,&temp,cvRect(i,i+1,1,height-i-1));
-        if (temp.rows == 0 || temp.cols == 0)
-            memcpy(temp.data.fl,b,sizeof(float));
-        else
-            cvZero(&temp);									//zero the submatrix
-    }
-
-    for (int j=0; j<matMem.size(); j++)
-    {
-        cvReleaseMat(matMem[j]);
-    }
-*/
-}
-
-static void testCVAndQR()
-{
-   /* CvMat* test = cvCreateMat( 3, 3, CV_32FC1 );
-    CvMat* Q = cvCreateMat( 3,3,CV_32FC1 );
-    CvMat* R = cvCreateMat( 3,3,CV_32FC1 );
-    cvSetReal2D(test,0,0,cos(1));
-    cvSetReal2D(test,0,1,-sin(1));
-    cvSetReal2D(test,0,2,0);
-    cvSetReal2D(test,1,0,sin(1));
-    cvSetReal2D(test,1,1,cos(1));
-    cvSetReal2D(test,1,2,0);
-    cvSetReal2D(test,2,0,0);
-    cvSetReal2D(test,2,1,0);
-    cvSetReal2D(test,2,2,1);
-
-    printf("The matrix:\n");
-    for( int i = 0; i < 3; i++ )
-    {
-        for( int j = 0; j < 3; j++ )
-        {
-            printf("%f ",cvGetReal2D(test,i,j));
-        }
-        printf("\n");
-    }
-    printf("\n");
-
-    cvQR( test, Q, R );
-    float det=  cvDet(Q);
-    printf("det:%f\n",det);
-
-    printf("The matrix Q:\n");
-    for( int i = 0; i < 3; i++ )
-    {
-        for( int j = 0; j < 3; j++ )
-        {
-            printf("%f ",cvGetReal2D(Q,i,j));
-        }
-        printf("\n");
-    }
-    printf("\n");*/
-}
-
-/*
-static void printMatrix4x4( Matrix4x4 mat )
-{
-    REAL* data = mat.data;
-    printf("Matrix:\n");
-    for( int i= 0; i < 4; i++ )
-    {
-        for( int j = 0; j < 4; j++ )
-        {
-            printf("%f ",data[i*4+j]);
-        }
-        printf("\n");
-    }
-    printf("\n");
-}
-*/
 
 Object::Object()
 {
@@ -154,8 +23,6 @@ Object::Object()
     m_color = Colorf(1.f,1.f,1.f,1.f);
     m_renderNormals = false;
     m_density = WATER_DENSITY;
-    m_upwards = false;
-    m_decay = false;
     m_dragCoeff = DRAG_COEFF;
     m_liftCoeff = LIFT_COEFF;
     m_w = DEFAULT_W;
@@ -164,22 +31,8 @@ Object::Object()
     c2 = -WATER_DENSITY*m_liftCoeff*0.5;
     c3 = WATER_DENSITY*GRAVITY;
     m_h = 1.f;
+    m_firstHit = false;
     memset( m_tessell, -1, 3*sizeof(int ) );
-
-    /**
-     * Test GramShmidt
-     */
-  /*  Matrix4x4 rot = Matrix4x4(cos(1),-sin(1),0,0,sin(1),cos(1),0,0,0,0,1,0,0,0,0,1);
-
-    printMatrix4x4( rot );
-    printMatrix4x4( GramSchmidt( rot ) );
-
-    Matrix4x4 t = Matrix4x4(1,2,3,4,2,3,4,1,3,4,1,2,4,1,2,3);
-
-    printMatrix4x4( t );
-    printMatrix4x4( GramSchmidt( t ) );
-
-    */
     computeOrigin();
 }
 
@@ -195,22 +48,15 @@ Object::Object(FluidGPU *fluid, Vector3 position, float dx, GLuint texID, float 
     m_dragCoeff = DRAG_COEFF;
     m_liftCoeff = LIFT_COEFF;
     m_w = DEFAULT_W;
-    m_upwards = false;
-    m_decay = false;
     m_density = density;
     c1 = -WATER_DENSITY*m_dragCoeff*0.5;
     c2 = -WATER_DENSITY*m_liftCoeff*0.5;
     c3 = WATER_DENSITY*GRAVITY;
     m_h = 1.f;
     memset( m_tessell, -1, 3*sizeof(int ) );
+    m_firstHit = false;
     computeOrigin();
     initFluidInfo( fluid );
-
-    /**
-     * Test QR decomposition and QA
-     */
-
-   // testCVAndQR();
 }
 
 Object::~Object()
@@ -255,7 +101,7 @@ void Object::draw()
         drawNormal();
 }
 
-void Object::update( float dt )
+void Object::update( float dt, FluidGPU* fluid )
 {
     /**
      * Compute the buoyance
@@ -323,8 +169,11 @@ void Object::update( float dt )
     dragAccTotal = dragTotal*m_massInv;
     liftAccTotal = liftTotal*m_massInv;
     Vector3 forceDir = (buoyAccTotal + Vector3(0.f,GRAVITY,0.f) +dragAccTotal +liftAccTotal);
-//    printf("%f\n",liftAccTotal.x);
+
+  //  printf("%f\n",buoyAccTotal.x);
+
     m_velocity += 2*(forceDir*dt);
+
     // Check if the next position is below terrain, if it is, we set the velocity to zero
     // Actually if one of the box's triangle is below terrain
     bool hitBottom = false;
@@ -355,6 +204,20 @@ void Object::update( float dt )
     if( !skipRotUpdate )
         updateRotMat( abc, dt );
     updatePosAndNorm();
+
+    if( !m_firstHit && forceDir.y > 0 && m_lastForce.y < 0 )
+    {
+        float h = (forceDir.y - m_lastForce.y)*dt*2;
+        float x = m_position.x - m_origX;
+        float z = m_position.z - m_origZ;
+        int indx = (int)(x*m_dxInv);
+        int indz = (int)(z*m_dxInv);
+        fluid->addDrop( indx, indz, max(1, m_boundingRadius*0.5),h );
+        if( !m_firstHit )
+            m_firstHit = true;
+    }
+    if( !m_firstHit )
+        m_lastForce = forceDir;
 }
 
 /**
@@ -374,6 +237,7 @@ void Object::initPhysics()
 #endif
     computeTessel();
     computeMass();
+    computeBoundingRadius();
     buildTriangleList();
 }
 

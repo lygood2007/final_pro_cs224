@@ -98,7 +98,7 @@ FluidGPU::~FluidGPU()
     safeFreeArray1D( m_gammaField );
     safeFreeArray1D( m_phiField );
     safeFreeArray1D( m_psiField );
-//    safeFreeArray1D( m_paintNormalField ); //@TODO - this is causing the memory error
+    safeFreeArray1D( m_paintNormalField );
     safeFreeArray1D( m_heightField );
     safeFreeArray1D( m_depthField );
 
@@ -134,8 +134,6 @@ void FluidGPU::draw() const
 {
     drawFluid( DRAW_MESH_VBO );
 
-//    if(m_glw->m_useParticles) drawParticles2(); //moved this call to glwidget for rendering separatly
-
     if( m_renderNormals )
         drawNormal();
 }
@@ -155,7 +153,7 @@ void FluidGPU::update(const float dt)
     m_dt = dt;
 
     updateFluidGPU( dt );
-   // clampFields();
+    clampFields();
     copybackGPU(HEIGHT,m_heightField);
 
     copybackGPU(VEL_U,m_velocityU);
@@ -215,15 +213,23 @@ void FluidGPU::update(const float dt)
 
 }
 
-void FluidGPU::addDrop(const int posX, const int posZ)
+void FluidGPU::addDrop(const int posX, const int posZ, int radius, float h )
 {
-    // Fixed size
-    int radius = m_gridSize/25;
-    if( radius < 1 )
-        radius = 1;
-    float h = m_domainSize/15;
+
+    if( radius < 0 )
+    {
+        // Fixed size
+        radius = m_gridSize/25;
+        if( radius < 1 )
+            radius = 1;
+    }
+    if( h < 0 )
+    {
+        h = m_domainSize/20;
+    }
 
     addDropGPU( posX, posZ, radius, h );
+    clampFields();
     //copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
     copybackGPU( PAINT, (float*)m_paintField );
@@ -297,15 +303,12 @@ void FluidGPU::backupHeight( Terrain* t )
     //initialize particles
     initParticlesGPU(TERRAIN_MIN_HEIGHT, TOTAL_NUM_SPLASH_PARTICLES, TOTAL_NUM_SPRAY_PARTICLES, TOTAL_NUM_FOAM_PARTICLES);
 
-    if(m_glw->m_useParticles)
-    {
-        copybackGPU(PARTICLE_POSITIONS, (float*)m_splash_positions );
-        copybackGPU(PARTICLE_VELOCITIES, (float*)m_splash_velocities );
-        copybackGPU(SPRAY_POSITIONS, (float*) m_spray_positions);
-        copybackGPU(SPRAY_VELOCITIES, (float*) m_spray_velocities);
-        copybackGPU(FOAM_POSITIONS, (float*) m_foam_positions);
-        copybackGPU(FOAM_TTLS, (float*) m_foam_ttls);
-    }
+    copybackGPU(PARTICLE_POSITIONS, (float*)m_splash_positions );
+    copybackGPU(PARTICLE_VELOCITIES, (float*)m_splash_velocities );
+    copybackGPU(SPRAY_POSITIONS, (float*) m_spray_positions);
+    copybackGPU(SPRAY_VELOCITIES, (float*) m_spray_velocities);
+    copybackGPU(FOAM_POSITIONS, (float*) m_foam_positions);
+    copybackGPU(FOAM_TTLS, (float*) m_foam_ttls);
 
 }
 
@@ -377,8 +380,8 @@ void FluidGPU::init(const int gridSize, const float domainSize)
         m_paintNormalField[i] = Vector3(0,1,0);
     }
 
-    int sizeIndex = (m_gridSize+1)*(m_gridSize-1)*2;
-    m_indices = (GLuint*)malloc(sizeIndex*sizeof(sizeIndex));
+    int sizeIndex = (m_gridPaintSize+1)*(m_gridPaintSize-1)*2;
+    m_indices = (GLuint*)malloc(sizeIndex*sizeof(GLuint));
     initIndices();
     buildTriangleList();
     // Set the random seed
@@ -396,61 +399,58 @@ void FluidGPU::init(const int gridSize, const float domainSize)
         printf("GPU does not support CUDA!\n");
     }
 
-    if(m_glw->m_useParticles)
-    {
-        //initialize particle sources
-        initParticleSources();
+    //initialize particle sources
+    initParticleSources();
 
-        //universal constants
-        m_particle_acceleration = Vector3(0, GRAVITY, 0);
+    //initialize particles
 
-        //spray array
-        int spraySize = sizeof(Vector3) * TOTAL_NUM_SPRAY_PARTICLES;
-        m_spray_positions = (Vector3*) malloc(spraySize);
-        m_spray_velocities = (Vector3*) malloc(spraySize);
-        for(int i = 0; i < TOTAL_NUM_SPRAY_PARTICLES; i++){
-            m_spray_positions[i] = Vector3(0, -1, 0);
-            m_spray_velocities[i] = Vector3::zero();
-        }
-        m_last_active_spray_index = -1;
+    //universal constants
+    m_particle_acceleration = Vector3(0, GRAVITY, 0);
 
-        //splash array
-        int splashSize = sizeof(Vector3) * TOTAL_NUM_SPLASH_PARTICLES;
-        m_splash_positions = (Vector3*) malloc(splashSize);
-        m_splash_velocities = (Vector3*) malloc(splashSize);
-        for(int i = 0; i < TOTAL_NUM_SPLASH_PARTICLES; i++){
-            m_splash_positions[i] = Vector3(0, -1, 0);
-            m_splash_velocities[i] = Vector3::zero();
-        }
-        m_last_active_splash_index = -1;
-
-        //foam array
-        int foamSize = sizeof(Vector3) * TOTAL_NUM_FOAM_PARTICLES;
-        m_foam_positions = (Vector3*) malloc(foamSize);
-        m_foam_ttls = (float*) malloc(foamSize);
-        for(int i = 0; i < TOTAL_NUM_FOAM_PARTICLES; i++){
-            m_foam_positions[i] = Vector3(0, -1, 0);
-            m_foam_ttls[i] = 0.0f;
-        }
-        m_last_active_foam_index = -1;
-
-        //splash to foam array
-        m_splash_to_foam_array = (float*) malloc(splashSize);
-        for(int i = 0; i < TOTAL_NUM_SPLASH_PARTICLES; i++){
-            m_splash_to_foam_array[i] = -1;
-        }
-
-        //pre-caclulating several needed values to speed up things throughout
-        m_VeffSpray = C_DEPOSIT * (4.0 / 3.0) * M_PI *
-                SPRAY_PARTICLE_RADIUS * SPRAY_PARTICLE_RADIUS * SPRAY_PARTICLE_RADIUS;
-        m_sprayHeightChange = m_VeffSpray / (m_dx * m_dx);
-
-        m_VeffSplash = C_DEPOSIT * (4.0 / 3.0) * M_PI *
-                SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
-        m_splashHeightChange = m_VeffSplash / (m_dx * m_dx);
-
-
+    //spray array
+    int spraySize = sizeof(Vector3) * TOTAL_NUM_SPRAY_PARTICLES;
+    m_spray_positions = (Vector3*) malloc(spraySize);
+    m_spray_velocities = (Vector3*) malloc(spraySize);
+    for(int i = 0; i < TOTAL_NUM_SPRAY_PARTICLES; i++){
+        m_spray_positions[i] = Vector3(0, -1, 0);
+        m_spray_velocities[i] = Vector3::zero();
     }
+    m_last_active_spray_index = -1;
+
+    //splash array
+    int splashSize = sizeof(Vector3) * TOTAL_NUM_SPLASH_PARTICLES;
+    m_splash_positions = (Vector3*) malloc(splashSize);
+    m_splash_velocities = (Vector3*) malloc(splashSize);
+    for(int i = 0; i < TOTAL_NUM_SPLASH_PARTICLES; i++){
+        m_splash_positions[i] = Vector3(0, -1, 0);
+        m_splash_velocities[i] = Vector3::zero();
+    }
+    m_last_active_splash_index = -1;
+
+    //foam array
+    int foamSize = sizeof(Vector3) * TOTAL_NUM_FOAM_PARTICLES;
+    m_foam_positions = (Vector3*) malloc(foamSize);
+    m_foam_ttls = (float*) malloc(foamSize);
+    for(int i = 0; i < TOTAL_NUM_FOAM_PARTICLES; i++){
+        m_foam_positions[i] = Vector3(0, -1, 0);
+        m_foam_ttls[i] = 0.0f;
+    }
+    m_last_active_foam_index = -1;
+
+    //splash to foam array
+    m_splash_to_foam_array = (float*) malloc(splashSize);
+    for(int i = 0; i < TOTAL_NUM_SPLASH_PARTICLES; i++){
+        m_splash_to_foam_array[i] = -1;
+    }
+
+    //pre-caclulating several needed values to speed up things throughout
+    m_VeffSpray = C_DEPOSIT * (4.0 / 3.0) * M_PI *
+            SPRAY_PARTICLE_RADIUS * SPRAY_PARTICLE_RADIUS * SPRAY_PARTICLE_RADIUS;
+    m_sprayHeightChange = m_VeffSpray / (m_dx * m_dx);
+
+    m_VeffSplash = C_DEPOSIT * (4.0 / 3.0) * M_PI *
+            SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS * SPLASH_PARTICLE_RADIUS;
+    m_splashHeightChange = m_VeffSplash / (m_dx * m_dx);
 }
 
 /**
@@ -465,7 +465,7 @@ void FluidGPU::initBuffer()
 
     glGenBuffers(1,&m_vertexBuffer );
     glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
-    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_paintNormalField, GL_STATIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, terrainSize*sizeof(Vector3), m_paintField, GL_STATIC_DRAW );
 
     glGenBuffers( 1, &m_normalBuffer );
     glBindBuffer( GL_ARRAY_BUFFER, m_normalBuffer );
@@ -581,18 +581,6 @@ void FluidGPU::drawFluid( DrawMethod method ) const
     if( method = DRAW_MESH_VBO )
     {
         // Not applicable
-        /*glPushMatrix();
-        glBegin(GL_POINTS);
-        glColor4f( m_color.r,m_color.g, m_color.b, m_color.a );
-        for( int i = 0; i < m_gridPaintSize; i++ )
-        {
-            for( int j =0; j < m_gridPaintSize; j++ )
-            {
-                glVertex3fv(m_paintField[getIndex1D(i,j,PAINT)].xyz);
-            }
-        }
-        glPopMatrix();
-        glEnd();*/
 
         glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
         Vector3* vertBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
@@ -1407,6 +1395,7 @@ void FluidGPU::createWave(int side)
     if(side >= 1 && side <= 4){
         addSideWaveGPU(side, sideLength, h );
     }
+    clampFields();
     copybackGPU(DEPTH,m_depthField);
     copybackGPU(HEIGHT,m_heightField);
     copybackGPU( PAINT, (float*)m_paintField );
@@ -1486,10 +1475,7 @@ void FluidGPU::resetFluid()
     //reset grid, particles, dampening fields
     resetGridGPU();
     resetDampeningFieldsGPU();
-    if(m_glw->m_useParticles)
-    {
-        resetParticlesGPU(TERRAIN_MIN_HEIGHT);
-    }
+    resetParticlesGPU(TERRAIN_MIN_HEIGHT);
 
     copybackGPU(PAINT,(float*)m_paintField);
     copybackGPU(DEPTH,m_depthField);
@@ -1501,13 +1487,10 @@ void FluidGPU::resetFluid()
     copybackGPU(PHI, m_psiField);
     copybackGPU(PSI, m_phiField);
 
-    if(m_glw->m_useParticles)
-    {
-        copybackGPU(PARTICLE_POSITIONS, (float*)m_splash_positions );
-        copybackGPU(PARTICLE_VELOCITIES, (float*)m_splash_velocities );
-        copybackGPU(SPRAY_POSITIONS, (float*) m_spray_positions);
-        copybackGPU(SPRAY_VELOCITIES, (float*) m_spray_velocities);
-        copybackGPU(FOAM_POSITIONS, (float*) m_foam_positions);
-        copybackGPU(FOAM_TTLS, (float*) m_foam_ttls);
-    }
+    copybackGPU(PARTICLE_POSITIONS, (float*)m_splash_positions );
+    copybackGPU(PARTICLE_VELOCITIES, (float*)m_splash_velocities );
+    copybackGPU(SPRAY_POSITIONS, (float*) m_spray_positions);
+    copybackGPU(SPRAY_VELOCITIES, (float*) m_spray_velocities);
+    copybackGPU(FOAM_POSITIONS, (float*) m_foam_positions);
+    copybackGPU(FOAM_TTLS, (float*) m_foam_ttls);
 }

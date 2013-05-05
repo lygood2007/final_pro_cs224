@@ -224,7 +224,8 @@ __host__ __device__ inline vec3 normalize( const vec3 v )
 /**
  * Functions for getting data from 2D array in GPU
  */
-__host__ __device__ inline float map2Dread( const float* map, int i, int j, int width )
+template<class T>
+__host__ __device__ inline T map2Dread( const T* map, int i, int j, int width )
 {
     return map[i*width+ j];
 }
@@ -232,7 +233,8 @@ __host__ __device__ inline float map2Dread( const float* map, int i, int j, int 
 /**
  * Functions for writting data from 2D array in GPU
  */
-__host__ __device__ inline void map2Dwrite( float* map, int i, int j, float value, int width )
+template<class T>
+__host__ __device__ inline void map2Dwrite( T* map, int i, int j, T value, int width )
 {
     map[i*width + j] = value;
 }
@@ -507,7 +509,8 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
             float vel1 = map2Dread( velUMap,i,j-1,width);
             float vel2 = map2Dread( velUMap,i,j+1,width);
             float vel3 = map2Dread( velUMap, i,j, width );
-            map2Dwrite( velUMap,i,j,0.33*(vel1+vel2+vel3),width);
+            float avg = 0.33*(vel1+vel2+vel3);
+            map2Dwrite( velUMap,i,j,avg,width);
             return;
 
         }
@@ -547,7 +550,8 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
              float vel1 = map2Dread( velWMap,i-1,j,width);          
              float vel2 = map2Dread( velWMap,i+1,j,width);
              float vel3 = map2Dread( velWMap, i, j, width );
-             map2Dwrite( velWMap,i,j,0.33*(vel1+vel2+vel3),width);
+             float avg = 0.33*(vel1+vel2+vel3);
+             map2Dwrite( velWMap,i,j,avg,width);
              return;
 
          }
@@ -673,8 +677,11 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
          const int index = i*gSize+ j;
          paintMap[index].x = -halfdm + j*dx;     
          paintMap[index].y = heightMap[index];
-         if( depthMap[index] < EPS )
-             paintMap[index].y -= DEC;
+         /**
+          * No bumping
+          */
+         /*if( depthMap[index] < EPS )
+             paintMap[index].y -= DEC;*/
          paintMap[index].z = -halfdm + i*dx;
      }
  }
@@ -702,11 +709,16 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
              jj = j-1;
              paintMap[curInd].x = -halfdm + jj*dx;
              paintMap[curInd].y = map2Dread( heightMap, ii, jj , gSize-2 );
-             if( map2Dread(depthMap,ii,jj,gSize-2) < EPS )
+
+             /**
+              * No bumping
+              */
+
+             /*if( map2Dread(depthMap,ii,jj,gSize-2) < EPS )
              {
                  // We decrease the surface for painting
                  paintMap[curInd].y -= DEC;
-             }
+             }*/
              paintMap[curInd].z = -halfdm + ii*dx;
          }
          else // Boundary condition
@@ -759,6 +771,55 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
             paintMap[curInd].x = -halfdm + jj*dx;
             paintMap[curInd].y = map2Dread(heightMap,ii,jj,gSize-2 ) - map2Dread( depthMap,ii,jj,gSize-2);
             paintMap[curInd].z = -halfdm + ii*dx;
+         }
+     }
+ }
+
+ /**
+  * Bump those vertices that the depth is very asmall or zero
+  */
+ __global__ void bumpPaintMapCUDA( vec3* paintMap, const vec3* normalMap, const float* depthMap, const int gSize)
+ {
+     int i = blockDim.y*blockIdx.y + threadIdx.y;
+     int j = blockDim.x*blockIdx.x + threadIdx.x;
+
+     if( i >= 0&& i < gSize&&j >= 0 && j < gSize )
+     {
+         int ii;
+         int jj;
+         if( i >= 1&& i < gSize-1&&j >= 1 && j < gSize-1 )
+         {
+             ii = i - 1;
+             jj = j - 1;
+             /*int depthWidth = width - 2;
+             float depth = map2Dread( depthMap, ii, jj, depthWidth );
+             if( depth <0.1 )
+             {
+                 vec3 val = map2Dread( paintMap, i, j, width );
+                 vec3 dir = map2Dread( normalMap, i,j, width );
+                 dir.x = -dir.x;
+                 dir.y = -dir.y;
+                 dir.z = -dir.z;
+                 val.x = val.x + dir.x*0.5;
+                 val.y = val.y + dir.y*0.5;
+                 val.z = val.z + dir.z*0.5;
+                 map2Dwrite( paintMap, i,j, val, width );
+             }*/
+
+             int depthWidth = gSize - 2;
+             float depth = map2Dread( depthMap, ii, jj, depthWidth );
+             if( depth <0.25)
+             {
+                 vec3 val = map2Dread( paintMap, i, j, gSize );
+                 vec3 dir = map2Dread( normalMap, i,j, gSize );
+                 dir.x = -dir.x;
+                 dir.y = -dir.y;
+                 dir.z = -dir.z;
+                 val.x = val.x + dir.x*0.3;
+                 val.y = val.y + dir.y*0.3;
+                 val.z = val.z + dir.z*0.3;
+                 map2Dwrite( paintMap, i,j, val, gSize );
+             }
          }
      }
  }
@@ -831,7 +892,7 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
  /**
   * Reduce the overshooting phenomenon when the wave enters a shallow region
   */
- __global__ void overshootingReduction( const float* depthMap, float* nextDepthMap, const float* heightMap,
+ __global__ void overshootingReductionCUDA( const float* depthMap, float* nextDepthMap, const float* heightMap,
                                         const float dx, const int width, const int height )
  {
      int i = blockDim.y*blockIdx.y + threadIdx.y;
@@ -1196,7 +1257,7 @@ __global__ void initBreakingWavesCUDA( float* breakingWavesMap, const int width,
 /**
  *  clamp the depth (min 0)
  */
-__global__ void clampDepthCUDA( float* depthMap, const int width, const int height )
+__global__ void clampDepthCUDA( float* depthMap, float* terrainMap, const int width, const int height )
 {
     int i = blockDim.y*blockIdx.y +threadIdx.y;
     int j = blockDim.x*blockIdx.x +threadIdx.x;
@@ -1204,6 +1265,8 @@ __global__ void clampDepthCUDA( float* depthMap, const int width, const int heig
     if( i >= 0 && i < height && j >= 0 && j < width )
     {
         float depth = cudaMax(0.f, map2Dread( depthMap, i, j, width ));
+        float height = map2Dread( terrainMap, i,j, width );
+        depth = cudaMin( depth, maxHeight - height );
         map2Dwrite( depthMap, i, j, depth, width );
     }
 }
@@ -1526,12 +1589,19 @@ void initGridGPU( const int hostGridSize, const int hostGridPaintSize, const flo
                                                             halfDomain, mapdx, gridPaintSize);
         error = cudaDeviceSynchronize();
         checkCudaError(error);
+        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize);
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
 
     }
     else if( gridPaintSize == gridSize + 2 )
     {
         updatePaintBoundCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, deviceDepthMap,
                                                             halfDomain, mapdx, gridPaintSize);
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
+
+        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
         error = cudaDeviceSynchronize();
         checkCudaError(error);
     }
@@ -1625,7 +1695,7 @@ void updateFluidGPU( const float dt )
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
-    overshootingReduction<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
+    overshootingReductionCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
                                                               deviceNextDepthMap, deviceHeightMap, mapdx, gridSize, gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
@@ -1660,7 +1730,7 @@ void updateFluidGPU( const float dt )
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
-    overshootingReduction<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
+    overshootingReductionCUDA<<<blocksPerGrid,threadsPerBlock>>>( deviceDepthMap,
                                                               deviceNextDepthMap, deviceHeightMap, mapdx, gridSize, gridSize );
     error = cudaDeviceSynchronize();
     checkCudaError(error);
@@ -1683,23 +1753,14 @@ void updateFluidGPU( const float dt )
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
-    /**
-     * Compute he normal map
-     */
+
     blockPerGridX = (gridPaintSize + blockSizeX - 1)/(blockSizeX);
     blockPerGridY = (gridPaintSize+ blockSizeY - 1)/(blockSizeY);
     blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
-    computePaintNormalCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintNormalMap, devicePaintMap,
-                                                          gridPaintSize, gridPaintSize );
-    error = cudaDeviceSynchronize();
-    checkCudaError(error);
 
     /**
      * Update the paint map
      */
-    blockPerGridX = (gridPaintSize + blockSizeX - 1)/(blockSizeX);
-    blockPerGridY = (gridPaintSize+ blockSizeY - 1)/(blockSizeY);
-    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
     if( gridPaintSize == gridSize )
     {
 
@@ -1707,12 +1768,39 @@ void updateFluidGPU( const float dt )
                                                             halfDomain, mapdx, gridPaintSize);
         error = cudaDeviceSynchronize();
         checkCudaError(error);
-
     }
     else if( gridPaintSize == gridSize + 2 )
     {
         updatePaintBoundCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, deviceDepthMap,
                                                             halfDomain, mapdx, gridPaintSize);
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
+    }
+    else
+    {
+        assert(0);
+    }
+    /**
+     * Compute he normal map
+     */
+    computePaintNormalCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintNormalMap, devicePaintMap,
+                                                          gridPaintSize, gridPaintSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
+
+    /**
+     * Bump the paint map
+     */
+    if( gridPaintSize == gridSize )
+    {
+        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
+
+    }
+    else if( gridPaintSize == gridSize + 2 )
+    {
+        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
         error = cudaDeviceSynchronize();
         checkCudaError(error);
     }
@@ -2176,7 +2264,7 @@ void clampFieldsGPU( const float velocityClamp ){
     dim3 blocksPerGrid(blockPerGridX,blockPerGridY);
     //clamp depth, min value is 0
     clampDepthCUDA<<<blocksPerGrid,threadsPerBlock>>>(
-                                                   deviceDepthMap, gridSize, gridSize
+                                                   deviceDepthMap, deviceTerrainMap, gridSize, gridSize
                                                    );
     //update height field
     updateHeightCUDA<<<blocksPerGrid, threadsPerBlock>>>( deviceHeightMap, deviceDepthMap, deviceTerrainMap,
@@ -2360,12 +2448,18 @@ void resetGridGPU(){
                                                             halfDomain, mapdx, gridPaintSize);
         error = cudaDeviceSynchronize();
         checkCudaError(error);
+        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
 
     }
     else if( gridPaintSize == gridSize + 2 )
     {
         updatePaintBoundCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, deviceDepthMap,
                                                             halfDomain, mapdx, gridPaintSize);
+        error = cudaDeviceSynchronize();
+        checkCudaError(error);
+        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
         error = cudaDeviceSynchronize();
         checkCudaError(error);
     }

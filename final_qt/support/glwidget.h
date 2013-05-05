@@ -17,7 +17,7 @@
 #include "camera.h"
 #include "fluid_global.h"
 #include "resourceloader.h"
-
+#include "object_defs.h"
 // We fix the size
 #define WIN_W 1000.0
 #define WIN_H 700.0
@@ -25,7 +25,8 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
-#define USE_HEIGHTMAP
+#define CONFIG "./configuration/configure.txt"
+//#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
 //#define USE_FBO
@@ -45,7 +46,8 @@ class QGLFramebufferObject;
 class Terrain;
 class FluidCPU;
 class FluidGPU;
-class Box;
+class Object;
+
 class GLWidget : public QGLWidget
 {
     Q_OBJECT
@@ -65,8 +67,10 @@ private:
     QTimer m_timer; // The timer variable
     OrbitCamera m_camera; // Camera
     Terrain* m_terrain;
-    QList<Box*> m_boxes;
+    QList<Object*> m_objects;
     GLuint m_boxTexID;
+    GLuint m_sphereTexID;
+
 #ifdef USE_GPU_FLUID
     FluidGPU* m_fluid;
 #else
@@ -78,13 +82,15 @@ private:
     GLuint m_skybox; // skybox call list ID
     GLuint m_cubeMap; // cubeMap texture ID
     QFont m_font; // font for rendering tex
-
+    std::string m_heightMapFileName;
 
     bool m_mouseLeftDown; // True if mouse left is down
     bool m_mouseRightDown; // True if mouse right is down
 
     bool m_drawFrame; // True if draw in wireframe mode
     bool m_animate;
+
+    bool m_useHeightMap; // Flag for using height map or not
 
     int m_prevTime;
     float m_prevFps, m_fps;
@@ -181,18 +187,35 @@ public:
     void renderBlur(int width, int height);
 
     /**
-     * @brief addObject Drop objects from the air
+     * @brief addObject Drop a object from the air with object's type specified by type
      * @param x The x position
      * @param z The z position
+     * @param type The object's type
      * @param Height The height
      */
-    void addObject( const float x, const float z, const float y = OBJECT_ORIGIN_HEIGHT );
+    void addObject( const float x, const float z, const ObjectType type, const float y = OBJECT_ORIGIN_HEIGHT );
 
     /**
      * @brief updateObjects Update the objects' positions
      * @param dt the time step
      */
     void updateObjects( float dt );
+
+    /**
+     * @brief resetObjects Delete the objects
+     */
+    void resetObjects();
+
+    /**
+     * @brief loadConfig load the configuration from configure file
+     * @return True if it load successfully
+     */
+     bool loadConfig( std::string fileName );
+
+     /**
+      * @brief initConfig Init the configuration
+      */
+     void initConfig();
 
 private slots:
     /** Callback function, will be called whenever the timer ticks*/

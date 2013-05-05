@@ -129,7 +129,7 @@ void Box::buildTriangleList()
             t2.norms[2] = -t1.norms[0];
             t2.area = t1.area;
             t2.avgNorm = t1.norms[0];
-            t2.avgPos = (t2.verts[0] + t2.verts[1] + t2.verts[2])/3.f+ m_position;
+            t2.avgPos = (t2.verts[0] + t2.verts[1] + t2.verts[2])*0.33f+ m_position;
             m_tris.push_back( t2 );
             //front face
             Tri t3;
@@ -161,7 +161,7 @@ void Box::buildTriangleList()
             t4.norms[2] = -t3.norms[0];
             t4.area = t3.area;
             t4.avgNorm = t4.norms[0];
-            t4.avgPos = (t4.verts[0] + t4.verts[1] + t4.verts[2])/3.f+ m_position;
+            t4.avgPos = (t4.verts[0] + t4.verts[1] + t4.verts[2])*0.33f+ m_position;
             m_tris.push_back( t4 );
         }
     }
@@ -188,7 +188,7 @@ void Box::buildTriangleList()
             Vector3 cro = v01.cross(v02);
             t1.area = cro.length()/2.f;
             t1.avgNorm = t1.norms[0];
-             t1.avgPos = (t1.verts[0] + t1.verts[1] + t1.verts[2])/3.f+ m_position;
+             t1.avgPos = (t1.verts[0] + t1.verts[1] + t1.verts[2])*0.33f+ m_position;
             m_tris.push_back( t1 );
 
 
@@ -206,7 +206,7 @@ void Box::buildTriangleList()
             t2.norms[2] = -t1.norms[0];
             t2.area = t1.area;
             t2.avgNorm = t2.norms[0];
-            t2.avgPos = (t2.verts[0] + t2.verts[1] + t2.verts[2])/3.f+ m_position;
+            t2.avgPos = (t2.verts[0] + t2.verts[1] + t2.verts[2])*0.33f+ m_position;
             m_tris.push_back( t2 );
 
 
@@ -222,7 +222,7 @@ void Box::buildTriangleList()
             v02 = t3.verts[2] - t3.verts[0];
             t3.area = fabs(v01.cross(v02).length())/2.f;
             t3.avgNorm = t3.norms[0];
-            t3.avgPos = (t3.verts[0] + t3.verts[1] + t3.verts[2])/3.f+ m_position;
+            t3.avgPos = (t3.verts[0] + t3.verts[1] + t3.verts[2])*0.33f+ m_position;
             m_tris.push_back( t3 );
 
             // left face
@@ -238,7 +238,7 @@ void Box::buildTriangleList()
             t4.norms[2] = -t3.norms[0];
             t4.area = t3.area;
             t4.avgNorm = t4.norms[0];
-            t4.avgPos = (t4.verts[0] + t4.verts[1] + t4.verts[2])/3.f+ m_position;
+            t4.avgPos = (t4.verts[0] + t4.verts[1] + t4.verts[2])*0.33f+ m_position;
             m_tris.push_back( t4 );
         }
     }
@@ -359,3 +359,11 @@ void Box::computeMass()
     m_massInv = 1/m_mass;
 }
 
+
+/**
+ * @brief computeBoundingRadius Compute the bounding radius
+ */
+void Box::computeBoundingRadius()
+{
+    m_boundingRadius = sqrt(m_length*m_length + m_width*m_width + m_height*m_height);
+}
