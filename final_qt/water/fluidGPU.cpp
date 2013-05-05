@@ -134,8 +134,6 @@ void FluidGPU::draw() const
 {
     drawFluid( DRAW_MESH_VBO );
 
-//    if(m_glw->m_useParticles) drawParticles2(); //moved this call to glwidget for rendering separatly
-
     if( m_renderNormals )
         drawNormal();
 }
@@ -583,18 +581,6 @@ void FluidGPU::drawFluid( DrawMethod method ) const
     if( method = DRAW_MESH_VBO )
     {
         // Not applicable
-        /*glPushMatrix();
-        glBegin(GL_POINTS);
-        glColor4f( m_color.r,m_color.g, m_color.b, m_color.a );
-        for( int i = 0; i < m_gridPaintSize; i++ )
-        {
-            for( int j =0; j < m_gridPaintSize; j++ )
-            {
-                glVertex3fv(m_paintField[getIndex1D(i,j,PAINT)].xyz);
-            }
-        }
-        glPopMatrix();
-        glEnd();*/
 
         glBindBuffer( GL_ARRAY_BUFFER, m_vertexBuffer );
         Vector3* vertBuffer = (Vector3*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );

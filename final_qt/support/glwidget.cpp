@@ -23,8 +23,8 @@
 #include <QGLShaderProgram>
 #include <fstream>
 #include <sstream>
-#include <foreach.hpp>
-#include <tokenizer.hpp>
+#include <boost/foreach.hpp>
+#include <boost/tokenizer.hpp>
 
 // Declaration of Cuda functions
 extern "C"
@@ -93,7 +93,9 @@ void GLWidget::init()
     m_useAxis = false; m_useDampening = false;
 
     if( m_useHeightMap )
-        m_terrain = new HeightmapTerrain(HEIGHTMAP_FILENAME);
+    {
+        m_terrain = new HeightmapTerrain(m_heightMapFileName.c_str());
+    }
     else
         m_terrain = new RandomTerrain();
 
