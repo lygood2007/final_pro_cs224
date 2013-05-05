@@ -21,6 +21,11 @@
 //added by SH
 #include <QGLFramebufferObject>
 #include <QGLShaderProgram>
+#include <fstream>
+#include <sstream>
+#include <foreach.hpp>
+#include <tokenizer.hpp>
+
 // Declaration of Cuda functions
 extern "C"
 {
@@ -80,17 +85,18 @@ void GLWidget::init()
     // The game loop is implemented using a timer
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(tick()));
 
+    initConfig();
     //use everything
     m_useShaders = m_useFBO = m_useSimpleCube = m_useSkybox = m_useParticles = true;
     m_useParticleSources = m_useRectangularParticleSources = false;
     //except these
     m_useAxis = false; m_useDampening = false;
 
-#ifdef USE_HEIGHTMAP
-    m_terrain = new HeightmapTerrain();
-#else
-    m_terrain = new RandomTerrain();
-#endif
+    if( m_useHeightMap )
+        m_terrain = new HeightmapTerrain(HEIGHTMAP_FILENAME);
+    else
+        m_terrain = new RandomTerrain();
+
 
     // Start a timer that will try to get 100 frames per second (the actual
     // frame rate depends on the operating system and other running programs)
@@ -100,9 +106,6 @@ void GLWidget::init()
     m_mouseRightDown = false;
     m_drawFrame = false;
     m_animate = false;
-
-    m_timeStep = TIME_STEP;
-
     // Center the mouse, which is explained more in mouseMoveEvent() below.
     // This needs to be done here because the mouse may be initially outside
     // the fullscreen window and will not automatically receive mouse move
@@ -1214,6 +1217,105 @@ void GLWidget::resetObjects()
     }
     m_objects.clear();
 }
+
+/**
+ * @brief loadConfig load the configuration from configure file
+ * @return True if it load successfully
+ */
+ bool GLWidget::loadConfig( std::string fileName )
+ {
+    ifstream inFile;
+    inFile.open( fileName.c_str() );
+    if( !inFile.is_open() )
+    {
+        printf("Cannot find the configuration file:" CONFIG );
+        return false;
+    }
+    string line;
+    std::getline( inFile, line );
+    std::cout<<line;
+    bool correctHeader =!line.compare("#FLUID#");
+    // Firstly check the header
+    if( !correctHeader )
+    {
+        printf("Wrong type\n");
+        inFile.close();
+        return false;
+    }
+    while( !inFile.eof() )
+    {
+        std::string subLine;
+        std::getline( inFile, subLine );
+        boost::char_separator<char> sep("\t :");
+        boost::tokenizer< boost::char_separator<char> > tokens(subLine, sep);
+        vector<string> texts;
+        BOOST_FOREACH (const std::string& t, tokens) {
+            texts.push_back(t);
+        }
+        if( texts.size() <= 0 )
+            continue;
+        else
+        {
+            if( texts[0] == "#USE_HEIGHTMAP#" )
+            {
+                if( texts.size() != 3 )
+                {
+                    printf("Bad file\n");
+                    return false;
+                }
+                else
+                {
+                    if( texts[1] == "1")
+                    {
+                        m_useHeightMap = true;
+                        m_heightMapFileName = texts[2];
+                    }
+                    else if( texts[1] == "0" )
+                    {
+                        m_useHeightMap = false;
+                    }
+                    else
+                    {
+                        printf("Bad file\n");
+                        return false;
+                    }
+                }
+            }
+            else if( texts[0] == "#TIME_STEP#")
+            {
+                if( texts.size() != 2 )
+                {
+                    printf("Bad file\n");
+                    return false;
+                }
+                else
+                {
+                    std::stringstream ss;
+                    ss<<texts[1];
+                    ss>>m_timeStep;
+                }
+            }
+            else
+            {
+                // Add more tokens
+            }
+        }
+    }
+    inFile.close();
+    return true;
+ }
+
+ /**
+  * @brief initConfig Init the configuration
+  */
+ void GLWidget::initConfig()
+ {
+     if( !loadConfig(CONFIG) )
+     {
+         m_timeStep = TIME_STEP;
+         m_useHeightMap = false;
+     }
+ }
 
 void GLWidget::tick()
 {

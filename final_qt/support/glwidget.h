@@ -25,7 +25,8 @@
 // Flag for testing
 #define DRAW_TERRAIN
 
-#define USE_HEIGHTMAP
+#define CONFIG "./configuration/configure.txt"
+//#define USE_HEIGHTMAP
 
 #define RENDER_FLUID
 //#define USE_FBO
@@ -81,13 +82,15 @@ private:
     GLuint m_skybox; // skybox call list ID
     GLuint m_cubeMap; // cubeMap texture ID
     QFont m_font; // font for rendering tex
-
+    std::string m_heightMapFileName;
 
     bool m_mouseLeftDown; // True if mouse left is down
     bool m_mouseRightDown; // True if mouse right is down
 
     bool m_drawFrame; // True if draw in wireframe mode
     bool m_animate;
+
+    bool m_useHeightMap; // Flag for using height map or not
 
     int m_prevTime;
     float m_prevFps, m_fps;
@@ -202,6 +205,17 @@ public:
      * @brief resetObjects Delete the objects
      */
     void resetObjects();
+
+    /**
+     * @brief loadConfig load the configuration from configure file
+     * @return True if it load successfully
+     */
+     bool loadConfig( std::string fileName );
+
+     /**
+      * @brief initConfig Init the configuration
+      */
+     void initConfig();
 
 private slots:
     /** Callback function, will be called whenever the timer ticks*/

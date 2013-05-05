@@ -115,12 +115,12 @@ CUDA_ARCH = sm_21
 NVCC_FLAGS = --compiler-options -fno-strict-aliasing -use_fast_math --ptxas-options=-v
 
 CV_DIR = /contrib/projects/OpenCV2.2/install
-
 #include paths for cuda
 INCLUDEPATH += $$CUDA_DIR/include \
                 $$CUDA_SDK/common/inc \
                 $$CUDA_SDK/../shared/inc \
-                $$CV_DIR/include
+                $$CV_DIR/include \
+
 #libs
 LIBS += -L$$CUDA_DIR/lib \
         -L$$CUDA_SDK/lib \
