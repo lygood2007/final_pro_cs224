@@ -24,7 +24,7 @@ public:
     void updateMatrices();
     void updateProjectionMatrix();
     void updateModelviewMatrix();
-    void updatePanModelMatrix();
+    void translateCamera();
     void applyPerspectiveCamera(const float width, const float height);
     Matrix4x4 getInvViewTransMatrix();
     Vector4 getEyePos();

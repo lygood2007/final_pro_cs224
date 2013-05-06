@@ -769,7 +769,7 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
     else if ( event->button() == Qt::MiddleButton )
     {
         m_camera.mouseDown(event->x(),event->y());
-        //apply perspective
+        updateCamera();
         m_mouseMiddleDown = true;
     }
     else
@@ -817,6 +817,8 @@ void GLWidget::mouseMoveEvent(QMouseEvent *event)
        }
     else if (m_mouseMiddleDown)
     {
+        m_camera.mouseMovePan(event->x(),event->y());
+        updateCamera();
     }
    else if( m_mouseLeftDown )
    {
@@ -826,6 +828,7 @@ void GLWidget::mouseMoveEvent(QMouseEvent *event)
 void GLWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     m_mouseLeftDown = false;
+    m_mouseMiddleDown = false;
     m_mouseRightDown = false;
 }
 

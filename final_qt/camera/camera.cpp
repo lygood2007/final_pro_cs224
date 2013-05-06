@@ -57,6 +57,24 @@ void OrbitCamera::mouseMove( int x, int y )
 void OrbitCamera::mouseMovePan(const int x, const int y)
 {
 
+    float dx, dy;
+    dy = y - m_oldY;
+    dx = x - m_oldX;
+    m_oldX = x;
+    m_oldY = y;
+
+    glMatrixMode(GL_MODELVIEW);
+    double matrix[16];
+    glPushMatrix();
+    glLoadIdentity();
+
+        //translate the camera by x and y
+    glTranslatef(dx, dy, 0.f);
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, matrix);
+    glPopMatrix();
+    // because it's column order
+   m_modelviewMatrix = Matrix4x4(matrix).getTranspose();
 }
 
 
@@ -107,8 +125,27 @@ void OrbitCamera::updateModelviewMatrix()
    m_modelviewMatrix = Matrix4x4(matrix).getTranspose();
 }
 
-void OrbitCamera::updatePanModelMatrix()
+void OrbitCamera::translateCamera()
 {
+    setRatio(width/height);
+    Vector3 dir(-Vector3::fromAngles(m_theta, m_phi));
+    Vector3 eye( - dir * m_zoom);
+
+    float dx, dy;
+    dy = y - m_oldY;
+    dx = x - m_oldX;
+    m_oldX = x;
+    m_oldY = y;
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(m_fovy, m_ratio, m_near, m_far);
+    //from here
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    //moved this to here
+    gluLookAt(dx, dy, eye.z, dx + dir.x, dy + dir.y, eye.z + dir.z,
+              m_up.x, m_up.y, m_up.z); //dave said it's okay
 
 }
 
