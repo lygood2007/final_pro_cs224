@@ -2,7 +2,7 @@
 // IoR of Water is 1.33335  (at 20 deg C)
 // n = n2/n1, (n - 1)/(n + 1) = 0.0399
 
-//const float Eta = .0399; // Ratio of indices of refraction
+const float Eta = .04; // Ratio of indices of refraction
 const float FresnelPower = 5.0;
 
 //const float F  = ((1.0-Eta) * (1.0-Eta)) / ((1.0+Eta) * (1.0+Eta));
