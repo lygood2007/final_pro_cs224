@@ -1,3 +1,3 @@
 #FLUID#
-	#USE_HEIGHTMAP# 1 ./resource/h_map_6.jpg
+	#USE_HEIGHTMAP# 1 ./resource/h_map_9.jpg
 	#TIME_STEP# 0.025
