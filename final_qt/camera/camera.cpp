@@ -53,6 +53,13 @@ void OrbitCamera::mouseMove( int x, int y )
     updateModelviewMatrix();
 }
 
+
+void OrbitCamera::mouseMovePan(const int x, const int y)
+{
+
+}
+
+
 void OrbitCamera::mouseWheel(float delta)
 {
     m_zoom *= powf(0.999f, delta);
@@ -99,6 +106,12 @@ void OrbitCamera::updateModelviewMatrix()
     // becaues it's column order
    m_modelviewMatrix = Matrix4x4(matrix).getTranspose();
 }
+
+void OrbitCamera::updatePanModelMatrix()
+{
+
+}
+
 
 void OrbitCamera::applyPerspectiveCamera( const float width, const float height)
 {

@@ -19,10 +19,12 @@ public:
     ~OrbitCamera();
     void mouseDown(const int x, const int y);
     void mouseMove(const int x, const int y);
+    void mouseMovePan(const int x, const int y);
     void mouseWheel(const float delta);
     void updateMatrices();
     void updateProjectionMatrix();
     void updateModelviewMatrix();
+    void updatePanModelMatrix();
     void applyPerspectiveCamera(const float width, const float height);
     Matrix4x4 getInvViewTransMatrix();
     Vector4 getEyePos();

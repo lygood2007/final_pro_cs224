@@ -766,6 +766,12 @@ void GLWidget::mousePressEvent(QMouseEvent *event)
         updateCamera();
         m_mouseRightDown = true;
     }
+    else if ( event->button() == Qt::MiddleButton )
+    {
+        m_camera.mouseDown(event->x(),event->y());
+        //apply perspective
+        m_mouseMiddleDown = true;
+    }
     else
     {
 #ifdef RENDER_FLUID
@@ -809,9 +815,12 @@ void GLWidget::mouseMoveEvent(QMouseEvent *event)
            updateCamera();
 
        }
-       else if( m_mouseLeftDown )
-       {
-       }
+    else if (m_mouseMiddleDown)
+    {
+    }
+   else if( m_mouseLeftDown )
+   {
+   }
 }
 
 void GLWidget::mouseReleaseEvent(QMouseEvent *event)

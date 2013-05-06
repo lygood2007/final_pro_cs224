@@ -85,6 +85,7 @@ private:
     std::string m_heightMapFileName;
 
     bool m_mouseLeftDown; // True if mouse left is down
+    bool m_mouseMiddleDown; // True if mouse left is down
     bool m_mouseRightDown; // True if mouse right is down
 
     bool m_drawFrame; // True if draw in wireframe mode

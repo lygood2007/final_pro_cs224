@@ -1097,10 +1097,10 @@ void FluidGPU::initParticleSources(){
 //    m_particle_sources.append(particleSource2);
 
     //long waterfall
-    Vector3 centerPosition3 = Vector3(0, 0, halfDomain - 15.0f);
-    centerPosition3.y = PARTICLE_DROP_HEIGHT;
+    Vector3 centerPosition3 = Vector3(0.0f, PARTICLE_DROP_HEIGHT, 0.0f);
+    //centerPosition3.y = PARTICLE_DROP_HEIGHT;
     ParticleSource *particleSource3 = new ParticleSource(centerPosition3, 10.0f, 1.0f,
-                                                         -halfDomain + 1.0f, -halfDomain + 2.0f, PARTICLE_DROP_HEIGHT, 1.0f, -halfDomain, halfDomain,
+                                                         -halfDomain + 10.0f, -halfDomain + 11.0f, PARTICLE_DROP_HEIGHT, 1.0f, -halfDomain, halfDomain,
                                                          1000);
     m_particle_sources.append(particleSource3);
 }
@@ -1433,8 +1433,8 @@ void FluidGPU::addNewFoamParticles(){
 
                 float lenX = (currPosition.x + halfDomain) * m_dxInv;
                 float lenZ = (currPosition.z + halfDomain) * m_dxInv;
-                int i = (int) min(m_gridSize - 1, max(0.0, round(lenX)));
-                int j = (int) min(m_gridSize - 1, max(0.0, round(lenZ)));
+                int j = (int) min(m_gridSize - 1, max(0.0, round(lenX)));
+                int i = (int) min(m_gridSize - 1, max(0.0, round(lenZ)));
                 int gridIndex = getIndex1D(i, j, HEIGHT);
 
                 //get the position

@@ -815,9 +815,9 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
                  dir.x = -dir.x;
                  dir.y = -dir.y;
                  dir.z = -dir.z;
-                 val.x = val.x + dir.x*0.3;
-                 val.y = val.y + dir.y*0.3;
-                 val.z = val.z + dir.z*0.3;
+                 val.x = val.x + dir.x*0.6;
+                 val.y = val.y + dir.y*0.6;
+                 val.z = val.z + dir.z*0.6;
                  map2Dwrite( paintMap, i,j, val, gSize );
              }
          }
@@ -1033,7 +1033,7 @@ __global__ void updateParticleValuesCUDA( vec3* positionsMap, vec3* velocitiesMa
  * Update the foam particle fields
  **/
 __global__ void updateFoamValuesCUDA( vec3* positionsMap, float* ttlsMap,
-                                      float* heightMap, float* velUMap, float* velWMap,
+                                      float* heightMap, float* depthMap, float* velUMap, float* velWMap,
                                       float width, float height, float uwidth, float uheight, float wwidth, float wheight,
                                       float minHeight, float dt, float halfDomain, float mdxInv, int numParticles )
 {
@@ -1053,11 +1053,16 @@ __global__ void updateFoamValuesCUDA( vec3* positionsMap, float* ttlsMap,
 
             //get the velocities and height
             float hxz = map2Dread( heightMap, z, x, width );
-            float uxz = map2Dread( velUMap, z, x, uwidth );
-            float wxz = map2Dread( velWMap, z, x, wwidth );
-            positionsMap[i].x += 1.0f * uxz * dt;
-            positionsMap[i].y = hxz;
-            positionsMap[i].z += 1.0f * wxz * dt;
+            float dxz = map2Dread( depthMap, z, x, width );
+            if(dxz < 0.01){
+                positionsMap[i].y = minHeight - 1;
+            } else {
+                float uxz = map2Dread( velUMap, z, x, uwidth );
+                float wxz = map2Dread( velWMap, z, x, wwidth );
+                positionsMap[i].x += 1.0f * uxz * dt;
+                positionsMap[i].y = hxz;
+                positionsMap[i].z += 1.0f * wxz * dt;
+            }
         } else {
             positionsMap[i].y = minHeight - 1;
         }
@@ -2149,7 +2154,7 @@ void updateParticlesGPU( const float minHeight, const float dt, const float half
     blocksPerGrid = (deviceNumFoamParticles + threadsPerBlock - 1) / threadsPerBlock;
     updateFoamValuesCUDA<<<blocksPerGrid, threadsPerBlock>>>(
                                                     deviceFoamPositionsArray, deviceFoamTTLArray,
-                                                    deviceHeightMap, deviceVelocityUMap, deviceVelocityWMap,
+                                                    deviceHeightMap, deviceDepthMap, deviceVelocityUMap, deviceVelocityWMap,
                                                     gridSize, gridSize, uwidth, uheight, wwidth, wheight,
                                                     minHeight, dt, halfDomain, mdxInv, deviceNumFoamParticles
                                                     );
