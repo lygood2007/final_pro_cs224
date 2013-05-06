@@ -71,7 +71,7 @@ void Sphere::buildTriangleList()
     for( int i = 0; i < m_tessell[1]; i++ )
     {
         theta = 2*M_PI-unitTheta*i;
-        tri.verts[0]= Vector3( 0, 0.5, 0 );
+        tri.verts[0]= Vector3( 0, m_radius, 0 );
         tri.norms[0] = Vector3( 0, 1, 0 );
         tri.uvs[0].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[0].y = 1;
 
@@ -102,7 +102,7 @@ void Sphere::buildTriangleList()
     for( int i = 0; i < m_tessell[1]; i++ )
     {
         theta = unitTheta*i;
-        tri.verts[0] = Vector3( 0,-0.5, 0 );
+        tri.verts[0] = Vector3( 0,-m_radius, 0 );
         tri.norms[0] = Vector3( 0, -1, 0 );
         tri.uvs[0].x = (2*M_PI - theta)/(2*M_PI); tri.uvs[0].y = 0;
         tri.verts[1] = Vector3( m_radius*sin(phi)*cos(theta) ,

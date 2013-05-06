@@ -1241,7 +1241,6 @@ void GLWidget::resetObjects()
     }
     string line;
     std::getline( inFile, line );
-    std::cout<<line;
     bool correctHeader =!line.compare("#FLUID#");
     // Firstly check the header
     if( !correctHeader )
