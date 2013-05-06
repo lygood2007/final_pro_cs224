@@ -1,12 +1,12 @@
 // IoR of Air is   1.0002926
 // IoR of Water is 1.33335  (at 20 deg C)
-// (n1-n2)/(n1+n2) = -0.1427199692
+// n = n2/n1, (n - 1)/(n + 1) = 0.0399
 
-const float Eta = 0.143;         // Ratio of indices of refraction
+//const float Eta = .0399; // Ratio of indices of refraction
 const float FresnelPower = 5.0;
 
-const float F  = ((1.0-Eta) * (1.0-Eta)) / ((1.0+Eta) * (1.0+Eta));
-
+//const float F  = ((1.0-Eta) * (1.0-Eta)) / ((1.0+Eta) * (1.0+Eta));
+const float F  = .0399; //caclulating it out once for water
 varying vec3  Reflect;
 varying vec3  Refract;
 varying float Ratio;

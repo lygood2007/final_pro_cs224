@@ -16,7 +16,7 @@
 #include <iostream>
 #include <assert.h>
 
-#define TEXTURE_DIR "./resource/sandy_sea_floor.jpg"
+#define TEXTURE_DIR "./resource/rock_texture.jpg"
 
 typedef Vector2 GridIndex;
 

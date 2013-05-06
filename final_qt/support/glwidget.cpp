@@ -551,7 +551,7 @@ void GLWidget::loadCubeMap()
         fileList.append(new QFile("resource/posx.jpg"));
         fileList.append(new QFile("resource/negx.jpg"));
         fileList.append(new QFile("resource/posy.jpg"));
-        fileList.append(new QFile("resource/sandy_sea_floor.jpg"));
+        fileList.append(new QFile("resource/rock_texture.jpg"));
         fileList.append(new QFile("resource/posz.jpg"));
         fileList.append(new QFile("resource/negz.jpg"));
     }
