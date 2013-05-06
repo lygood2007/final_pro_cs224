@@ -166,7 +166,7 @@ void GLWidget::initializeGL()
     glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     glEnable(GL_LIGHT0);
 
-    glEnable(GL_PROGRAM_POINT_SIZE_EXT); //so we can adjust particle sizes
+    glEnable(GL_PROGRAM_POINT_SIZE_EXT); //so we can adjust particle sizes when drawing gl_points
 
     initializeResources();
 }
@@ -188,7 +188,7 @@ void GLWidget::initializeResources()
     cout << "  Loaded Skymap ->" << endl;
 
     createShaderPrograms();
-//    m_waterNormalMap = loadTexture("./resource/shallow_normal.jpg");
+    m_foamTex = loadTexture("./resource/foam.jpg"); //my foam texture to try and smooth it out
     cout << "  Loaded Shaders ->" << endl;
 
     createFramebufferObjects(width(), height());
@@ -352,22 +352,21 @@ void GLWidget::renderScene()
         m_shaderPrograms["fresnel"]->bind();
         m_shaderPrograms["fresnel"]->setUniformValue("CubeMap", 0);
         m_shaderPrograms["fresnel"]->setUniformValue("CurrColor", SEA_WATER);
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_2D, m_waterNormalMap);
-//        m_shaderPrograms["fresnel"]->setUniformValue("NormalMap", 1);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
         renderFluid();
         glPopMatrix();
-//        glBindTexture(GL_TEXTURE_2D, 0);
         glActiveTexture(GL_TEXTURE0);
         m_shaderPrograms["fresnel"]->release();
 
+        //release the cube map
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+        glDisable(GL_TEXTURE_CUBE_MAP);
+        glPopMatrix();
 
-        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this should allow us to change point size in the shader but it never quite worked
+//        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); //this should allow us to change point size in the shader but it never quite worked
         // Render the spray with the point shader
         m_shaderPrograms["spray"]->bind();
-        m_shaderPrograms["spray"]->setUniformValue("CubeMap", GL_TEXTURE0);
         m_shaderPrograms["spray"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
@@ -377,7 +376,6 @@ void GLWidget::renderScene()
 
         // Render the splash with the splash shader
         m_shaderPrograms["splash"]->bind();
-        m_shaderPrograms["splash"]->setUniformValue("CubeMap", GL_TEXTURE0);
         m_shaderPrograms["splash"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
@@ -387,20 +385,16 @@ void GLWidget::renderScene()
 
 
         // Render the foam with the foam shader
+        glBindTexture(GL_TEXTURE_2D, m_foamTex);
         m_shaderPrograms["foam"]->bind();
-        m_shaderPrograms["foam"]->setUniformValue("CubeMap", GL_TEXTURE0);
+        m_shaderPrograms["foam"]->setUniformValue("texture", GL_TEXTURE0);
         m_shaderPrograms["foam"]->setUniformValue("CurrColor", SEA_WATER);
         glPushMatrix();
         glTranslatef(0.f,1.25f,0.f);
         renderFoam();
         glPopMatrix();
         m_shaderPrograms["foam"]->release();
-
-        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-        glDisable(GL_TEXTURE_CUBE_MAP);
-
-        glPopMatrix();
-
+        glBindTexture(GL_TEXTURE_2D, 0);
 
         }
         else //plain old fluid, nothing special

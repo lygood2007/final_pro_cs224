@@ -6,6 +6,7 @@ void main()
 {
         vec3 vertex = vec3(gl_ModelViewMatrix * gl_Vertex).xyz;
         n = normalize( gl_NormalMatrix * gl_Normal );
+        gl_TexCoord[0] = gl_MultiTexCoord0;
         vec3 i = normalize(vertex);
         lightDir = vec3(L - vVertex);
 

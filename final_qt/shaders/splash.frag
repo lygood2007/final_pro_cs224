@@ -1,4 +1,4 @@
-uniform samplerCube CubeMap; //the skymap
+//uniform samplerCube CubeMap; //the skymap
 uniform vec4 CurrColor; //the current color of the water
 varying vec3 n, lightDir, r;
 
@@ -13,7 +13,7 @@ void main (void)
         if(lambertTerm > 0.0)
         {
                 // Specular
-                final_color += textureCube( CubeMap, r);
+                final_color += vec4(1.0,1.0,1.0,1.0);//textureCube( CubeMap, r);
 //            final_color += vec4(1.0, 1.0, 1.0, 1.0);
         }
 //                gl_FragColor = CurrColor;

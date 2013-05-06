@@ -33,7 +33,7 @@
 //#define USE_SKYBOX
 
 // Colors to use when rendering
-#define SEA_WATER 0.0f,0.42f,0.58f,0.9f
+#define SEA_WATER 0.0f,0.42f,0.58f,1.f
 #define TIME_STEP 0.03 //0.03 //is max for gridsize 80
 /**
     Uncomment this if you don't want to use CUDA to compute
@@ -99,7 +99,7 @@ private:
 
     float m_timeStep;
 
-    GLuint m_waterNormalMap;
+    GLuint m_foamTex;
 
 
 public:
