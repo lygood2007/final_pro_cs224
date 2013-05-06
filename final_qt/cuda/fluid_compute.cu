@@ -791,24 +791,10 @@ __global__ void addSideWaveCUDA( float* depthMap, const int sideLength, const in
          {
              ii = i - 1;
              jj = j - 1;
-             /*int depthWidth = width - 2;
-             float depth = map2Dread( depthMap, ii, jj, depthWidth );
-             if( depth <0.1 )
-             {
-                 vec3 val = map2Dread( paintMap, i, j, width );
-                 vec3 dir = map2Dread( normalMap, i,j, width );
-                 dir.x = -dir.x;
-                 dir.y = -dir.y;
-                 dir.z = -dir.z;
-                 val.x = val.x + dir.x*0.5;
-                 val.y = val.y + dir.y*0.5;
-                 val.z = val.z + dir.z*0.5;
-                 map2Dwrite( paintMap, i,j, val, width );
-             }*/
 
              int depthWidth = gSize - 2;
              float depth = map2Dread( depthMap, ii, jj, depthWidth );
-             if( depth <0.25)
+             if( depth <0.3)
              {
                  vec3 val = map2Dread( paintMap, i, j, gSize );
                  vec3 dir = map2Dread( normalMap, i,j, gSize );
@@ -1576,25 +1562,15 @@ void initGridGPU( const int hostGridSize, const int hostGridPaintSize, const flo
     error = cudaDeviceSynchronize();
     checkCudaError(error);
 
-   /* blockPerGridX = (gridPaintSize + blockSizeX - 1)/(blockSizeX);
-    blockPerGridY = (gridPaintSize+ blockSizeY - 1)/(blockSizeY);
-    blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
-    updatePaintCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, deviceDepthMap,
-                                                        halfDomain, mapdx, gridPaintSize);
-    error = cudaDeviceSynchronize();
-    checkCudaError(error);
-    */
     blockPerGridX = (gridPaintSize + blockSizeX - 1)/(blockSizeX);
     blockPerGridY = (gridPaintSize+ blockSizeY - 1)/(blockSizeY);
     blocksPerGrid = dim3(blockPerGridX,blockPerGridY);
+
     if( gridPaintSize == gridSize )
     {
 
         updatePaintCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, deviceHeightMap, deviceDepthMap,
                                                             halfDomain, mapdx, gridPaintSize);
-        error = cudaDeviceSynchronize();
-        checkCudaError(error);
-        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize);
         error = cudaDeviceSynchronize();
         checkCudaError(error);
 
@@ -1606,14 +1582,19 @@ void initGridGPU( const int hostGridSize, const int hostGridPaintSize, const flo
         error = cudaDeviceSynchronize();
         checkCudaError(error);
 
-        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
-        error = cudaDeviceSynchronize();
         checkCudaError(error);
     }
     else
     {
         assert(0);
     }
+
+    computePaintNormalCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintNormalMap, devicePaintMap,
+                                                          gridPaintSize, gridPaintSize );
+
+    bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize);
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
 }
 
 // Review passed
@@ -1796,23 +1777,9 @@ void updateFluidGPU( const float dt )
     /**
      * Bump the paint map
      */
-    if( gridPaintSize == gridSize )
-    {
-        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
-        error = cudaDeviceSynchronize();
-        checkCudaError(error);
-
-    }
-    else if( gridPaintSize == gridSize + 2 )
-    {
-        bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
-        error = cudaDeviceSynchronize();
-        checkCudaError(error);
-    }
-    else
-    {
-        assert(0);
-    }
+    bumpPaintMapCUDA<<<blocksPerGrid,threadsPerBlock>>>( devicePaintMap, devicePaintNormalMap, deviceDepthMap, gridPaintSize );
+    error = cudaDeviceSynchronize();
+    checkCudaError(error);
 }
 
 // Review passed
@@ -1887,7 +1854,6 @@ void destroyGPUmem()
     cudaFree( deviceFoamPositionsArray );
     cudaFree( deviceFoamTTLArray );
     cudaFree( deviceSplashToFoamArray );
-
     cudaFree( deviceBreakingWavesMap );
 
     cudaThreadExit();
